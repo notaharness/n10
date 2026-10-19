@@ -2,15 +2,10 @@ import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BeamMesh } from '@/components/beam/mesh/beam-mesh';
-import { ConversationsStage } from '@/components/conversations/conversations-stage';
-import { OrchestraStage } from '@/components/orchestra/orchestra-stage';
-import { cn } from '@/lib/cn';
 
 /**
- * Beam, Orchestra and Conversations, the notaharness tools that
- * work on their own and compose with n10. They lead the feature list,
- * in the feature layout with their own page's scene in the frame
- * instead of a recording.
+ * Beam, which works on its own and composes with n10: copy beside the
+ * /beam page's mesh, framed on a sage pane.
  */
 function CompanionSection({
   label,
@@ -18,18 +13,16 @@ function CompanionSection({
   children,
   links,
   scene,
-  reverse = false,
 }: {
   label: string;
   title: string;
   children: ReactNode;
   links: { text: string; href: string }[];
   scene: ReactNode;
-  reverse?: boolean;
 }) {
   return (
     <div className="grid items-center gap-10 md:grid-cols-12 md:gap-14">
-      <div className={cn('min-w-0 md:col-span-5', reverse && 'md:order-2')}>
+      <div className="min-w-0 md:col-span-5">
         <p className="text-fd-primary font-mono text-xs tracking-wide">
           {label}
         </p>
@@ -58,12 +51,7 @@ function CompanionSection({
       <div className="relative min-w-0 md:col-span-7">
         <div
           aria-hidden
-          className={cn(
-            'n10-pane absolute top-6 -bottom-3 rounded-xl',
-            reverse
-              ? 'n10-pane--sand right-6 -left-3'
-              : 'n10-pane--sage -right-3 left-6'
-          )}
+          className="n10-pane n10-pane--sage absolute top-6 -right-3 -bottom-3 left-6 rounded-xl"
         />
         <div className="n10-frame bg-fd-card relative overflow-hidden rounded-xl">
           {scene}
@@ -122,8 +110,8 @@ export function BeamFeature() {
     >
       <p>
         Beam makes connecting simpler than SSH: one passkey, no SSH keys, no
-        port forwarding and no Tailscale account. Run your agents locally, or pair a
-        machine in n10 to run a worktree, tmux session and agent there.
+        port forwarding and no Tailscale account. Run your agents locally, or
+        pair a machine in n10 to run a worktree, tmux session and agent there.
       </p>
       <p>
         Machines connect to each other over WireGuard through Tailscale&apos;s
@@ -136,58 +124,10 @@ export function BeamFeature() {
           className="text-fd-primary font-medium"
         >
           our security model
-        </Link>.
+        </Link>
+        .
       </p>
       <TailscaleCredit />
-    </CompanionSection>
-  );
-}
-
-export function OrchestraFeature() {
-  return (
-    <CompanionSection
-      label="Orchestra"
-      title="Orchestrate agents with your own agent"
-      links={[
-        { text: 'Read the guide', href: '/docs/orchestra' },
-        { text: 'About Orchestra', href: '/orchestra' },
-      ]}
-      scene={<OrchestraStage className="mx-auto w-full px-4 pb-2" />}
-      reverse
-    >
-      <p>
-        Orchestra is our orchestrator plugin for agents such as Claude Code and
-        Codex. Your agent assigns tasks to other agents in separate tmux
-        sessions, each in its own Git worktree or a directory you choose. Use it
-        without n10, or add Beam to run agents across machines.
-      </p>
-      <p>
-        Adopt n10, Beam and Orchestra independently. n10 manages sessions and
-        code review, Beam connects machines, and Orchestra coordinates agents.
-        n10 is agent-agnostic, not an agent harness: it runs whichever agent you
-        configure.
-      </p>
-    </CompanionSection>
-  );
-}
-
-export function ConversationsFeature() {
-  return (
-    <CompanionSection
-      label="Conversations"
-      title="One session, many conversations"
-      links={[
-        { text: 'Read the guide', href: '/docs/conversations' },
-        { text: 'About Conversations', href: '/conversations' },
-      ]}
-      scene={<ConversationsStage />}
-    >
-      <p>
-        Conversations is a Claude Code plugin that gives each topic in a busy
-        session its own conversation: a CI run, a subagent&apos;s task, a
-        message from another session. A sidebar marks unread updates and
-        anything waiting on you, and Main keeps your conversation with Claude.
-      </p>
     </CompanionSection>
   );
 }

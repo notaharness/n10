@@ -274,8 +274,7 @@
 /* Product media. A frame is a hairline plus a two-part shadow — a tight
  * one that seats the edge and a wide soft one that lifts it — which is
  * what makes a screenshot look like a window rather than a pasted
- * image. The stage glow is the mark's two colours thrown up from behind
- * the hero shot. */
+ * image. */
 .n10-frame {
   border: 1px solid var(--color-fd-border);
   box-shadow: 0 1px 2px rgb(40 35 20 / 0.06),
@@ -285,16 +284,6 @@
 .dark .n10-frame {
   box-shadow: 0 0 0 1px rgb(255 250 230 / 0.03),
     0 30px 80px -20px rgb(0 0 0 / 0.8);
-}
-
-.n10-stage-glow {
-  background: linear-gradient(to right, var(--n10-sage), var(--n10-sand));
-  filter: blur(70px);
-  opacity: 0.35;
-}
-
-.dark .n10-stage-glow {
-  opacity: 0.22;
 }
 
 /* The pane behind a feature demo: one sheet of the mark's glass, set
@@ -309,10 +298,6 @@
 
 .n10-pane--sage {
   background: var(--n10-sage);
-}
-
-.n10-pane--sand {
-  background: var(--n10-sand);
 }
 
 /* /logo-lab: a plain, unmasked patch of the hero grid, 30 × 6 cells,

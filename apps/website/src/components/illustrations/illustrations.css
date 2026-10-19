@@ -53,14 +53,6 @@
   );
 }
 
-.beam-break .ill {
-  --ill-ground: color-mix(
-    in srgb,
-    var(--n10-sand) 12%,
-    var(--color-fd-background)
-  );
-}
-
 .review-chapter .ill {
   --ill-ground: color-mix(
     in srgb,
@@ -174,10 +166,6 @@
 
 .ill .btn {
   fill: var(--ill-primary);
-}
-.ill .btn-text {
-  fill: var(--color-fd-primary-foreground);
-  font-weight: 500;
 }
 .ill .pointer {
   fill: var(--ill-fg);

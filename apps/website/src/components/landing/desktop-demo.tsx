@@ -2,8 +2,14 @@
 
 import { MousePointer2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type RefObject,
+} from 'react';
 import { cn } from '@/lib/cn';
-import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 
 /**
  * n10 itself, running in the page on sample data: the desktop
@@ -12,10 +18,13 @@ import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } fro
  * desktop window's size and scaled to fit. At 1100px and below the demo
  * is hidden, and its sample-data bundle is not loaded.
  *
- * The page tells it two things by message: whether to play (paused off
- * screen) and the theme, when the site's changes. The demo itself holds
- * its running agents once the visitor clicks or types in it, and under
- * reduced motion starts at the end state, so there is no play control.
+ * The page tells it by message whether to play (paused off screen), the
+ * theme, when the site's changes, and whether it is interactive. It stays
+ * inert, out of the tab order and unable to take focus, until the visitor
+ * activates the entry button over it; Escape or Ctrl+Space inside it hands
+ * focus back to that button. The demo itself holds its running agents once
+ * the visitor clicks or types in it, and under reduced motion starts at
+ * the end state, so there is no play control.
  */
 const SRC = '/desktop-demo/demo/index.html';
 const WINDOW = { width: 1280, height: 800 };
@@ -66,7 +75,11 @@ function useInView(ref: RefObject<HTMLElement | null>): boolean {
 export function DesktopDemo({ className }: { className?: string }) {
   const [interactive, setInteractive] = useState(false);
   const entry = useRef<HTMLButtonElement>(null);
-  const wide = useSyncExternalStore(subscribeWidth, () => window.matchMedia(WIDE).matches, () => false);
+  const wide = useSyncExternalStore(
+    subscribeWidth,
+    () => window.matchMedia(WIDE).matches,
+    () => false
+  );
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const scale = useScale(box);
@@ -80,51 +93,81 @@ export function DesktopDemo({ className }: { className?: string }) {
     }
   }, [resolvedTheme]);
 
+  // The demo posts `n10-demo-exit` when Escape or Ctrl+Space leaves it.
   useEffect(() => {
     function receive(event: MessageEvent) {
-      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow || event.data?.type !== 'n10-demo-exit') return;
-      restore();
+      if (
+        event.origin !== window.location.origin ||
+        event.source !== frame.current?.contentWindow ||
+        event.data?.type !== 'n10-demo-exit'
+      )
+        return;
+      setInteractive(false);
+      send(frame.current, { interactive: false });
+      requestAnimationFrame(() =>
+        entry.current?.focus({ preventScroll: true })
+      );
     }
     window.addEventListener('message', receive);
     return () => window.removeEventListener('message', receive);
   }, []);
-  function restore() {
-    setInteractive(false);
-    send(frame.current, { interactive: false });
-    requestAnimationFrame(() => entry.current?.focus({ preventScroll: true }));
-  }
+
   function enter() {
     setInteractive(true);
     // The frame becomes non-inert before its own focus request is delivered.
     requestAnimationFrame(() => send(frame.current, { interactive: true }));
   }
+
   return (
     <div id="desktop-demo" className={cn('relative scroll-mt-24', className)}>
-      <a className="skip-link demo-skip" href="#coding-heading" onClick={() => document.getElementById("coding-heading")?.focus()}>Skip demo</a>
-        <div className="demo-viewport">
-          {!interactive && <button ref={entry} type="button" className="demo-entry" aria-label="Use n10 demo. Escape returns to the page." onClick={enter}><MousePointer2 size={24} aria-hidden /></button>}
-      <div
-        ref={box}
-        inert={!interactive}
-        className="live-demo-frame n10-frame bg-fd-card relative w-full overflow-hidden rounded-sm"
-        style={{ aspectRatio: `${WINDOW.width} / ${WINDOW.height}` }}
+      <a
+        className="skip-link"
+        href="#coding-heading"
+        onClick={() => document.getElementById('coding-heading')?.focus()}
       >
-        {wide && <iframe
-          ref={frame}
-          src={SRC}
-          title="n10, running on sample data"
-          tabIndex={-1}
-          onLoad={(event) => send(event.currentTarget, { playing: inView, theme: resolvedTheme })}
-          className="absolute top-0 left-0 origin-top-left border-0"
-          style={{
-            width: WINDOW.width,
-            height: WINDOW.height,
-            transform: `scale(${scale})`,
-            visibility: scale ? 'visible' : 'hidden',
-          }}
-        />}
-      </div>
+        Skip demo
+      </a>
+      <div className="demo-viewport">
+        {!interactive && (
+          <button
+            ref={entry}
+            type="button"
+            className="demo-entry"
+            aria-label="Use n10 demo. Escape returns to the page."
+            onClick={enter}
+          >
+            <MousePointer2 size={24} aria-hidden />
+          </button>
+        )}
+        <div
+          ref={box}
+          inert={!interactive}
+          className="n10-frame bg-fd-card relative w-full overflow-hidden rounded-sm"
+          style={{ aspectRatio: `${WINDOW.width} / ${WINDOW.height}` }}
+        >
+          {wide && (
+            <iframe
+              ref={frame}
+              src={SRC}
+              title="n10, running on sample data"
+              tabIndex={-1}
+              onLoad={(event) =>
+                send(event.currentTarget, {
+                  playing: inView,
+                  theme: resolvedTheme,
+                })
+              }
+              className="absolute top-0 left-0 origin-top-left border-0"
+              style={{
+                width: WINDOW.width,
+                height: WINDOW.height,
+                transform: `scale(${scale})`,
+                visibility: scale ? 'visible' : 'hidden',
+              }}
+            />
+          )}
         </div>
+      </div>
     </div>
   );
 }

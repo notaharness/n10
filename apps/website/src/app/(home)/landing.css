@@ -1,0 +1,738 @@
+/* The homepage. Three widths: wide (above 1100px, with the live demo),
+ * tablet (761–1100px, copy beside each illustration) and phone (760px and
+ * below, one column). Media queries sit at the end of the file. */
+
+.landing-page {
+  --rule: var(--color-fd-border);
+  font-size: 16px;
+}
+.landing-page .page-width {
+  width: min(1320px, calc(100% - 96px));
+  margin-inline: auto;
+}
+.landing-page :is(h1, h2, h3) {
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.landing-page h2 {
+  font-size: 32px;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+.landing-page p {
+  line-height: 1.65;
+  max-width: 65ch;
+}
+.landing-page a {
+  color: var(--color-fd-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.landing-page a:hover {
+  text-decoration-thickness: 2px;
+}
+.landing-page :is(a, button):focus-visible,
+#review-heading:focus,
+#coding-heading:focus {
+  outline: 2px solid var(--color-fd-primary);
+  outline-offset: 4px;
+}
+#review-heading,
+#coding-heading {
+  scroll-margin-top: 88px;
+}
+#home-content {
+  scroll-margin-top: 80px;
+}
+
+/* Skip links stay offscreen until focused. */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 16px;
+  z-index: 100;
+  transform: translateY(-180%);
+  padding: 12px 16px;
+  background: var(--color-fd-background);
+  color: var(--color-fd-foreground);
+  text-decoration: underline;
+  border: 2px solid var(--color-fd-primary);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* The navbar appears once the hero has scrolled past (home-shell.tsx). */
+.landing-nav {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 40;
+  visibility: hidden;
+  pointer-events: none;
+  background: var(--color-fd-background);
+  border-bottom: 1px solid var(--color-fd-border);
+}
+.landing-nav[data-revealed='true'] {
+  visibility: visible;
+  pointer-events: auto;
+}
+.landing-nav nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: min(1320px, calc(100% - 40px));
+  min-height: 64px;
+  margin: auto;
+}
+.landing-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 4px;
+  font-size: 14px;
+}
+.landing-nav a:first-child {
+  margin-right: auto;
+}
+.landing-nav .nav-github {
+  width: 44px;
+  justify-content: center;
+}
+.landing-nav button {
+  cursor: pointer;
+}
+.landing-nav [data-theme-toggle] {
+  flex-shrink: 0;
+}
+.landing-nav :is(a, button):focus-visible {
+  outline: 2px solid var(--color-fd-primary);
+  outline-offset: 2px;
+}
+.landing-nav :is(a, button):hover {
+  text-decoration: underline;
+}
+
+/* Hero: the mark beside the statement, sized to the statement's height
+ * (hero-copy.tsx), then the downloads. */
+.drawing-board {
+  position: relative;
+  padding-bottom: 48px;
+}
+.drawing-board > .n10-backdrop {
+  height: 920px;
+}
+.masthead {
+  position: relative;
+  padding-block: 48px 40px;
+}
+.hero-statement {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+.masthead-logo {
+  width: 176px;
+  height: auto;
+  max-width: none;
+  margin: 0;
+}
+.intro {
+  min-width: 0;
+}
+.intro h1 {
+  max-width: 920px;
+  font-size: 68px;
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+}
+.intro p {
+  max-width: 76ch;
+  margin-top: 24px;
+  font-size: 16px;
+  text-wrap: balance;
+}
+
+.hero-downloads {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 16px;
+  margin-top: 32px;
+  padding: 24px 0 0;
+  border-top: 1px solid var(--rule);
+  scroll-margin-top: 88px;
+}
+.platform-choices {
+  display: contents;
+}
+.landing-page .platform-download {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  margin: 0;
+  padding: 12px 16px;
+  white-space: nowrap;
+  background: color-mix(
+    in srgb,
+    var(--n10-sand) 26%,
+    var(--color-fd-background)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--n10-sand) 65%, var(--color-fd-foreground));
+  border-radius: 3px;
+  color: var(--color-fd-foreground);
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.landing-page .platform-download.primary {
+  background: var(--n10-sage);
+  border-color: #71865e;
+  color: #20321a;
+}
+.dark .landing-page .platform-download {
+  background: color-mix(
+    in srgb,
+    var(--n10-sand) 18%,
+    var(--color-fd-background)
+  );
+  color: #e3c16f;
+}
+.dark .landing-page .platform-download.primary {
+  background: #9caf88;
+  color: #20321a;
+}
+.landing-page .platform-download:hover {
+  opacity: 0.85;
+}
+.landing-page button.platform-download {
+  cursor: pointer;
+}
+.platform-mark {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+.linux-package-menu {
+  z-index: 80;
+  min-width: var(--radix-dropdown-menu-trigger-width);
+  max-width: calc(100vw - 32px);
+  padding: 4px;
+  background: var(--color-fd-background);
+  color: var(--color-fd-foreground);
+  border: 1px solid var(--color-fd-border);
+  border-radius: 3px;
+  box-shadow: 0 8px 24px #0002;
+}
+.linux-package-menu [role='menuitem'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 16px;
+  text-decoration: none;
+  outline: none;
+}
+.linux-package-menu [data-highlighted] {
+  background: color-mix(
+    in srgb,
+    var(--n10-sage) 25%,
+    var(--color-fd-background)
+  );
+  outline: 2px solid var(--color-fd-primary);
+  outline-offset: -2px;
+}
+.package-arch {
+  font: 13px var(--font-mono);
+  color: var(--color-fd-muted-foreground);
+}
+
+.npm-install {
+  grid-column: 3;
+  grid-row: 1;
+}
+.npm-install > span {
+  display: block;
+  font-size: 13px;
+  color: var(--color-fd-muted-foreground);
+}
+.npm-install [role='status'] {
+  position: absolute;
+}
+.npm-install [role='status']:empty {
+  display: none;
+}
+.command-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding-left: 12px;
+  background: var(--color-fd-secondary);
+  border: 1px solid var(--rule);
+}
+.command-line code {
+  min-width: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.command-line button {
+  min-height: 44px;
+  margin-left: auto;
+  padding: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.install-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  grid-column: 1 / 3;
+  grid-row: 2;
+}
+.install-links a,
+.guide-row a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-block: 8px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.windows-note {
+  grid-column: 3;
+  grid-row: 2;
+  align-self: start;
+  font-size: 13px;
+  color: var(--color-fd-muted-foreground);
+}
+.windows-note a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-block: 8px;
+}
+
+/* The live demo. Its glow sits on the wrapper: the iframe clips only its
+ * own contents. */
+.demo-stage {
+  position: relative;
+  padding: 16px 0 24px;
+}
+.live-window {
+  position: relative;
+  box-shadow: 0 4px 12px rgb(40 35 20 / 0.05),
+    0 24px 56px -12px rgb(40 35 20 / 0.18);
+}
+.dark .live-window {
+  box-shadow: 0 0 48px 10px rgb(156 175 136 / 0.16),
+    0 0 100px 24px rgb(156 175 136 / 0.09);
+}
+.n10-live-surface .n10-frame {
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  box-shadow: none;
+}
+.demo-viewport {
+  position: relative;
+}
+.demo-entry {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.demo-entry svg {
+  box-sizing: content-box;
+  padding: 16px;
+  opacity: 0;
+  color: var(--color-fd-foreground);
+  background: var(--color-fd-background);
+  border: 1px solid var(--rule);
+}
+.demo-entry:hover svg,
+.demo-entry:focus-visible svg {
+  opacity: 1;
+}
+
+/* Chapters share a 12-column grid. Coding continues the demo's
+ * background; the chapters after it alternate. */
+.purpose-chapter {
+  padding-block: 64px;
+}
+.review-chapter {
+  background: color-mix(
+    in srgb,
+    var(--n10-sage) 7%,
+    var(--color-fd-background)
+  );
+}
+.auto-fix-chapter,
+.beam-chapter {
+  background: var(--color-fd-background);
+}
+.orchestration-chapter {
+  background: color-mix(
+    in srgb,
+    var(--n10-sand) 7%,
+    var(--color-fd-background)
+  );
+}
+.chapter-heading,
+.orchestration-intro,
+.review-followup .purpose-story {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 32px;
+  align-items: start;
+}
+.chapter-heading {
+  margin-bottom: 32px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--rule);
+}
+.chapter-heading > :first-child,
+.orchestration-intro > :first-child,
+.review-followup .story-copy {
+  grid-column: span 4;
+}
+.chapter-heading > :last-child,
+.orchestration-intro > :last-child,
+.review-followup .story-illustration {
+  grid-column: span 8;
+}
+
+/* Three stories per row; subgrid lines up their titles, copy, links and
+ * illustrations across the row. */
+.feature-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 32px;
+  row-gap: 16px;
+}
+.purpose-story {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 4;
+  min-width: 0;
+}
+.feature-columns .story-copy {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+}
+.story-copy h3 {
+  font-size: 24px;
+  line-height: 1.25;
+}
+.story-copy > p {
+  font-size: 16px;
+}
+.story-illustration {
+  align-self: start;
+  width: 100%;
+  min-width: 0;
+}
+.review-followup .story-illustration,
+.orchestration-intro .story-illustration {
+  max-width: 720px;
+}
+.review-followup .purpose-story {
+  grid-template-rows: auto;
+  grid-row: auto;
+}
+.review-followup h3 {
+  margin-bottom: 16px;
+}
+.review-followup .guide-row,
+.orchestration-intro .guide-row {
+  margin-top: 16px;
+}
+.orchestration-intro p {
+  margin-top: 24px;
+}
+.coordination-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+  margin-top: 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--rule);
+}
+.coordination-columns h3 {
+  font-size: 20px;
+  line-height: 1.3;
+}
+.coordination-columns p {
+  margin-top: 16px;
+  font-size: 16px;
+}
+.beam-restored {
+  padding-block: 80px;
+}
+
+.closing-cta {
+  padding-top: 32px;
+}
+.closing-cta a {
+  min-height: 44px;
+  text-decoration: none;
+}
+.closing-cta a:first-child {
+  color: var(--color-fd-primary-foreground);
+}
+.closing-cta p {
+  max-width: 28rem;
+}
+
+/* The closing panel's grid, with four cells that light up in turn. */
+.quiet-grid {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.quiet-grid-cell {
+  position: absolute;
+  left: calc(50% + var(--column) * var(--n10-cell));
+  top: calc(var(--row) * var(--n10-cell));
+  width: var(--n10-cell);
+  height: var(--n10-cell);
+  background: var(--n10-sage);
+  opacity: 0;
+  animation: quiet-grid-light 24s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+.quiet-grid-cell:nth-child(even) {
+  background: var(--n10-sand);
+}
+@keyframes quiet-grid-light {
+  0%,
+  45%,
+  75%,
+  100% {
+    opacity: 0;
+  }
+  60% {
+    opacity: 0.16;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quiet-grid-cell {
+    animation: none;
+    opacity: 0.06;
+  }
+}
+
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding-block: 32px;
+}
+.landing-footer > div {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.landing-footer p {
+  font-size: 14px;
+}
+.landing-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.landing-footer nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-block: 8px;
+  text-decoration: none;
+}
+
+/* Tablet and phone: the demo is hidden and the hero stacks. */
+@media (max-width: 1100px) {
+  .demo-stage {
+    display: none;
+  }
+  .hero-statement {
+    display: block;
+  }
+  .masthead-logo {
+    margin-bottom: 28px;
+  }
+  .intro h1 {
+    font-size: 48px;
+  }
+  .chapter-heading > :is(:first-child, :last-child),
+  .orchestration-intro > :is(:first-child, :last-child) {
+    grid-column: auto;
+  }
+}
+
+/* Tablet: each story puts its copy beside its illustration. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  .landing-page .page-width {
+    width: calc(100% - 48px);
+  }
+  .masthead-logo {
+    width: 120px;
+  }
+  .landing-page .platform-download {
+    gap: 8px;
+    padding: 12px;
+    font-size: 14px;
+  }
+  .platform-mark {
+    width: 20px;
+    height: 20px;
+  }
+  .chapter-heading,
+  .feature-columns .purpose-story,
+  .review-followup .purpose-story,
+  .orchestration-intro,
+  .coordination-columns article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(350px, 1.22fr);
+    gap: 24px;
+  }
+  .chapter-heading > *,
+  .review-followup .story-copy,
+  .review-followup .story-illustration,
+  .orchestration-intro > * {
+    grid-column: auto;
+  }
+  .feature-columns {
+    display: block;
+  }
+  .feature-columns .purpose-story {
+    margin-top: 40px;
+  }
+  .feature-columns .purpose-story:first-child {
+    margin-top: 0;
+  }
+  .feature-columns .story-copy {
+    display: block;
+  }
+  .story-copy h3 {
+    margin-bottom: 16px;
+  }
+  .guide-row {
+    margin-top: 16px;
+  }
+  .story-illustration,
+  .review-followup .story-illustration,
+  .orchestration-intro .story-illustration {
+    max-width: 560px;
+  }
+  .coordination-columns {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .coordination-columns p {
+    margin-top: 0;
+  }
+}
+
+/* Phone: one column throughout. */
+@media (max-width: 760px) {
+  .landing-page .page-width {
+    width: calc(100% - 40px);
+  }
+  .landing-nav nav {
+    gap: 12px;
+  }
+  .landing-nav a {
+    padding-inline: 0;
+    font-size: 13px;
+  }
+  .drawing-board {
+    padding-bottom: 32px;
+  }
+  .masthead {
+    padding-top: 32px;
+  }
+  .masthead-logo {
+    width: 104px;
+  }
+  .intro h1 {
+    font-size: 38px;
+  }
+  .intro p {
+    margin-top: 16px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .hero-downloads {
+    display: flex;
+    flex-direction: column;
+  }
+  .platform-choices {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .npm-install [role='status'] {
+    position: static;
+  }
+  .install-links {
+    gap: 0 20px;
+  }
+  .purpose-chapter {
+    padding-block: 48px;
+  }
+  .beam-restored {
+    padding-block: 48px;
+  }
+  .chapter-heading,
+  .feature-columns,
+  .review-followup .purpose-story,
+  .orchestration-intro,
+  .coordination-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .feature-columns {
+    gap: 40px;
+  }
+  .chapter-heading > *,
+  .review-followup .story-copy,
+  .review-followup .story-illustration,
+  .orchestration-intro > * {
+    grid-column: auto;
+  }
+  .purpose-story,
+  .feature-columns .story-copy {
+    display: block;
+    grid-row: auto;
+  }
+  .story-copy h3 {
+    margin-bottom: 16px;
+  }
+  .guide-row {
+    margin-top: 16px;
+  }
+  .story-illustration {
+    margin-top: 16px;
+  }
+  .landing-footer,
+  .landing-footer > div {
+    align-items: start;
+  }
+  .landing-footer {
+    flex-direction: column;
+  }
+}
