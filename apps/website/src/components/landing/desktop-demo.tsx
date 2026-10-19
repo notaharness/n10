@@ -80,6 +80,12 @@ export function DesktopDemo({ className }: { className?: string }) {
     () => window.matchMedia(WIDE).matches,
     () => false
   );
+  // Narrowing unmounts the frame, and a frame mounted later starts passive.
+  const [wasWide, setWasWide] = useState(wide);
+  if (wide !== wasWide) {
+    setWasWide(wide);
+    if (!wide) setInteractive(false);
+  }
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const scale = useScale(box);
@@ -120,6 +126,8 @@ export function DesktopDemo({ className }: { className?: string }) {
 
   return (
     <div id="desktop-demo" className={cn('relative scroll-mt-24', className)}>
+      {/* The heading has tabIndex={-1} (purpose-sections.tsx), so it can
+          take focus as well as the scroll. */}
       <a
         className="skip-link"
         href="#coding-heading"
