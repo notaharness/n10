@@ -14,7 +14,7 @@ prefix=$1
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-curl -fsSL -o "$work/tmux.tar.gz" \
+curl -fsSL --retry 3 --retry-all-errors -o "$work/tmux.tar.gz" \
   "https://github.com/tmux/tmux/releases/download/$TMUX_VERSION/tmux-$TMUX_VERSION.tar.gz"
 echo "$TMUX_SHA256  $work/tmux.tar.gz" | sha256sum -c -
 tar -xzf "$work/tmux.tar.gz" -C "$work"
