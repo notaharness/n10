@@ -14,8 +14,8 @@ export function Track({
     <g
       style={
         {
-          '--n10-mesh-color': color,
-          '--n10-mesh-seconds': '6s',
+          '--n10-diagram-color': color,
+          '--n10-diagram-seconds': '6s',
         } as CSSProperties
       }
     >
@@ -27,7 +27,7 @@ export function Track({
         strokeDasharray={pending ? '4 5' : undefined}
         opacity={0.5}
       />
-      {!pending && <path d={d} pathLength={100} className="n10-mesh-packet" />}
+      {!pending && <path d={d} pathLength={100} className="n10-diagram-packet" />}
     </g>
   );
 }

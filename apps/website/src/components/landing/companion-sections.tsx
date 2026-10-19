@@ -122,13 +122,21 @@ export function BeamFeature() {
     >
       <p>
         Beam makes connecting simpler than SSH: one passkey, no SSH keys, no
-        port forwarding and no Tailscale account. Use it on its own, or pick a
-        machine in n10 Desktop to run a worktree, tmux session and agent there.
+        port forwarding and no Tailscale account. Run your agents locally, or pair a
+        machine in n10 to run a worktree, tmux session and agent there.
       </p>
       <p>
-        Machines connect over WireGuard, directly when possible or through a
-        relay. Beam uses Tailcat without Tailscale&apos;s control plane. Your
-        shells and commands never pass through beam.n10.is.
+        Machines connect to each other over WireGuard through Tailscale&apos;s
+        infrastructure via Tailcat. Your connection information is stored
+        encrypted by your passkey for your convenience and never reaches us
+        unencrypted. This is verifiable by looking at outbound network requests
+        on beam.n10.is. Read more about{' '}
+        <Link
+          href="https://github.com/notaharness/beam/blob/main/docs/01-model.md"
+          className="text-fd-primary font-medium"
+        >
+          our security model
+        </Link>.
       </p>
       <TailscaleCredit />
     </CompanionSection>
@@ -151,7 +159,7 @@ export function OrchestraFeature() {
         Orchestra is our orchestrator plugin for agents such as Claude Code and
         Codex. Your agent assigns tasks to other agents in separate tmux
         sessions, each in its own Git worktree or a directory you choose. Use it
-        without n10 Desktop, or add Beam to run agents across machines.
+        without n10, or add Beam to run agents across machines.
       </p>
       <p>
         Adopt n10, Beam and Orchestra independently. n10 manages sessions and

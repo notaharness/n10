@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { RELEASES_URL } from '@/lib/release-assets';
 import { CopyButton } from '@/components/copy-button';
 import { cn } from '@/lib/cn';
 
@@ -20,7 +21,7 @@ export function InstallStrip({ className }: { className?: string }) {
       <div className="n10-frame bg-fd-card flex items-center gap-3 overflow-hidden rounded-xl py-2.5 pr-2.5 pl-4 sm:pl-5">
         <div className="flex min-w-0 flex-1 flex-col gap-x-6 gap-y-0.5 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-fd-muted-foreground text-xs font-medium">
-            n10 Desktop and terminal UI
+            n10 and the TUI
           </span>
           <code className="overflow-x-auto font-mono text-[13px] whitespace-nowrap sm:text-sm">
             <span className="text-fd-primary/70 select-none">$ </span>
@@ -43,10 +44,10 @@ export function InstallStrip({ className }: { className?: string }) {
       <p className="text-fd-muted-foreground mt-3 text-center text-xs">
         Linux and macOS ·{' '}
         <Link
-          href="/download"
+          href={RELEASES_URL}
           className="hover:text-fd-foreground underline decoration-fd-border underline-offset-4 transition-colors"
         >
-          Linux packages
+          Releases
         </Link>{' '}
         ·{' '}
         <a

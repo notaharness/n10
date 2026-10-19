@@ -136,23 +136,30 @@ const CODE_LINES: readonly {
   { v: 0.725, u0: 0.14, u1: 0.36, tone: 'sage' },
 ];
 
-/** Your laptop: open, facing the viewer, a few lines of code on screen. */
-export function Laptop({ cx, cy }: { cx: number; cy: number }) {
-  const base: Box = {
-    x: cx - 1.5,
-    y: cy - 0.8,
-    z: 0,
-    w: 3,
-    d: 2,
-    h: 0.14,
-  };
+function laptopBase(cx: number, cy: number): Box {
+  return { x: cx - 1.5, y: cy - 0.8, z: 0, w: 3, d: 2, h: 0.14 };
+}
+
+/** The laptop's open lid, corners in order from the top left. */
+export function laptopLid(
+  cx: number,
+  cy: number
+): readonly [Vec3, Vec3, Vec3, Vec3] {
+  const base = laptopBase(cx, cy);
   const deck = base.z + base.h;
-  const lid: readonly [Vec3, Vec3, Vec3, Vec3] = [
+  return [
     [base.x, base.y - 0.55, deck + 1.85],
     [base.x + base.w, base.y - 0.55, deck + 1.85],
     [base.x + base.w, base.y + 0.06, deck],
     [base.x, base.y + 0.06, deck],
   ];
+}
+
+/** Your laptop: open, facing the viewer, a few lines of code on screen. */
+export function Laptop({ cx, cy }: { cx: number; cy: number }) {
+  const base = laptopBase(cx, cy);
+  const deck = base.z + base.h;
+  const lid = laptopLid(cx, cy);
   const display = [
     inQuad(lid, 0.05, 0.07),
     inQuad(lid, 0.95, 0.07),

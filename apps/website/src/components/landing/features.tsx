@@ -20,7 +20,7 @@ const features: Feature[] = [
     href: '/docs/guides/agent-reviews#guided-review',
     title: 'Understand the pull request before the diff',
     description:
-      'Your reviewer walks you through what changes and why, one short slide at a time. Follow diagrams and before-and-after views, jump to the code, then step into the ranked findings. Works with any agent in n10 Desktop, with no plugin to install.',
+      'Your reviewer walks you through what changes and why, one short slide at a time. Follow diagrams and before-and-after views, jump to the code, then step into the ranked findings. Works with any agent in n10, with no plugin to install.',
     scene: <GuidedReviewScene />,
   },
   {
@@ -29,7 +29,7 @@ const features: Feature[] = [
     href: '/docs/guides/reviewing-code',
     title: 'Review diffs and resolve threads',
     description:
-      'Read split or unified diffs, reply to and resolve threads, and submit reviews. n10 Desktop also shows whole files with unchanged code folded.',
+      'Read split or unified diffs, reply to and resolve threads, and submit reviews. n10 also shows whole files with unchanged code folded.',
   },
   {
     media: 'plan',
@@ -56,8 +56,8 @@ const features: Feature[] = [
     description: (
       <>
         <code>n10 --tui</code> shares projects, configuration, worktrees and
-        sessions with n10 Desktop. Some features, including whole-file diffs,
-        require Desktop.
+        sessions with n10. Some features, including whole-file diffs,
+        aren’t available in the TUI.
       </>
     ),
   },

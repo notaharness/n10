@@ -41,7 +41,7 @@ export function Hero() {
           <div className="relative lg:hidden">
             <ThemeImage
               name="hero-demo"
-              alt="n10 Desktop with worktrees and pull requests in the sidebar, beside a Claude Code agent asking permission to run the end-to-end tests"
+              alt="n10 with worktrees and pull requests in the sidebar, beside a Claude Code agent asking permission to run the end-to-end tests"
               className="n10-frame w-full rounded-xl"
             />
           </div>

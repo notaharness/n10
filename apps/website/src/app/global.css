@@ -413,7 +413,7 @@
 .n10-iso-led {
   fill: var(--n10-sage);
   animation: n10-iso-blink 2.8s steps(1, end) infinite;
-  animation-play-state: var(--n10-mesh-play);
+  animation-play-state: var(--n10-diagram-play);
 }
 
 .n10-iso-led--sand {
@@ -429,90 +429,54 @@
   }
 }
 
-.n10-mesh-grid {
+.n10-diagram-grid {
   fill: none;
   stroke: var(--color-fd-border);
   stroke-width: 1;
 }
 
-.n10-mesh-pool {
-  opacity: 0.55;
-}
-
-.dark .n10-mesh-pool {
-  opacity: 0.3;
-}
-
-/* A beam carrying on past its machine: a thin track and one slow
- * packet, both painted with a gradient that runs out along the ray, so
- * a packet dims as it leaves and brightens as it arrives. */
-.n10-mesh-ray {
-  opacity: 0.4;
-}
-
-.n10-mesh-ray-packet {
+/* Shared traffic animation for the Beam diagrams and Orchestra stage. */
+.n10-diagram-packet {
   fill: none;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-dasharray: 1.4 48.6;
-  animation: n10-mesh-flow var(--n10-mesh-seconds) linear infinite;
-  animation-play-state: var(--n10-mesh-play);
-}
-
-.n10-mesh-ray-packet--inbound {
-  animation-direction: reverse;
-}
-
-/* A beam is two thin translucent tracks, one per direction, each as
- * wide as a ray: long packets out on one, short ones back on the other.
- * The dash pattern repeats every quarter of the (normalised, 100-long)
- * path, so sliding it by one whole path length loops without a seam. */
-.n10-mesh-ribbon {
-  fill: var(--n10-mesh-color);
-  opacity: 0.42;
-}
-
-.n10-mesh-packet {
-  fill: none;
-  stroke: var(--n10-mesh-color);
+  stroke: var(--n10-diagram-color);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 4 21;
-  animation: n10-mesh-flow var(--n10-mesh-seconds) linear infinite;
-  animation-play-state: var(--n10-mesh-play);
+  animation: n10-diagram-flow var(--n10-diagram-seconds) linear infinite;
+  animation-play-state: var(--n10-diagram-play);
 }
 
-.n10-mesh-packet--back {
+.n10-diagram-packet--back {
   stroke-dasharray: 1.5 23.5;
   stroke-dashoffset: 12;
-  animation-name: n10-mesh-flow-back;
-  animation-duration: calc(var(--n10-mesh-seconds) * 1.35);
+  animation-name: n10-diagram-flow-back;
+  animation-duration: calc(var(--n10-diagram-seconds) * 1.35);
 }
 
-.dark .n10-mesh-packet {
-  filter: drop-shadow(0 0 3px var(--n10-mesh-color));
+.dark .n10-diagram-packet {
+  filter: drop-shadow(0 0 3px var(--n10-diagram-color));
 }
 
-@keyframes n10-mesh-flow {
+@keyframes n10-diagram-flow {
   to {
     stroke-dashoffset: -100;
   }
 }
 
-@keyframes n10-mesh-flow-back {
+@keyframes n10-diagram-flow-back {
   to {
     stroke-dashoffset: 112;
   }
 }
 
 /* Runs by default and holds still under reduced motion. */
-.n10-mesh {
-  --n10-mesh-play: running;
+.n10-diagram {
+  --n10-diagram-play: running;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .n10-mesh {
-    --n10-mesh-play: paused;
+  .n10-diagram {
+    --n10-diagram-play: paused;
   }
 }
 
@@ -559,7 +523,7 @@
  * beams reuse the beam mesh's styles; everything else here is the show. */
 .orchestra-stage {
   --orchestra-play: running;
-  --n10-mesh-play: var(--orchestra-play);
+  --n10-diagram-play: var(--orchestra-play);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -580,7 +544,7 @@
  * each way, with the beam mesh's packets running along it. */
 .orchestra-line {
   fill: none;
-  stroke: var(--n10-mesh-color);
+  stroke: var(--n10-diagram-color);
   stroke-width: 5;
   stroke-linecap: round;
   opacity: 0.3;

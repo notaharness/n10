@@ -13,7 +13,7 @@ export function BeamFigure({
       viewBox="0 0 400 250"
       role="img"
       aria-label={label}
-      className="n10-mesh text-fd-foreground h-auto w-full"
+      className="n10-diagram text-fd-foreground h-auto w-full"
     >
       {children}
     </svg>

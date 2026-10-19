@@ -16,24 +16,12 @@ export function baseOptions(): BaseLayoutProps {
         url: '/docs',
       },
       {
-        text: 'Download',
-        url: '/download',
-      },
-      {
         text: 'Beam',
         url: '/beam',
       },
       {
         text: 'Orchestra',
         url: '/orchestra',
-      },
-      {
-        text: 'Conversations',
-        url: '/conversations',
-      },
-      {
-        text: 'Roadmap',
-        url: '/docs/roadmap',
       },
       {
         type: 'icon',

@@ -1,3 +1,4 @@
+import { demoMayFocus } from '../../lib/demo-focus.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -216,7 +217,7 @@ export function SessionTerminal({
   // row's takes it).
   useEffect(() => {
     if (!xterm) return undefined;
-    if (!blocked && shown) {
+    if (!blocked && shown && demoMayFocus()) {
       const raf = requestAnimationFrame(() => xterm.term.focus());
       return () => cancelAnimationFrame(raf);
     }

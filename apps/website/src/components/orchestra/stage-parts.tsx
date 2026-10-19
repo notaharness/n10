@@ -132,7 +132,7 @@ export function Ground() {
         fill="url(#orchestra-pool)"
         className="orchestra-pool"
       />
-      <g mask="url(#orchestra-mask)" className="n10-mesh-grid">
+      <g mask="url(#orchestra-mask)" className="n10-diagram-grid">
         {gridLines.map((points) => (
           <polyline key={points} points={points} />
         ))}
@@ -146,8 +146,8 @@ const LANE = 3.5;
 /** A player's beam: a straight line between the two machines' centres, one lane out and one back, its ends hidden under the machines so it seems to come from beneath them. */
 export function Beam({ spec, seconds }: { spec: PlayerSpec; seconds: number }) {
   const vars = {
-    '--n10-mesh-color': spec.color,
-    '--n10-mesh-seconds': `${seconds}s`,
+    '--n10-diagram-color': spec.color,
+    '--n10-diagram-seconds': `${seconds}s`,
   } as CSSProperties;
   const [x1, y1] = project([...PODIUM, 0]);
   const [x2, y2] = project([...groundOf(spec), 0]);
@@ -168,8 +168,8 @@ export function Beam({ spec, seconds }: { spec: PlayerSpec; seconds: number }) {
               pathLength={100}
               className={
                 side < 0
-                  ? 'n10-mesh-packet n10-mesh-packet--back'
-                  : 'n10-mesh-packet'
+                  ? 'n10-diagram-packet n10-diagram-packet--back'
+                  : 'n10-diagram-packet'
               }
             />
           </g>

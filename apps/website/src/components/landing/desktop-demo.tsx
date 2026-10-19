@@ -1,23 +1,16 @@
 'use client';
 
-import { MousePointerClick } from 'lucide-react';
+import { MousePointer2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/cn';
-import {
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type RefObject,
-} from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 
 /**
- * n10 Desktop itself, running in the page on sample data: the desktop
+ * n10 itself, running in the page on sample data: the desktop
  * renderer built with an in-page mock host (apps/desktop/src/renderer/
  * demo, copied here by `website:sync-demo`). It is laid out at a
- * desktop window's size and scaled to fit. The frame is only created
- * from `WIDE` up, where the scaled app is still readable; below it the
- * hero shows a screenshot and the demo costs nothing.
+ * desktop window's size and scaled to fit. At 1100px and below the demo
+ * is hidden, and its sample-data bundle is not loaded.
  *
  * The page tells it two things by message: whether to play (paused off
  * screen) and the theme, when the site's changes. The demo itself holds
@@ -26,19 +19,13 @@ import {
  */
 const SRC = '/desktop-demo/demo/index.html';
 const WINDOW = { width: 1280, height: 800 };
-/** Tailwind's `lg`, which the hero uses to swap the screenshot out. */
-const WIDE = '(min-width: 64rem)';
 
-function useMedia(query: string): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const list = window.matchMedia(query);
-      list.addEventListener('change', onChange);
-      return () => list.removeEventListener('change', onChange);
-    },
-    () => window.matchMedia(query).matches,
-    () => false
-  );
+const WIDE = '(min-width: 1101px)';
+
+function subscribeWidth(onChange: () => void) {
+  const media = window.matchMedia(WIDE);
+  media.addEventListener('change', onChange);
+  return () => media.removeEventListener('change', onChange);
 }
 
 function send(frame: HTMLIFrameElement | null, message: object): void {
@@ -77,12 +64,14 @@ function useInView(ref: RefObject<HTMLElement | null>): boolean {
 }
 
 export function DesktopDemo({ className }: { className?: string }) {
+  const [interactive, setInteractive] = useState(false);
+  const entry = useRef<HTMLButtonElement>(null);
+  const wide = useSyncExternalStore(subscribeWidth, () => window.matchMedia(WIDE).matches, () => false);
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const scale = useScale(box);
   const inView = useInView(box);
   const { resolvedTheme } = useTheme();
-  const wide = useMedia(WIDE);
   useEffect(() => send(frame.current, { playing: inView }), [inView]);
 
   useEffect(() => {
@@ -91,36 +80,51 @@ export function DesktopDemo({ className }: { className?: string }) {
     }
   }, [resolvedTheme]);
 
+  useEffect(() => {
+    function receive(event: MessageEvent) {
+      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow || event.data?.type !== 'n10-demo-exit') return;
+      restore();
+    }
+    window.addEventListener('message', receive);
+    return () => window.removeEventListener('message', receive);
+  }, []);
+  function restore() {
+    setInteractive(false);
+    send(frame.current, { interactive: false });
+    requestAnimationFrame(() => entry.current?.focus({ preventScroll: true }));
+  }
+  function enter() {
+    setInteractive(true);
+    // The frame becomes non-inert before its own focus request is delivered.
+    requestAnimationFrame(() => send(frame.current, { interactive: true }));
+  }
   return (
     <div id="desktop-demo" className={cn('relative scroll-mt-24', className)}>
-      <p className="border-fd-border bg-fd-card text-fd-muted-foreground absolute -top-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap">
-        <MousePointerClick className="size-3.5" aria-hidden />
-        Try a preview
-        <span className="text-fd-muted-foreground text-[11px] font-normal">
-          · sample data
-        </span>
-      </p>
+      <a className="skip-link demo-skip" href="#coding-heading" onClick={() => document.getElementById("coding-heading")?.focus()}>Skip demo</a>
+        <div className="demo-viewport">
+          {!interactive && <button ref={entry} type="button" className="demo-entry" aria-label="Use n10 demo. Escape returns to the page." onClick={enter}><MousePointer2 size={24} aria-hidden /></button>}
       <div
         ref={box}
-        className="n10-frame bg-fd-card relative w-full overflow-hidden rounded-xl"
+        inert={!interactive}
+        className="live-demo-frame n10-frame bg-fd-card relative w-full overflow-hidden rounded-sm"
         style={{ aspectRatio: `${WINDOW.width} / ${WINDOW.height}` }}
       >
-        {wide && (
-          <iframe
-            ref={frame}
-            src={SRC}
-            title="n10 Desktop, running on sample data"
-            onLoad={(event) => send(event.currentTarget, { playing: inView })}
-            className="absolute top-0 left-0 origin-top-left border-0"
-            style={{
-              width: WINDOW.width,
-              height: WINDOW.height,
-              transform: `scale(${scale})`,
-              visibility: scale ? 'visible' : 'hidden',
-            }}
-          />
-        )}
+        {wide && <iframe
+          ref={frame}
+          src={SRC}
+          title="n10, running on sample data"
+          tabIndex={-1}
+          onLoad={(event) => send(event.currentTarget, { playing: inView, theme: resolvedTheme })}
+          className="absolute top-0 left-0 origin-top-left border-0"
+          style={{
+            width: WINDOW.width,
+            height: WINDOW.height,
+            transform: `scale(${scale})`,
+            visibility: scale ? 'visible' : 'hidden',
+          }}
+        />}
       </div>
+        </div>
     </div>
   );
 }
