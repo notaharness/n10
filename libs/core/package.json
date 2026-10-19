@@ -16,6 +16,11 @@
       "import": "./src/plan.ts",
       "default": "./src/plan.ts"
     },
+    "./open-url": {
+      "types": "./src/open-url.ts",
+      "import": "./src/open-url.ts",
+      "default": "./src/open-url.ts"
+    },
     "./readiness": {
       "types": "./src/readiness.ts",
       "import": "./src/readiness.ts",
