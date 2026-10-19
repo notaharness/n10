@@ -5,123 +5,46 @@ import {
   electronSpawnOptions,
   exitStatus,
   missingDisplay,
-  sandboxArgs,
   superviseChild,
 } from './launch-desktop.js';
 
-const ELECTRON = '/pkg/node_modules/electron/dist/electron';
-
-function helper(uid: number, mode: number) {
-  return (path: string) => {
-    expect(path).toBe('/pkg/node_modules/electron/dist/chrome-sandbox');
-    return { uid, mode };
-  };
-}
-
-describe('sandboxArgs', () => {
-  const noNamespaces = () => false;
-  const namespaces = () => true;
-  const missing = () => {
-    throw new Error('ENOENT');
-  };
-
-  it('keeps the sandbox when root owns a setuid helper', () => {
-    expect(
-      sandboxArgs(ELECTRON, 'linux', helper(0, 0o104755), {}, noNamespaces)
-    ).toEqual([]);
-  });
-
-  it('disables it when the user owns the helper, as npm leaves it', () => {
-    expect(
-      sandboxArgs(ELECTRON, 'linux', helper(1000, 0o104755), {}, noNamespaces)
-    ).toEqual(['--no-sandbox']);
-  });
-
-  it('disables it when the helper lacks the setuid bit', () => {
-    expect(
-      sandboxArgs(ELECTRON, 'linux', helper(0, 0o100755), {}, noNamespaces)
-    ).toEqual(['--no-sandbox']);
-  });
-
-  it('disables it when there is no helper', () => {
-    expect(sandboxArgs(ELECTRON, 'linux', missing, {}, noNamespaces)).toEqual([
-      '--no-sandbox',
-    ]);
-  });
-
-  it('keeps it for an npm install where user namespaces work, as in WSL', () => {
-    expect(
-      sandboxArgs(ELECTRON, 'linux', helper(1000, 0o104755), {}, namespaces)
-    ).toEqual([]);
-    expect(sandboxArgs(ELECTRON, 'linux', missing, {}, namespaces)).toEqual([]);
-  });
-
-  describe('with ELECTRON_OVERRIDE_DIST_PATH', () => {
-    const env = { ELECTRON_OVERRIDE_DIST_PATH: '/opt/electron' };
-
-    it('keeps the sandbox on a build with no helper, as a distribution ships', () => {
-      expect(
-        sandboxArgs(ELECTRON, 'linux', missing, env, noNamespaces)
-      ).toEqual([]);
-    });
-
-    it('disables it for a stock dist whose helper is not set up', () => {
-      expect(
-        sandboxArgs(
-          ELECTRON,
-          'linux',
-          helper(1000, 0o100755),
-          env,
-          noNamespaces
-        )
-      ).toEqual(['--no-sandbox']);
-      expect(
-        sandboxArgs(ELECTRON, 'linux', helper(0, 0o100755), env, noNamespaces)
-      ).toEqual(['--no-sandbox']);
-    });
-
-    it('keeps it when the helper is setuid root', () => {
-      expect(
-        sandboxArgs(ELECTRON, 'linux', helper(0, 0o104755), env, noNamespaces)
-      ).toEqual([]);
-    });
-  });
-
-  it('leaves other platforms alone', () => {
-    const unused = () => {
-      throw new Error('not consulted');
-    };
-    expect(sandboxArgs(ELECTRON, 'darwin', unused, {}, unused)).toEqual([]);
-    expect(sandboxArgs(ELECTRON, 'win32', unused, {}, unused)).toEqual([]);
-  });
-});
-
 describe('missingDisplay', () => {
+  const wsl2 = { version: 2, distro: 'Ubuntu-24.04', interop: true } as const;
+  const wsl1 = { version: 1, distro: 'Ubuntu', interop: true } as const;
+
   it('lets Electron start on an X11 or Wayland display', () => {
-    expect(missingDisplay('linux', { DISPLAY: ':0' })).toBeNull();
+    expect(missingDisplay('linux', { DISPLAY: ':0' }, null)).toBeNull();
     expect(
-      missingDisplay('linux', { WAYLAND_DISPLAY: 'wayland-0' })
+      missingDisplay('linux', { WAYLAND_DISPLAY: 'wayland-0' }, null)
     ).toBeNull();
     expect(
-      missingDisplay('linux', {
-        WSL_DISTRO_NAME: 'Ubuntu-24.04',
-        DISPLAY: ':0',
-        WAYLAND_DISPLAY: 'wayland-0',
-      })
+      missingDisplay(
+        'linux',
+        { DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-0' },
+        wsl2
+      )
     ).toBeNull();
   });
 
-  it('points WSL without a display at WSLg and the terminal UI', () => {
-    const message = missingDisplay('linux', {
-      WSL_DISTRO_NAME: 'Ubuntu-24.04',
-    });
+  it('points WSL 2 without a display at WSLg and the terminal UI', () => {
+    const message = missingDisplay('linux', {}, wsl2);
     expect(message).toContain('WSLg');
     expect(message).toContain('wsl --update');
     expect(message).toContain('n10 --tui');
   });
 
+  it('points WSL 1 without a display at WSL 2 and the terminal UI', () => {
+    const message = missingDisplay('linux', {}, wsl1);
+    expect(message).toContain('wsl --set-version Ubuntu 2');
+    expect(message).toContain('n10 --tui');
+    expect(message).not.toContain('WSLg');
+    expect(missingDisplay('linux', {}, { ...wsl1, distro: null })).toContain(
+      'wsl --set-version <distro> 2'
+    );
+  });
+
   it('points a Linux session without a display at the terminal UI', () => {
-    const message = missingDisplay('linux', {});
+    const message = missingDisplay('linux', {}, null);
     expect(message).toContain('n10 --tui');
     expect(message).not.toContain('WSL');
   });

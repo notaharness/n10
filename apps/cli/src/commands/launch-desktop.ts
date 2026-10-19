@@ -1,79 +1,36 @@
 import { superviseChild } from './child-supervision.js';
 export { superviseChild, exitStatus } from './child-supervision.js';
 import { desktopUpdateHandoff } from './desktop-update.js';
-import { spawn, spawnSync, type SpawnOptions } from 'node:child_process';
 import {
-  accessSync,
-  constants as fsConstants,
-  existsSync,
-  statSync,
-  type Stats,
-} from 'node:fs';
+  sandboxAbortHint,
+  sandboxArgs,
+  unsandboxedWarning,
+} from './desktop-sandbox.js';
+import { wslEnvironment, type WslEnvironment } from '@n10/core/wsl';
+import { spawn, type SpawnOptions } from 'node:child_process';
+import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 /**
- * Chromium sandboxes its Linux processes in unprivileged user namespaces
- * when the kernel lets it, and falls back to its setuid helper otherwise.
- * That helper works only when root owns it with the setuid bit; an npm
- * install leaves it owned by the user, and Electron then aborts with
- * SIGTRAP, so with neither the app runs unsandboxed.
- *
- * An Electron the user points at with ELECTRON_OVERRIDE_DIST_PATH may be a
- * distribution's build, which has no helper and is trusted to sandbox
- * without one. An unpacked stock release has the helper, and is held to the
- * same rule as an npm install.
- */
-export function sandboxArgs(
-  electron: string,
-  platform: NodeJS.Platform = process.platform,
-  stat: (path: string) => Pick<Stats, 'uid' | 'mode'> = statSync,
-  env: NodeJS.ProcessEnv = process.env,
-  userNamespaces: () => boolean = canSandboxInNamespaces
-): string[] {
-  if (platform !== 'linux') return [];
-  let helperMissing = false;
-  try {
-    const helper = stat(join(dirname(electron), 'chrome-sandbox'));
-    if (helper.uid === 0 && (helper.mode & 0o4755) === 0o4755) return [];
-  } catch {
-    helperMissing = true;
-  }
-  if (userNamespaces()) return [];
-  return helperMissing && env.ELECTRON_OVERRIDE_DIST_PATH
-    ? []
-    : ['--no-sandbox'];
-}
-
-/**
- * Whether this user can create the namespaces Chromium's sandbox uses.
- * Creating a bare user namespace is not enough to tell: Ubuntu's AppArmor
- * restriction (`apparmor_restrict_unprivileged_userns`) allows it but
- * withholds the capabilities inside, so the probe maps root and creates
- * network and PID namespaces as the sandbox does.
- */
-export function canSandboxInNamespaces(): boolean {
-  const probe = spawnSync(
-    'unshare',
-    ['--user', '--map-root-user', '--net', '--pid', '--fork', 'true'],
-    { stdio: 'ignore', timeout: 2_000 }
-  );
-  return probe.status === 0;
-}
-
-/**
  * Why Electron would find no display to open a window on, or null when
- * it has one. Inside WSL the display comes from WSLg, which sets
+ * it has one. Inside WSL 2 the display comes from WSLg, which sets
  * `DISPLAY` and `WAYLAND_DISPLAY` in every process it starts; without
  * either, Electron dies with an X error that names neither WSLg nor the
- * terminal UI.
+ * terminal UI. WSL 1 has no WSLg.
  */
 export function missingDisplay(
   platform: NodeJS.Platform = process.platform,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  wsl: WslEnvironment | null = platform === 'linux' ? wslEnvironment() : null
 ): string | null {
   if (platform !== 'linux' || env.DISPLAY || env.WAYLAND_DISPLAY) return null;
-  if (env.WSL_DISTRO_NAME) {
+  if (wsl?.version === 1) {
+    return `n10: the desktop app needs WSL 2. From Windows, run \`wsl --set-version ${
+      wsl.distro ?? '<distro>'
+    } 2\`, or run \`n10 --tui\`.`;
+  }
+  if (wsl) {
     return 'n10: no display is available in this WSL session. Run `n10 --tui`, or check your WSLg setup (`wsl --update` from Windows).';
   }
   return 'n10: no graphical session is available (DISPLAY and WAYLAND_DISPLAY are unset). Run `n10 --tui`.';
@@ -160,16 +117,16 @@ export function launchDesktop(root: string, version: string): Promise<number> {
     return Promise.resolve(1);
   }
   const args = sandboxArgs(electron);
-  if (args.length > 0) {
-    console.warn(
-      '[n10] SUID sandbox unavailable — launching with --no-sandbox'
-    );
-  }
+  if (args.length > 0) console.warn(unsandboxedWarning());
   const handoff = desktopUpdateHandoff(root);
   const options = electronSpawnOptions(version, {
     ...process.env,
     N10_UPDATE_HANDOFF: handoff.request,
   });
   const child = spawn(electron, [...args, root], options);
-  return superviseChild(child).then((code) => handoff.finish(code));
+  return superviseChild(child).then((code) => {
+    const hint = sandboxAbortHint(code, args);
+    if (hint) console.error(hint);
+    return handoff.finish(code);
+  });
 }
