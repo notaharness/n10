@@ -31,9 +31,9 @@ Launching the desktop app from a repository opens it; from anywhere else it reop
 
 The first launch of the desktop app downloads Electron's binary (~100–200 MB); the terminal UI does not need it. The desktop app needs a 64-bit system, and macOS 13 or later on a Mac.
 
-### Windows
+### Windows (experimental)
 
-Run it under WSL 2, which gives you the unix environment the agent and tmux backends expect. WSLg renders the desktop app as a normal Windows window. Keep your repositories on the Linux filesystem (`~/code/...`) rather than `/mnt/c/...`; git across the filesystem boundary is much slower.
+Run n10 inside WSL 2, with Node.js, Git, tmux and your agents installed in the Linux distribution. `n10` opens its window through WSLg; without WSLg, use `n10 --tui`. Both are experimental on Windows. Keep repositories and worktrees on the Linux filesystem, such as `~/src`. See [Windows (WSL)](https://n10.is/docs/windows) for setup and limits.
 
 ## What it does
 

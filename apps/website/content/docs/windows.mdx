@@ -1,0 +1,171 @@
+---
+title: Windows (WSL, experimental)
+description: Experimental support for running n10 on Windows inside WSL 2.
+---
+
+<Callout type="warn" title="Experimental">
+  Windows support through WSL 2 is experimental, for n10 on WSLg and for the
+  TUI. Report problems in an
+  [issue](https://github.com/notaharness/n10/issues).
+</Callout>
+
+On Windows, run n10 inside WSL 2. Install Node.js, Git, tmux and your agents
+in the Linux distribution, and keep repositories and worktrees there too.
+n10 opens its window on the Windows desktop through WSLg; without WSLg, the
+TUI runs in Windows Terminal.
+
+## Recommended setup
+
+- Windows 11 on x64
+- The Microsoft Store version of WSL, updated with `wsl --update`, running WSL 2
+- Ubuntu 24.04 LTS
+- Windows Terminal
+
+Other distributions, ARM64 and Windows 10 are untested. WSL 1 and native
+Windows execution are unsupported. n10 requires tmux inside WSL.
+
+## Set up WSL
+
+Open PowerShell as administrator:
+
+```powershell
+wsl --install -d Ubuntu-24.04
+```
+
+Restart Windows if asked, then open **Ubuntu 24.04 LTS** from the Start menu and
+create your Linux user. To confirm it runs on WSL 2:
+
+```powershell
+wsl --list --verbose
+```
+
+The `VERSION` column should say `2`. If it says `1`, run
+`wsl --set-version Ubuntu-24.04 2` from PowerShell.
+
+## Install the prerequisites
+
+Run the following commands in the Ubuntu terminal. Later steps explicitly marked PowerShell run in Windows.
+
+```sh
+sudo apt update
+sudo apt install -y git tmux build-essential python3 gh curl
+```
+
+n10 needs Node.js 22.12 or newer, which is newer than Ubuntu's own `nodejs`
+package. Install it inside WSL with nvm, following the Linux instructions on
+[nodejs.org](https://nodejs.org/en/download). WSL can find Windows programs
+on its `PATH`, so check that these tools use their Linux installations:
+
+```sh
+command -v node npm git tmux
+node -p process.platform
+```
+
+The paths should point to Linux installations, not Windows drives such as
+`/mnt/c/`. The last line should print `linux`.
+
+Install your agents inside WSL as well, following each one's Linux
+instructions, and sign in from the Ubuntu terminal. Check authentication inside WSL even if you have already signed in on Windows.
+For GitHub:
+
+```sh
+gh auth login
+```
+
+## Keep repositories in Linux
+
+Clone repositories into your Linux home, for example `~/src`:
+
+```sh
+mkdir -p ~/src && cd ~/src
+git clone https://github.com/you/app.git
+```
+
+Paths such as `/mnt/c/` access Windows drives. Git operations across this
+filesystem boundary can be slower, and permissions and line endings can
+differ. n10 opens repositories there with an unsupported-location warning.
+Worktrees go inside the repository by default, so they stay on Linux too. If
+you set **Worktree Path**, keep it in your Linux home.
+
+To browse your Linux files from Windows, open `\\wsl$\Ubuntu-24.04\home` in
+File Explorer. Use Linux Git for this checkout, including in your editor's
+Git integration.
+
+## Install and run n10
+
+```sh
+npm install -g @notaharness/n10
+cd ~/src/app
+n10
+```
+
+With nvm, global packages install into your home directory, so neither the
+install nor n10's own updates need `sudo`.
+
+n10 opens as a window on the Windows desktop through WSLg, which WSL 2
+includes on Windows 11. If n10 reports no display, check your WSLg setup. To
+update and restart WSL, save your work first: `wsl --shutdown` stops all WSL
+distributions and ends their tmux and agent sessions. Then run these commands
+in PowerShell:
+
+```powershell
+wsl --update
+wsl --shutdown
+```
+
+Open a new Ubuntu terminal and run `n10` again.
+
+If n10 prints `n10: running without Chromium's sandbox.` as it starts, the
+`.deb` package may help. On x64 Ubuntu, download and install it inside WSL,
+then run `n10-desktop`. The `n10` command still launches the npm installation:
+
+```sh
+curl -LO https://github.com/notaharness/n10/releases/latest/download/n10-desktop_amd64.deb
+sudo apt install ./n10-desktop_amd64.deb
+n10-desktop
+```
+
+If n10 stops unexpectedly, it may print this hint:
+
+```text
+n10: stopped unexpectedly. If the error above says no sandbox is usable, run `N10_NO_SANDBOX=1 n10` to start without Chromium's sandbox.
+```
+
+Using that command prints:
+
+```text
+n10: running without Chromium's sandbox (N10_NO_SANDBOX=1).
+```
+
+System notifications, image paste and graphics-driver compatibility are
+untested. Report problems in an
+[issue](https://github.com/notaharness/n10/issues).
+
+Without WSLg, use `n10 --tui`.
+
+## Sessions
+
+Agents run in tmux inside WSL. Quitting n10 or closing Windows Terminal
+detaches from them. Reopening n10 in the repository reattaches while those
+sessions are still running.
+
+Stopping the distribution, running `wsl --shutdown` or restarting Windows
+ends its sessions. n10 does not automatically restart the agents.
+
+## Links and the clipboard
+
+With WSL's Windows integration enabled, pull request links open in your
+Windows default browser when `wslview` or `explorer.exe` is available.
+If you set `BROWSER`, n10 uses your Linux browser configuration instead.
+If a link does not open in the TUI, hold Shift while dragging to select it,
+then press Ctrl+Shift+C to copy it.
+
+In the TUI, with Windows Terminal's default shortcuts, copy selected
+text with Ctrl+Shift+C and paste with Ctrl+Shift+V.
+
+## Not supported
+
+- WSL 1
+- Repositories or worktrees on a Windows drive (`/mnt/c/...`)
+- Windows-side Node.js, Git or agents
+- Running one n10 across several distributions or Linux users

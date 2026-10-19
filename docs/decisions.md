@@ -107,12 +107,22 @@ Tests isolate HOME and the tmux socket, unset inherited TMUX, and validate that
 the socket belongs to the fixture before cleanup. Kill fixture sessions
 individually; never use `tmux kill-server` or the user's default server.
 
-macOS and Linux are the supported platforms. Every launch goes through tmux,
-which has no native Windows build, so there is no native Windows path; the old
-`cmd.exe` branches in the agent registry (`shellInvoke`, `shellEnvRef`) and
-their `/bin/sh`-does-not-exist-on-Windows rationale predate the tmux-only
-launcher and are gone. WSL is untested and secondary — its tmux runs under
-Linux, so it may work, but nothing here specifically supports it.
+macOS and Linux are the supported platforms; Windows through WSL 2 is
+experimental. Every launch goes through tmux, which has no native Windows
+build, so there is no native Windows path; the old `cmd.exe` branches in the
+agent registry (`shellInvoke`, `shellEnvRef`) and their
+`/bin/sh`-does-not-exist-on-Windows rationale predate the tmux-only launcher
+and are gone. Windows means WSL 2, with everything n10 touches
+inside the distro: repositories, worktrees, Git, tmux, Node and agents. The
+Linux code path is the WSL path; what differs is in `@n10/core`'s
+`environment/`. A repository opened on WSL 1 or on a Windows drive (a drvfs
+mount, found in `/proc/self/mountinfo`, not by its `/mnt` spelling) opens
+with a warning rather than an error, since both work but are unsupported.
+Links go to the Windows browser through `wslview` or `explorer.exe`, with the
+URL as one argument and never through a shell, unless the user set
+`BROWSER`. The desktop runs on WSLg as a Linux Electron; without a display
+the launcher says so rather than letting Electron fail. There is no native
+Windows shell, installer or Windows-side process.
 
 ## Session identity shared with Orchestra
 

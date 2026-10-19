@@ -18,7 +18,7 @@ Documentation: **[n10.is/docs](https://n10.is/docs)**
 
 You need:
 
-- Linux or macOS, with Git 2.38 or newer, Node.js 22.12 or newer, and tmux 3.2 or newer.
+- Linux, macOS or [Windows through WSL 2 (experimental)](https://n10.is/docs/windows), with Git 2.38 or newer, Node.js 22.12 or newer, and tmux 3.2 or newer.
 - An agent CLI on your `PATH`, signed in: `claude`, `codex`, `gemini`, `copilot` or `opencode`.
 - For GitHub, the [`gh` CLI](https://cli.github.com), signed in. For Azure DevOps, a personal access token.
 - On Linux, `build-essential` and `python3`, to compile `node-pty` during the install.
