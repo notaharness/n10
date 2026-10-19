@@ -21,6 +21,11 @@ export function EnrolmentDialog() {
         className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg"
         aria-describedby={undefined}
         showCloseButton={!e.ceremony.outcome}
+        // A request's view is shorter than the form, so a double click's
+        // second press lands outside it; hiding stays explicit.
+        onPointerDownOutside={(event) => {
+          if (e.ceremony.view) event.preventDefault();
+        }}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           content.current

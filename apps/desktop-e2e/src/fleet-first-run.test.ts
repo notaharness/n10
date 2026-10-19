@@ -132,6 +132,26 @@ test.describe('First run', () => {
     await expect(view.getByRole('button', { name: 'Close' })).toHaveCount(0);
   });
 
+  test('a press outside the dialog leaves a request on screen', async ({
+    desktop,
+    beam,
+  }) => {
+    const { page } = desktop;
+    await openFleet(desktop);
+    await startCreate(page);
+    const dialog = page.getByTestId('enrolment-dialog');
+    await expect(dialog.getByTestId('ceremony-url')).toHaveText(
+      beam!.currentUrl
+    );
+    // The overlay: where a double click's second press lands once the
+    // form gives way to the shorter progress view.
+    await page.mouse.click(8, 8);
+    await expect(dialog).toHaveAttribute('data-state', 'open');
+    await expect(dialog.getByTestId('ceremony-url')).toHaveText(
+      beam!.currentUrl
+    );
+  });
+
   test('refuses a name beam would refuse, without rewriting it', async ({
     desktop,
   }) => {
@@ -292,6 +312,10 @@ test.describe('Revoking a member', () => {
     expect(beam!.ops('ceremony.cancel')).toHaveLength(0);
     await page.getByRole('button', { name: 'Resume passkey step' }).click();
     await expect(dialog).toBeVisible();
+
+    // A press outside hides nothing while the request is up.
+    await page.mouse.click(8, 8);
+    await expect(dialog).toHaveAttribute('data-state', 'open');
 
     beam!.failCeremony('bad-assertion');
     await expect(dialog.getByText(/Couldn’t verify the passkey/)).toBeVisible();
