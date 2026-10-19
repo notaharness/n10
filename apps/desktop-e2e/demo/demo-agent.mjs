@@ -62,8 +62,8 @@ const PLAN_STEPS = [
   [200, dim('  Done. 2 review comments resolved — ready for another look.')],
 ];
 
-/** What the agent does with a babysitter's status update. */
-const BABYSIT_STEPS = [
+/** What the agent does with an auto-fixer's status update. */
+const AUTO_FIX_STEPS = [
   [
     900,
     `  ${cyan('→')} Reading the failed check ${dim('· ci / test (node 22)')}`,
@@ -93,14 +93,14 @@ const BLANK_STEPS = [
 ];
 
 const seed = process.env.N10_SEED_PROMPT;
-// A babysitter starts this agent in a pane that is still being laid
+// An auto-fixer starts this agent in a pane that is still being laid
 // out; a beat before the first line lets the terminal take its final
 // width, so the update is not wrapped for a pane that no longer exists.
 if (seed?.startsWith('Status update')) await sleep(1500);
 banner();
 if (seed) {
   showPrompt(seed);
-  await work(seed.startsWith('Status update') ? BABYSIT_STEPS : PLAN_STEPS);
+  await work(seed.startsWith('Status update') ? AUTO_FIX_STEPS : PLAN_STEPS);
 } else {
   await work(BLANK_STEPS);
 }

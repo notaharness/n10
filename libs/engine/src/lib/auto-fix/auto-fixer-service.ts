@@ -1,16 +1,16 @@
 import { logError } from '@n10/logger';
-import type { BabysitStatus } from '@n10/core';
+import type { AutoFixStatus } from '@n10/core';
 import type { ConfigSnapshot } from '../config/api.js';
 import type { PullRequestList } from '../pull-requests/api.js';
-import { startPrBabysitter } from './pr-babysitter.js';
-import type { PrBabysitter } from './babysit-types.js';
+import { startPrAutoFixer } from './pr-auto-fixer.js';
+import type { PrAutoFixer } from './auto-fix-types.js';
 
-export type BabysitterEvent =
+export type AutoFixerEvent =
   | { type: 'changed'; repo: string }
   | { type: 'spawned'; repo: string; prId: number; name: string }
   | { type: 'ended'; repo: string; prId: number; sourceBranch: string };
 
-export interface BabysitterPorts {
+export interface AutoFixerPorts {
   config(repo: string): Pick<ConfigSnapshot, 'config' | 'provider'>;
   pullRequests: Pick<PullRequestList, 'lookupPullRequest'>;
   isCurrent(repo: string): boolean;
@@ -20,17 +20,17 @@ export interface BabysitterPorts {
 }
 
 interface Watch {
-  promise: Promise<BabysitStatus>;
-  handle?: PrBabysitter;
+  promise: Promise<AutoFixStatus>;
+  handle?: PrAutoFixer;
   branch?: string;
   blockedBranches: Set<string>;
 }
 
 /** Watches survive repository selection; only the selected scope may act. */
-export function createBabysitterService(ports: BabysitterPorts) {
+export function createAutoFixerService(ports: AutoFixerPorts) {
   const watches = new Map<string, Map<number, Watch>>();
-  const snapshots = new Map<string, ReadonlyMap<number, BabysitStatus>>();
-  const listeners = new Set<(event: BabysitterEvent) => void>();
+  const snapshots = new Map<string, ReadonlyMap<number, AutoFixStatus>>();
+  const listeners = new Set<(event: AutoFixerEvent) => void>();
   let disposed = false;
 
   function forRepo(repo: string): Map<number, Watch> {
@@ -41,12 +41,12 @@ export function createBabysitterService(ports: BabysitterPorts) {
     }
     return entries;
   }
-  function emit(event: BabysitterEvent): void {
+  function emit(event: AutoFixerEvent): void {
     for (const listener of listeners) {
       try {
         listener(event);
       } catch (error) {
-        logError('babysitter observer', error);
+        logError('auto-fixer observer', error);
       }
     }
   }
@@ -62,14 +62,16 @@ export function createBabysitterService(ports: BabysitterPorts) {
       watches.get(repo)?.get(prId) !== watch ||
       !ports.isCurrent(repo)
     )
-      throw new Error('Babysitting was cancelled before it started');
+      throw new Error('Auto-fix was cancelled before it started');
     if (lookup.kind !== 'found')
       throw new Error(`Pull request #${prId} is not in the sidebar`);
     const { pr } = lookup;
     if (watch.blockedBranches.has(pr.sourceBranch))
-      throw new Error('Babysitting was cancelled for worktree removal');
+      throw new Error(
+        'Auto-fix was cancelled because the worktree is being removed'
+      );
     watch.branch = pr.sourceBranch;
-    watch.handle = startPrBabysitter({
+    watch.handle = startPrAutoFixer({
       pr,
       cwd: repo,
       getProvider: () => ports.config(repo).provider,
@@ -95,8 +97,8 @@ export function createBabysitterService(ports: BabysitterPorts) {
     emit({ type: 'changed', repo });
     return watch.handle.status();
   }
-  function start(repo: string, prId: number): Promise<BabysitStatus> {
-    if (disposed) return Promise.reject(new Error('Babysitters have stopped'));
+  function start(repo: string, prId: number): Promise<AutoFixStatus> {
+    if (disposed) return Promise.reject(new Error('Auto-fix has shut down'));
     const entries = forRepo(repo);
     const existing = entries.get(prId);
     if (existing)
@@ -128,8 +130,8 @@ export function createBabysitterService(ports: BabysitterPorts) {
       }
       return stopped;
     },
-    getSnapshot(repo: string): ReadonlyMap<number, BabysitStatus> {
-      const next = new Map<number, BabysitStatus>();
+    getSnapshot(repo: string): ReadonlyMap<number, AutoFixStatus> {
+      const next = new Map<number, AutoFixStatus>();
       for (const [prId, watch] of watches.get(repo) ?? []) {
         if (watch.handle) next.set(prId, watch.handle.status());
       }
@@ -142,7 +144,7 @@ export function createBabysitterService(ports: BabysitterPorts) {
       snapshots.set(repo, next);
       return next;
     },
-    subscribe(listener: (event: BabysitterEvent) => void) {
+    subscribe(listener: (event: AutoFixerEvent) => void) {
       listeners.add(listener);
       return () => {
         listeners.delete(listener);

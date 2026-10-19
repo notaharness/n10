@@ -316,7 +316,7 @@ describe('checkoutWorktree', () => {
   });
 
   it('reuses a worktree that has the branch checked out under another directory name', async () => {
-    // The babysitter's spawn path lands here. Without the lookup both
+    // The auto-fixer's spawn path lands here. Without the lookup both
     // this and `git worktree add` come up empty — the branch is already
     // checked out — and the agent is never started.
     mockExec.mockResolvedValueOnce(
@@ -378,7 +378,7 @@ describe('checkoutWorktree', () => {
 });
 
 /**
- * The babysitter outlives the desktop's chdir between repositories,
+ * The auto-fixer outlives the desktop's chdir between repositories,
  * so each of its git calls names the repository it is about.
  */
 describe('git calls scoped to a repository', () => {

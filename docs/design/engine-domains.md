@@ -47,7 +47,7 @@ visibility, focus, toast text and terminal presentation remain shell concerns.
 | Worktrees        | `engine/worktrees` owns lists, freshness and commands; shell adapters only select, launch editors and render                       | Keep guarded stop/remove/delete operation and outcomes in core. Engine commands orchestrate it and invalidate worktree/session resources; sync uses that command. No duplicate removal sequence.                                                                                                        |
 | Review reads     | Engine `reviews` owns resources; TUI hooks and host review adapters consume them                                                   | Scoped engine resources, keyed by repository/provider/account/PR and revisions. Keep provider parsing and wire protocols in vcs. Move reads before publication.                                                                                                                                         |
 | Review writes    | Engine `reviews` owns drafts, commands and publication through vcs publishers                                                      | One engine command surface over scoped durable stores. Route both agent-comment publication paths through vcs publishers and delete review-comments' poster. Preserve partial/unknown outcomes; never automatically replay an uncertain mutation. Separate reviewable slice.                            |
-| Sessions         | Engine `sessions` and `babysitters` own lifetimes; core owns primitive operations                                                  | Engine owns observation, adoption, launch policy, attention facts and babysitter lifetime. Core keeps identity/launch/removal operations; terminal libs execute opaque plans. Shells supply view size and output transports. Preserve clients across repo switches and detach, never kill, on shutdown. |
+| Sessions         | Engine `sessions` and `auto-fix` own lifetimes; core owns primitive operations                                                     | Engine owns observation, adoption, launch policy, attention facts and auto-fixer lifetime. Core keeps identity/launch/removal operations; terminal libs execute opaque plans. Shells supply view size and output transports. Preserve clients across repo switches and detach, never kill, on shutdown. |
 | Machines         | Engine `machines` owns fleet state and policy; desktop owns Beam transport and daemon                                              | Engine owns fleet state and remote command policy once session scope includes machine identity. Beam remains a transport adapter; Electron retains utility-process spawning. Preserve external daemon ownership.                                                                                        |
 | Plans            | Engine `plans` owns delivery; core browser-safe cart, app-core hook and shell presentation                                         | Keep the cart local to each frontend for now. Checkout becomes an engine command with session work. No new global cart or persistence without a product need.                                                                                                                                           |
 
@@ -89,9 +89,9 @@ propagated through the stack before merging.
 6. **Review commands and drafts**: shared reply/resolve/draft/publication commands,
    scoped stores and publication reconciliation. Both agent-comment posting paths
    use vcs publishers; delete review-comments' independent poster.
-7. **Sessions and babysitters**: discovery, adoption, launch/restart/stop and connection/exit
+7. **Sessions and auto-fixers**: discovery, adoption, launch/restart/stop and connection/exit
    facts shared by both shells. Follow with process-wide terminal lifecycle and
-   babysitter coordination as separate reviewable parts of this domain. PTY
+   auto-fixer coordination as separate reviewable parts of this domain. PTY
    activity classification remains a primitive; shell seen/focus state remains UI. Delete shell orchestration; preserve retained connections across
    repo switches. Remove legacy command-to-agent inference and use explicit
    fixture-agent identity. Discovery receives the repository handle’s live scope
@@ -222,7 +222,7 @@ retained session clients have their own lifetime. The PR list is a multi-reposit
 cache because readers and watchers share entries across scopes. Do not impose a
 single global store shape on both lifetimes.
 
-## Babysitter removal suspension
+## Auto-fixer removal suspension
 
 Removal currently stops a watch and recreates it if guarded removal is refused.
 That discards its delivered baseline and may brief the same outstanding findings

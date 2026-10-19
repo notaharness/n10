@@ -157,8 +157,8 @@ vi.mock('./services/drafts.js', () =>
     'getGuidedReview',
   ])
 );
-vi.mock('./services/babysit.js', () =>
-  recorder('babysit', ['startBabysit', 'stopBabysit'])
+vi.mock('./services/auto-fix.js', () =>
+  recorder('autoFix', ['startAutoFix', 'stopAutoFix'])
 );
 vi.mock('./services/desktop-prefs.js', () =>
   recorder('prefs', ['loadDesktopPrefs', 'saveDesktopPrefs'])
@@ -376,8 +376,8 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'keybindings.setDesktopKeybinding',
   ],
 
-  ['startBabysit', [7], 'babysit.startBabysit'],
-  ['stopBabysit', [7], 'babysit.stopBabysit'],
+  ['startAutoFix', [7], 'autoFix.startAutoFix'],
+  ['stopAutoFix', [7], 'autoFix.stopAutoFix'],
 
   ['listMachines', [], 'machines.listMachines'],
   ['getBeamStatus', [], 'machines.getBeamStatus'],
@@ -453,7 +453,7 @@ describe('host API wiring', () => {
       'onLaunchStep',
       'onMenuCommand',
       'onThemeChanged',
-      'onBabysitChanged',
+      'onAutoFixChanged',
       'onSyncNotice',
       'onRemoteUpdated',
       'onDiscoveryChanged',

@@ -1,11 +1,11 @@
 import type { AppConfig, PullRequestInfo, VcsProvider } from '@n10/vcs-core';
 import type {
-  BabysitStatus,
+  AutoFixStatus,
   DeliveryTiming,
   PullRequestLookup,
 } from '@n10/core';
 
-export interface PrBabysitterOptions {
+export interface PrAutoFixerOptions {
   pr: PullRequestInfo;
   /** The repository the pull request belongs to. Every git call runs
    *  against it, whatever the process's directory is by then. */
@@ -26,8 +26,8 @@ export interface PrBabysitterOptions {
   /** Fires on a transition — the phase, a hold, a delivery, an error
    *  appearing or clearing, the end — and not on a poll that left all
    *  of that where it was. `status()` is always current regardless. */
-  onStatus: (status: BabysitStatus) => void;
-  /** Defaults come from the environment when set (`babysitTimingFromEnv`),
+  onStatus: (status: AutoFixStatus) => void;
+  /** Defaults come from the environment when set (`autoFixTimingFromEnv`),
    *  then from the model's constants. */
   intervalMs?: number;
   remoteRefreshMs?: number;
@@ -39,11 +39,11 @@ export interface PrBabysitterOptions {
   now?: () => number;
 }
 
-export interface PrBabysitter {
+export interface PrAutoFixer {
   /** Poll now rather than at the next tick. Resolves when the poll,
    *  and any delivery it led to, has finished. */
   pollNow(): Promise<void>;
-  status(): BabysitStatus;
+  status(): AutoFixStatus;
   /** Stop watching. Idempotent. */
   stop(): void;
 }

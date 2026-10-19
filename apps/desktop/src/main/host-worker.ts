@@ -1,6 +1,6 @@
 /**
  * The session host: every host service, every PTY attach client and
- * its emulator, ring buffer and relay, discovery, babysitters and the
+ * its emulator, ring buffer and relay, discovery, auto-fixers and the
  * beam client, in an Electron utility process named `n10 host`. The
  * main process keeps the windows and forwards the contract to it
  * (`host-process.ts`). A utility process, not a worker thread: node-pty
@@ -19,7 +19,7 @@ import {
   setFolderPicker,
   setShellGlue,
 } from '../host/register-handlers.js';
-import { stopAllBabysitters } from '../host/services/babysit.js';
+import { stopAllAutoFixers } from '../host/services/auto-fix.js';
 import { stopDiscovery } from '../host/services/discovery.js';
 import { installMachineResolver } from '../host/services/remote-machines.js';
 import { stopRemoteSyncLoop } from '../host/services/remote-sync.js';
@@ -123,7 +123,7 @@ async function shutdown(): Promise<void> {
   stopUpdates();
   const removals = stopRemoteSyncLoop();
   stopDiscovery();
-  stopAllBabysitters();
+  stopAllAutoFixers();
   try {
     killAll();
   } catch {

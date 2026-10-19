@@ -1,4 +1,4 @@
-import { composeBabysitPrompt, type BabysitReport } from '@n10/core/plan';
+import { composeAutoFixPrompt, type AutoFixReport } from '@n10/core/plan';
 import type { RemoteCommentThread } from '../../../../host/contract.js';
 import { PR_HOMEPAGE } from '../../data/beam.js';
 import { thread } from '../../data/threads.js';
@@ -7,9 +7,9 @@ import { scheduler } from '../scheduler.js';
 import type { Beat, ClaudeCode } from './claude-code.js';
 
 /**
- * Babysitting beam #39. Once it is babysat, CI fails on formatting and
+ * Auto-fixing beam #39. Once auto-fix is on, CI fails on formatting and
  * a teammate asks for the commands to be marked up; when the news has
- * settled, the babysitter briefs #39's idle agent in one message, which
+ * settled, the auto-fixer briefs #39's idle agent in one message, which
  * fixes both, pushes and resolves the thread. It plays once a page.
  */
 const CODE_THREAD: RemoteCommentThread = thread(
@@ -20,7 +20,7 @@ const CODE_THREAD: RemoteCommentThread = thread(
   1
 );
 
-const REPORT: BabysitReport = {
+const REPORT: AutoFixReport = {
   buildStatus: 'failed',
   lastToldBuildStatus: 'pending',
   ciChanged: true,
@@ -169,7 +169,7 @@ function fixBeats(repo: RepoState): Beat[] {
 let briefed = false;
 
 /** Starts the story; returns a cancel for whatever has not played yet. */
-export function babysitHomepage(
+export function autoFixHomepage(
   repo: RepoState,
   agent: ClaudeCode
 ): () => void {
@@ -184,9 +184,9 @@ export function babysitHomepage(
   });
   const deliver = () => {
     briefed = true;
-    agent.say(composeBabysitPrompt(PR_HOMEPAGE, REPORT), fixBeats(repo));
+    agent.say(composeAutoFixPrompt(PR_HOMEPAGE, REPORT), fixBeats(repo));
   };
-  // Like the real babysitter, it never interrupts a turn.
+  // Like the real auto-fixer, it never interrupts a turn.
   let waiting: () => void = () => undefined;
   const brief = scheduler.after(5500, () => {
     if (agent.idle) {

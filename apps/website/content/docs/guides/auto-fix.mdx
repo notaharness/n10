@@ -1,0 +1,22 @@
+---
+title: Auto-fix pull requests
+description: Send failing checks, review comments and conflicts to a pull request's agent.
+---
+
+Right-click a pull request in n10's sidebar and choose **Turn on Auto-fix**.
+n10 watches for failing checks, new review comments and conflicts, then
+sends them to the pull request's agent.
+
+- **Batching.** n10 waits until nothing new has arrived for ten minutes, or
+  at most thirty minutes, then sends the updates together.
+- **Idle gate.** It sends only when the agent's terminal has been quiet for
+  thirty seconds. That's a sign of idleness, not a guarantee: a long, quiet
+  tool call or a permission prompt looks idle too.
+- **No agent running.** If the pull request has no live agent when an update
+  is due, n10 checks out its branch and starts a new agent with the update.
+- **Lifetime.** Auto-fix runs only while n10 is open with that repository
+  active. Switching repositories pauses it. After restarting n10, turn
+  Auto-fix on again.
+
+Choose **Turn off Auto-fix** from the same menu to stop monitoring and
+automatic agent starts. This does not stop an agent that is already running.

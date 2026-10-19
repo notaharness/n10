@@ -13,7 +13,7 @@ import {
   type RepositoryHandle,
 } from '@n10/engine';
 import { activeReviewService, repository, requireRepo } from './repo.js';
-import { babysatStatuses } from './babysit.js';
+import { autoFixStatuses } from './auto-fix.js';
 import { getSyncDecorations, refreshRemoteSync } from './remote-sync.js';
 import { pullRequests, resolveProvider } from './program.js';
 import type { SidebarModel, SyncState } from '../contract.js';
@@ -44,7 +44,7 @@ import type { SidebarModel, SyncState } from '../contract.js';
  *
  * Merge/conflict decorations (mergedBranches, conflictCounts) come
  * from the host's remote sync loop (services/remote-sync.ts); a
- * babysat pull request's status from the babysit service, so a row
+ * status of a pull request under auto-fix from the auto-fix service, so a row
  * wears its badge without a query of its own.
  */
 
@@ -90,7 +90,7 @@ export async function listSidebarItems(
     yours,
     sync.merged,
     sync.conflicts,
-    babysatStatuses(cwd)
+    autoFixStatuses(cwd)
   );
 }
 

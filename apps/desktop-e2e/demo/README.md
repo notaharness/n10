@@ -15,15 +15,15 @@ node apps/desktop-e2e/demo/capture.mjs review,plan
 Needs `Xvfb` and `ffmpeg` on `PATH` (`sudo apt install xvfb ffmpeg`).
 Nothing else: no network, no GitHub token, no real agent.
 
-| demo              | what it records                                                                                             |
-| ----------------- | ----------------------------------------------------------------------------------------------------------- |
-| `worktrees`       | the sidebar's CI/review status, then creating a worktree and launching an agent                             |
-| `review`          | walking the agent's draft comments and posting one                                                          |
-| `review-in-place` | reading a pull request, switching diff views, replying to and resolving a thread                            |
-| `plan`            | queueing comments, annotating one, sending the plan to an agent                                             |
-| `babysit`         | babysitting a red pull request: the row's badge, then the update reaching an agent — cropped to the sidebar |
-| `tab-switching`   | Ctrl+PgDn/PgUp along the tab strip, then a held Ctrl+Tab through recent tabs, captioned                     |
-| `tui`             | the terminal UI: sidebar, changed files, diff with threads inline                                           |
+| demo              | what it records                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `worktrees`       | the sidebar's CI/review status, then creating a worktree and launching an agent                                         |
+| `review`          | walking the agent's draft comments and posting one                                                                      |
+| `review-in-place` | reading a pull request, switching diff views, replying to and resolving a thread                                        |
+| `plan`            | queueing comments, annotating one, sending the plan to an agent                                                         |
+| `auto-fix`        | turning on Auto-fix for a red pull request: the row's badge, then the update reaching an agent — cropped to the sidebar |
+| `tab-switching`   | Ctrl+PgDn/PgUp along the tab strip, then a held Ctrl+Tab through recent tabs, captioned                                 |
+| `tui`             | the terminal UI: sidebar, changed files, diff with threads inline                                                       |
 
 ## How it works
 

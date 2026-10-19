@@ -7,7 +7,7 @@ import { setUpdatesNotifier } from './services/updates.js';
  * utility process: the caller supplies how a push leaves.
  */
 import {
-  BABYSIT_EVENTS,
+  AUTO_FIX_EVENTS,
   DISCOVERY_EVENTS,
   MACHINES_EVENTS,
   SYNC_EVENTS,
@@ -25,7 +25,7 @@ import {
   startDiscoveryForRepo,
 } from './services/discovery.js';
 import { setSessionBroadcaster } from './services/sessions.js';
-import { setBabysitNotifier } from './services/babysit.js';
+import { setAutoFixNotifier } from './services/auto-fix.js';
 import { onThemeChange } from './services/theme.js';
 import {
   setBeamStatusNotifier,
@@ -70,9 +70,9 @@ export function installHostPushes({ broadcast, sendTo }: HostPushes): void {
   // is serving it from a query cache.
   setDiscoveryNotifier((event) => broadcast(DISCOVERY_EVENTS.changed, event));
 
-  // A babysitter started an agent (a row and a session) or ended; its
+  // An auto-fixer started an agent (a row and a session) or ended; its
   // status otherwise rides on the sidebar item.
-  setBabysitNotifier((event) => broadcast(BABYSIT_EVENTS.changed, event));
+  setAutoFixNotifier((event) => broadcast(AUTO_FIX_EVENTS.changed, event));
 
   // Windows repaint from the theme the main process reported, so the
   // UI and its terminals follow the same signal.

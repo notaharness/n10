@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import type { BabysitStatus, SidebarItem } from '../../../host/contract.js';
+import type { AutoFixStatus, SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
 import type { Tab } from '../../lib/tabs/tabs.js';
@@ -14,7 +14,7 @@ import {
   hasPeerMachines,
   resolveMachineLabel,
 } from '../../lib/machines/machine-model.js';
-import { babysitBadge } from '../../lib/sidebar/babysit-badge.js';
+import { autoFixBadge } from '../../lib/sidebar/auto-fix-badge.js';
 import {
   itemBranch,
   itemHasWorktree,
@@ -45,7 +45,7 @@ function RowBadges({
   rebasing,
   removed,
   conflictCount,
-  babysit,
+  autoFix,
   machineLabel,
 }: {
   merged: boolean;
@@ -53,7 +53,7 @@ function RowBadges({
   /** The worktree is gone and its agent still runs. */
   removed: boolean;
   conflictCount: number;
-  babysit: BabysitStatus | undefined;
+  autoFix: AutoFixStatus | undefined;
   /** The row's session machine, resolved by the caller — only when
    *  more than one machine is registered (ux-machines.md §6, D8). */
   machineLabel: string | null;
@@ -61,7 +61,7 @@ function RowBadges({
   const conflicts = `${conflictCount} conflict${
     conflictCount === 1 ? '' : 's'
   }`;
-  const sitter = babysit && babysitBadge(babysit);
+  const fixBadge = autoFix && autoFixBadge(autoFix);
   return (
     <>
       {machineLabel && (
@@ -72,17 +72,17 @@ function RowBadges({
           {machineLabel}
         </span>
       )}
-      {sitter && (
+      {fixBadge && (
         <span
           className={cn(
             'shrink-0 rounded px-1 text-[10px] font-medium',
-            sitter.tone === 'warning'
+            fixBadge.tone === 'warning'
               ? 'bg-warning/15 text-warning'
               : 'bg-info/15 text-info'
           )}
-          title={sitter.title}
+          title={fixBadge.title}
         >
-          {sitter.label}
+          {fixBadge.label}
         </span>
       )}
       {merged && (
@@ -196,7 +196,7 @@ export function SidebarRow({
         hasWorktree,
         running,
         hasPr: Boolean(pr),
-        babysitting: Boolean(item.babysit),
+        autoFixing: Boolean(item.autoFix),
         worktreeRemoved: itemWorktreeRemoved(item),
       })
     );
@@ -276,7 +276,7 @@ export function SidebarRow({
               rebasing={rebasing}
               removed={itemWorktreeRemoved(item)}
               conflictCount={conflictCount}
-              babysit={item.babysit}
+              autoFix={item.autoFix}
               machineLabel={machineLabel}
             />
           </div>

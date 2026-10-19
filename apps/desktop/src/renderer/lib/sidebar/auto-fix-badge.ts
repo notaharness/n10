@@ -1,6 +1,6 @@
-import type { BabysitStatus } from '../../../host/contract.js';
+import type { AutoFixStatus } from '../../../host/contract.js';
 
-export interface BabysitBadge {
+export interface AutoFixBadge {
   label: string;
   title: string;
   tone: 'info' | 'warning';
@@ -15,13 +15,13 @@ function relative(ms: number, now: number): string {
 }
 
 /**
- * The badge a babysat pull request's row wears. Its label is the
- * phase; its title says what the babysitter has done and whether the
+ * The badge the row of a pull request under auto-fix wears. Its label is the
+ * phase; its title says what the auto-fixer has done and whether the
  * last poll went wrong, which is the one thing the user cannot
  * otherwise see — a watcher that has quietly stopped reaching the
  * provider looks exactly like one with nothing to report.
  */
-const HELD: Record<NonNullable<BabysitStatus['held']>, string> = {
+const HELD: Record<NonNullable<AutoFixStatus['held']>, string> = {
   'agent-busy': 'held until the agent has been quiet for a while',
   'foreign-session':
     'held: a session under this branch name belongs to another repository',
@@ -31,10 +31,10 @@ const HELD: Record<NonNullable<BabysitStatus['held']>, string> = {
   interrupted: 'held: the checkout was interrupted; it will be retried',
 };
 
-export function babysitBadge(
-  status: BabysitStatus,
+export function autoFixBadge(
+  status: AutoFixStatus,
   now = Date.now()
-): BabysitBadge {
+): AutoFixBadge {
   const lines: string[] = [];
   if (status.phase === 'pending' && status.pendingSince !== null) {
     const held = status.held ? HELD[status.held] : 'sent once quiet';
@@ -55,7 +55,7 @@ export function babysitBadge(
   }
   if (status.lastError) lines.push(`Last check failed: ${status.lastError}`);
   return {
-    label: status.phase === 'pending' ? 'update pending' : 'babysitting',
+    label: status.phase === 'pending' ? 'update pending' : 'Auto-fix',
     title: lines.join('\n'),
     tone: status.lastError ? 'warning' : 'info',
   };

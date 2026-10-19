@@ -27,35 +27,35 @@ describe('sidebarRowMenuItems', () => {
       'open',
       'checkout',
       'open-pr',
-      'babysit',
+      'auto-fix',
       'open-editor',
       'copy',
     ]);
   });
 
-  it('offers babysitting on a pull request, and stopping it once it is on', () => {
+  it('offers Auto-fix on a pull request, and stopping it once it is on', () => {
     const idle = ids({ hasWorktree: true, running: false, hasPr: true });
-    expect(idle).toContain('babysit');
-    expect(idle).not.toContain('stop-babysit');
+    expect(idle).toContain('auto-fix');
+    expect(idle).not.toContain('stop-auto-fix');
 
     const on = ids({
       hasWorktree: true,
       running: true,
       hasPr: true,
-      babysitting: true,
+      autoFixing: true,
     });
-    expect(on).toContain('stop-babysit');
-    expect(on).not.toContain('babysit');
+    expect(on).toContain('stop-auto-fix');
+    expect(on).not.toContain('auto-fix');
 
     // Nothing to watch without a pull request, whatever the flag says.
     const none = ids({
       hasWorktree: true,
       running: false,
       hasPr: false,
-      babysitting: true,
+      autoFixing: true,
     });
-    expect(none).not.toContain('babysit');
-    expect(none).not.toContain('stop-babysit');
+    expect(none).not.toContain('auto-fix');
+    expect(none).not.toContain('stop-auto-fix');
   });
 
   it('offers session choices for every worktree and stop for a busy one', () => {

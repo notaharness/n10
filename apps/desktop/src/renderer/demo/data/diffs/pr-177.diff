@@ -150,9 +150,9 @@ index f4711f24..a3502b6f 100644
    (`getSidebarSnapshot`) and the renderer drops answers for a repo it is not
    showing (`loadSidebarModel`). A switch is in flight for several awaits.
  - The pull request list is fetched once per interval in core's cache
-   (`services/pull-requests.ts`); `services/sidebar.ts`, babysitters and the
+   (`services/pull-requests.ts`); `services/sidebar.ts`, auto-fixers and the
    sync loop all read it there. Do not call the provider from a second place.
- - Babysitters (`services/babysit.ts`) live per repo in memory, sit out while
+ - Auto-fixers (`services/auto-fix.ts`) live per repo in memory, sit out while
    another repo is open, stop when their worktree is removed, and push only
    `spawned` and `ended`; everything else rides on the sidebar poll.
  - Terminal tabs have no state file; tmux is the record: the kind is the
@@ -248,7 +248,7 @@ index a9d1a90f..a2e15f77 100644
    type SidebarItem,
  } from '@n10/core';
  import { activeRepoIs, requireRepo } from './repo.js';
- import { babysatStatuses } from './babysit.js';
+ import { autoFixStatuses } from './auto-fix.js';
  import { isOwnSessionAlive } from './sessions.js';
 +import { ownSessionNames } from './session-registry.js';
 +import { movedWorktreeSessions, withMovedSessions } from './worktree-sessions.js';
@@ -285,7 +285,7 @@ index a9d1a90f..a2e15f77 100644
   *
   * Merge/conflict decorations (mergedBranches, conflictCounts) come
   * from the host's remote sync loop (services/remote-sync.ts); a
-  * babysat pull request's status from the babysit service, so a row
+  * status of a pull request under auto-fix from the auto-fix service, so a row
   * wears its badge without a query of its own.
   */
  
@@ -345,7 +345,7 @@ index a9d1a90f..a2e15f77 100644
      sessionPrMap,
      sync.merged,
      sync.conflicts,
-     babysatStatuses(cwd)
+     autoFixStatuses(cwd)
    );
 +  return withMovedSessions(items, moved, isOwnSessionAlive);
  }
@@ -3278,7 +3278,7 @@ index 85cc1723..c7f07123 100644
 +++ b/libs/core/src/lib/types.ts
 @@ -1,77 +1,83 @@
  import type { PullRequestInfo } from '@n10/vcs-core';
- import type { BabysitStatus } from './babysit/babysit-model.js';
+ import type { AutoFixStatus } from './auto-fix/auto-fix-model.js';
  
  export type Focus = 'sidebar' | 'terminal';
  
@@ -3301,8 +3301,8 @@ index 85cc1723..c7f07123 100644
        branch?: string;
        isMerged: boolean;
        conflictCount?: number;
-       /** Set while the pull request is being babysat. */
-       babysit?: BabysitStatus;
+       /** Set while the pull request is under auto-fix. */
+       autoFix?: AutoFixStatus;
      }
    | {
        kind: 'orphan-pr';
@@ -3310,7 +3310,7 @@ index 85cc1723..c7f07123 100644
        running?: boolean;
        /** PTY session name when the PR's branch has a worktree session. */
        sessionName?: string;
-       babysit?: BabysitStatus;
+       autoFix?: AutoFixStatus;
      }
    | {
        kind: 'review-pr';
@@ -3319,7 +3319,7 @@ index 85cc1723..c7f07123 100644
        running?: boolean;
        /** PTY session name when the PR's branch has a worktree session. */
        sessionName?: string;
-       babysit?: BabysitStatus;
+       autoFix?: AutoFixStatus;
      };
  
  /** Extract the PR from any sidebar item kind. */

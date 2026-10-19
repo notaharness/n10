@@ -2,10 +2,10 @@
  * One line for `git fetch`, per repository.
  *
  * Two loops fetch: the remote sync pass (`git fetch --all --prune`,
- * hourly) and every babysitter (its pull request's two refs, every few
+ * hourly) and every auto-fixer (its pull request's two refs, every few
  * minutes). Two fetches running at once in one repository contend for
  * the same ref locks and one of them fails with "cannot lock ref",
- * which the babysitter then reports as a merge check that could not
+ * which the auto-fixer then reports as a merge check that could not
  * run. So every fetch goes through here, and fetches of one repository
  * run one after another.
  *

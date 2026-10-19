@@ -794,7 +794,7 @@ shows, an orchestrator's followed by its player tabs, which the strip notes in
 tabs, which the strip shows as part of it; from any other tab, and Close All,
 they close like every tab.
 
-## Plans and babysitting
+## Plans and auto-fixing
 
 Plan items are value snapshots taken when queued. Later comment edits or
 resolution must not change them. `composePlanPrompt` follows `planRows` order so
@@ -802,18 +802,18 @@ item numbers match what the user sees. The renderer composes the delivered text
 because it previews that exact prompt. Checkout injects into a live agent,
 respawns an ended one, or creates a worktree and launches an agent.
 
-`engine/babysitters` owns watches keyed by repository and PR, their polling,
+`engine/autoFixers` owns watches keyed by repository and PR, their polling,
 remote-read freshness and delivery coordination. Core keeps the pure baseline
 model, prompt composition and Git/session primitives. Desktop supplies the active
 config handle, pane dimensions and output adoption; it holds no watcher registry.
-The TUI has no babysitting controls. A parked repository retains its watch baseline
+The TUI has no auto-fixing controls. A parked repository retains its watch baseline
 but cannot poll or deliver until selected again. Concurrent starts share one lookup;
 stop, shutdown and worktree removal cancel pending starts before they create a watch.
 Busy timer ticks are skipped; explicit polls share at most one queued follow-up.
 Spawn completion names its captured repository even if selection changed while
 launching. Shutdown stops watchers and detaches clients without killing agents.
 
-The babysitter baseline is what the agent was told, not the latest observation.
+The auto-fixer baseline is what the agent was told, not the latest observation.
 Hold or delivery failures leave it unchanged. A new head or thread reply can be
 news; the user's own latest comment is not relayed. Recovery from a reported CI
 failure is news; an initial green result alone is not. An unavailable conflict
@@ -825,7 +825,7 @@ re-brief findings the agent already received. A separate change should
 park/resume the same watch and test
 refused removal and late delivery together. It must retain the removal safety
 verdicts and must not detach sessions on repository switches. See
-[the suspension follow-up](design/engine-domains.md#babysitter-removal-suspension).
+[the suspension follow-up](design/engine-domains.md#auto-fixer-removal-suspension).
 
 Batch updates after ten minutes of quiet or thirty minutes maximum, and deliver
 only after the agent has been idle for thirty seconds. Start agents with `seed`,
@@ -838,7 +838,7 @@ Use `sync/conflicts.ts` for both the badge and briefing. Checkout receives the
 captured repository and configured worktree path. Check liveness immediately
 before checkout as well.
 
-Babysitters read the shared PR cache, distinguish unknown from gone, and require
+Auto-fixers read the shared PR cache, distinguish unknown from gone, and require
 consecutive absences before ending a watch. Resolve the provider per poll so
 settings changes take effect. Desktop watchers are stored per repo, pause while
 another repo is open, and stop when their worktree is removed. Push `spawned`
@@ -850,7 +850,7 @@ assert the actual prompt received by a fake agent.
 
 Both shells read pull requests through the engine's list
 (`createPullRequestList`): the TUI's `usePrData`, and the desktop host's
-sidebar, babysitters and sync loop. The TUI holds a `watch`; the desktop's
+sidebar, auto-fixers and sync loop. The TUI holds a `watch`; the desktop's
 demand is its renderer's sidebar poll.
 
 - An answer is keyed by scope: repo path, provider, project and a credentials
@@ -897,7 +897,7 @@ Azure request budgets prevent per-PR polling from exhausting organization limits
 - A missing row on a complete runs page means no build. On a truncated page or
   failed lookup, omit the row: it has not been resolved and must not be cached as none.
 
-Babysitter thread reads use the provider throttle and TTL outside the list-cycle
+Auto-fixer thread reads use the provider throttle and TTL outside the list-cycle
 budget. GitHub gets rollup and counts with its list query and needs no equivalent
 per-row cache-reset methods. `request-budget.spec.ts` checks request counts.
 
@@ -1410,7 +1410,7 @@ grace period for automatic removals and manual operations, then detaches and exi
 even if an operation is still pending; this shell exit bound does not cancel or
 retry a mutation. Both manual and
 automatic removals go through captured-repo engine commands, with core retaining
-the stop/remove/delete safety checks. Desktop supplies repo-qualified babysitter
+the stop/remove/delete safety checks. Desktop supplies repo-qualified auto-fixer
 ports; a retained checkout resumes watchers only while its repo is selected.
 
 ## Repository-scoped worktrees

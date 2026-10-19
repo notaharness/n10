@@ -3,7 +3,7 @@
  * bridge from its changes to the renderer.
  *
  * Every host-side reader of the pull request list sits on this one
- * instance: the sidebar model, the babysitters (one row each, every
+ * instance: the sidebar model, the auto-fixers (one row each, every
  * minute) and the sync loop's conflict counts, which need to know a
  * branch's target. One instance is what keeps a watched row from
  * costing the provider a fetch of its own.

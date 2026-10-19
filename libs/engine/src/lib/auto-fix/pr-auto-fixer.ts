@@ -1,40 +1,40 @@
 import { logError } from '@n10/logger';
 import type { PullRequestInfo } from '@n10/vcs-core';
 import {
-  BABYSIT_POLL_MS,
-  initialBabysitState,
+  AUTO_FIX_POLL_MS,
+  initialAutoFixState,
   isDue,
   observe,
   statusSignature,
   takeReport,
-  composeBabysitPrompt,
+  composeAutoFixPrompt,
 } from '@n10/core';
-import type { BabysitState, BabysitStatus, DeliveryTiming } from '@n10/core';
-import { observePullRequest } from './babysit-observe.js';
-import type { RemoteSnapshot } from './babysit-observe.js';
-import { deliver } from './babysit-delivery.js';
-import type { PrBabysitter, PrBabysitterOptions } from './babysit-types.js';
+import type { AutoFixState, AutoFixStatus, DeliveryTiming } from '@n10/core';
+import { observePullRequest } from './auto-fix-observe.js';
+import type { RemoteSnapshot } from './auto-fix-observe.js';
+import { deliver } from './auto-fix-delivery.js';
+import type { PrAutoFixer, PrAutoFixerOptions } from './auto-fix-types.js';
 
 /**
  * The cadence as the environment overrides it, so a test in any shell
  * can watch a delivery happen in seconds rather than the ten minutes a
  * reviewer gets to finish typing. Unset means the model's defaults.
  */
-export function babysitTimingFromEnv(
+export function autoFixTimingFromEnv(
   env: Record<string, string | undefined> = process.env
 ): { intervalMs?: number; timing?: DeliveryTiming } {
   const read = (name: string): number | undefined => {
     const value = Number(env[name]);
     return Number.isFinite(value) && value > 0 ? value : undefined;
   };
-  const debounceMs = read('N10_BABYSIT_DEBOUNCE_MS');
+  const debounceMs = read('N10_AUTO_FIX_DEBOUNCE_MS');
   return {
-    intervalMs: read('N10_BABYSIT_POLL_MS'),
+    intervalMs: read('N10_AUTO_FIX_POLL_MS'),
     timing: debounceMs === undefined ? undefined : { debounceMs },
   };
 }
 
-function initialStatus(pr: PullRequestInfo): BabysitStatus {
+function initialStatus(pr: PullRequestInfo): AutoFixStatus {
   return {
     prId: pr.id,
     sourceBranch: pr.sourceBranch,
@@ -48,13 +48,13 @@ function initialStatus(pr: PullRequestInfo): BabysitStatus {
   };
 }
 
-export function startPrBabysitter(opts: PrBabysitterOptions): PrBabysitter {
+export function startPrAutoFixer(opts: PrAutoFixerOptions): PrAutoFixer {
   const { onStatus, isCurrent = () => true, now = Date.now } = opts;
-  const fromEnv = babysitTimingFromEnv();
-  const intervalMs = opts.intervalMs ?? fromEnv.intervalMs ?? BABYSIT_POLL_MS;
+  const fromEnv = autoFixTimingFromEnv();
+  const intervalMs = opts.intervalMs ?? fromEnv.intervalMs ?? AUTO_FIX_POLL_MS;
   const timing = opts.timing ?? fromEnv.timing;
   let pr = opts.pr;
-  let state: BabysitState = initialBabysitState();
+  let state: AutoFixState = initialAutoFixState();
   let remote: RemoteSnapshot | null = null;
   let status = initialStatus(pr);
   let stopped = false;
@@ -67,7 +67,7 @@ export function startPrBabysitter(opts: PrBabysitterOptions): PrBabysitter {
 
   const live = () => !stopped && isCurrent();
 
-  const publish = (patch: Partial<BabysitStatus>) => {
+  const publish = (patch: Partial<AutoFixStatus>) => {
     const ended = status.phase === 'ended' || patch.phase === 'ended';
     const phase = state.pendingSince === null ? 'watching' : 'pending';
     const before = statusSignature(status);
@@ -95,7 +95,7 @@ export function startPrBabysitter(opts: PrBabysitterOptions): PrBabysitter {
     if (!isDue(state, now(), timing)) return;
     const taken = takeReport(state, now());
     if (!taken) return;
-    const prompt = composeBabysitPrompt(pr, taken.report);
+    const prompt = composeAutoFixPrompt(pr, taken.report);
     const delivery = await deliver(opts, pr, prompt, live);
     if (delivery.outcome === 'held') {
       publish({ held: delivery.held });
@@ -154,7 +154,7 @@ export function startPrBabysitter(opts: PrBabysitterOptions): PrBabysitter {
       await maybeDeliver();
     } catch (err: unknown) {
       if (!live()) return;
-      logError('babysit', err);
+      logError('auto-fix', err);
       publish({ lastError: err instanceof Error ? err.message : String(err) });
     }
   };

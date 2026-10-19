@@ -1,15 +1,15 @@
-import { createBabysitterService } from '@n10/engine';
-import type { BabysitChangedEvent } from '../contract.js';
+import { createAutoFixerService } from '@n10/engine';
+import type { AutoFixChangedEvent } from '../contract.js';
 import { activeRepository, activeRepoIs, requireRepo } from './repo.js';
 import { defaultPaneSize, isForeignSession } from './sessions.js';
 import { adoptSession } from './session-registry.js';
 import { pullRequests } from './program.js';
 
-const babysitters = createBabysitterService({
+const autoFixers = createAutoFixerService({
   config: (repo) => {
     const active = activeRepository();
     if (active.cwd !== repo)
-      throw new Error('Babysitter read a parked repository');
+      throw new Error('Auto-fixer read a parked repository');
     const snapshot = active.config.getSnapshot();
     return {
       ...snapshot,
@@ -24,12 +24,12 @@ const babysitters = createBabysitterService({
 });
 let unsubscribe: (() => void) | undefined;
 
-export function setBabysitNotifier(
-  fn: ((event: BabysitChangedEvent) => void) | null
+export function setAutoFixNotifier(
+  fn: ((event: AutoFixChangedEvent) => void) | null
 ): void {
   unsubscribe?.();
   unsubscribe = fn
-    ? babysitters.subscribe((event) => {
+    ? autoFixers.subscribe((event) => {
         if (event.type === 'spawned')
           fn({ spawned: { prId: event.prId, name: event.name } });
         else if (event.type === 'ended')
@@ -38,13 +38,13 @@ export function setBabysitNotifier(
     : undefined;
 }
 
-export function startBabysit(prId: number) {
-  return babysitters.start(requireRepo(), prId);
+export function startAutoFix(prId: number) {
+  return autoFixers.start(requireRepo(), prId);
 }
-export const startBabysitForRepo = babysitters.start;
-export function stopBabysit(prId: number): void {
-  babysitters.stop(requireRepo(), prId);
+export const startAutoFixForRepo = autoFixers.start;
+export function stopAutoFix(prId: number): void {
+  autoFixers.stop(requireRepo(), prId);
 }
-export const stopBabysitForBranch = babysitters.stopBranch;
-export const babysatStatuses = babysitters.getSnapshot;
-export const stopAllBabysitters = babysitters.dispose;
+export const stopAutoFixForBranch = autoFixers.stopBranch;
+export const autoFixStatuses = autoFixers.getSnapshot;
+export const stopAllAutoFixers = autoFixers.dispose;

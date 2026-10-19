@@ -102,7 +102,7 @@ renders their snapshots. Reasoning: `docs/decisions.md`.
   each beside the local scan, never inside it; only a successful listing of a
   machine ends its terminals.
 
-- **Babysitters** (`babysitters/`): one retained watch per repository/PR. Coalesce
+- **Auto-fixers** (`auto-fix/`): one retained watch per repository/PR. Coalesce
   starts; stop and worktree removal cancel pending lookups before watch creation.
   Park inactive repositories without forgetting the delivered baseline. Skip busy
   ticks and bound explicit follow-ups. Check liveness after awaits; use captured

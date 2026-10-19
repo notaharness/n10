@@ -30,7 +30,7 @@ import * as prConversation from './services/pr-conversation.js';
 import * as prDetails from './services/pr-details.js';
 import * as prHistory from './services/pr-history.js';
 import * as reviewDrafts from './services/review-drafts.js';
-import * as babysit from './services/babysit.js';
+import * as autoFix from './services/auto-fix.js';
 import * as machines from './services/machines.js';
 import * as inboundMail from './services/inbound-mail.js';
 import { resolvePickedFolder } from './services/terminal-home.js';
@@ -182,9 +182,9 @@ export function createHostApi(): HostApi {
       Promise.resolve(keybindings.setDesktopKeybinding(actionId, descriptors)),
     showAbout: () => aboutBox(),
 
-    startBabysit: (prId) => babysit.startBabysit(prId),
-    stopBabysit: (prId) => Promise.resolve(babysit.stopBabysit(prId)),
-    onBabysitChanged: () => () => undefined,
+    startAutoFix: (prId) => autoFix.startAutoFix(prId),
+    stopAutoFix: (prId) => Promise.resolve(autoFix.stopAutoFix(prId)),
+    onAutoFixChanged: () => () => undefined,
 
     listMachines: () => machines.listMachines(),
     getBeamStatus: () => machines.getBeamStatus(),

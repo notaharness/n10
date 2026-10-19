@@ -85,7 +85,7 @@ The reasoning behind each rule is in `docs/decisions.md`.
 - **Plan** (`plan/`): items are value snapshots taken at add time.
   `composePlanPrompt` numbers items in `planRows` order. The engine owns
   checkout and session delivery; carts stay in each frontend.
-- **Babysit** (`babysit/`): pure baseline/observation model and prompt composition.
+- **Auto-fix** (`auto-fix/`): pure baseline/observation model and prompt composition.
   The engine owns watch lifetime, freshness, polling and delivery coordination.
   The baseline records what the agent was told, not merely what was observed.
 - **Sidebar sections** (`utils/sidebar-items.ts` `sidebarSection`): both
@@ -94,7 +94,7 @@ The reasoning behind each rule is in `docs/decisions.md`.
   viewer's own sections; a local worktree or agent never does. Someone else's checked-out PR outside every review bucket is
   a worktree row.
 - **Pull request lookup** (`pull-requests/pull-request-lookup.ts`): the
-  `found`/`gone`/`unknown` answer a babysitter reads. The list behind it is
+  `found`/`gone`/`unknown` answer an auto-fixer reads. The list behind it is
   `@n10/engine`'s.
 - **Git output streams** (`utils/git-run.ts`): `runGit` spawns, returns what
   arrived plus `truncated`, rejects only when `git` failed. `execFile` discards

@@ -8,7 +8,7 @@ import { EMPTY_PULL_REQUEST_LIST } from './pull-request-snapshot.js';
 
 /**
  * Every reader of a repository's pull requests sits on this service —
- * both shells' sidebars, babysitters, the desktop's sync loop — so the
+ * both shells' sidebars, auto-fixers, the desktop's sync loop — so the
  * subtle failures are the ones between calls: a refresh answered by a
  * request that predates it, a slow response committing over a fresher
  * one, a provider memo refilled by a request that was already out, a

@@ -1,5 +1,5 @@
 /**
- * Reading a pull request for the babysitter: what the provider says
+ * Reading a pull request for the auto-fixer: what the provider says
  * about its threads, and what git says about merging it.
  *
  * Every git call names the repository it is about. The watcher
@@ -11,10 +11,10 @@ import type { AppConfig, PullRequestInfo, VcsProvider } from '@n10/vcs-core';
 import { countPullRequestConflicts } from '@n10/core';
 import { fetchRefs } from '@n10/core';
 import {
-  BABYSIT_REMOTE_REFRESH_MS,
+  AUTO_FIX_REMOTE_REFRESH_MS,
   observeThread,
-  type BabysitObservation,
-  type BabysitThread,
+  type AutoFixObservation,
+  type AutoFixThread,
 } from '@n10/core';
 
 /** The expensive half of an observation, reused between refreshes. */
@@ -24,7 +24,7 @@ export interface RemoteSnapshot {
    *  either moving is reason to read them again early. */
   activeCommentCount: number | undefined;
   headSha: string | undefined;
-  threads: BabysitThread[];
+  threads: AutoFixThread[];
   fetched: boolean;
 }
 
@@ -47,7 +47,7 @@ async function readThreads(
   pr: PullRequestInfo,
   provider: VcsProvider | null,
   config: AppConfig
-): Promise<BabysitThread[]> {
+): Promise<AutoFixThread[]> {
   if (!provider?.fetchCommentThreads) return [];
   const isOwn = (author: string) => provider.matchesUser(author, config);
   const comments = await provider.fetchCommentThreads(
@@ -116,9 +116,9 @@ async function refreshRemote(
  */
 export async function observePullRequest(
   opts: ObserveOptions
-): Promise<{ observation: BabysitObservation; remote: RemoteSnapshot } | null> {
+): Promise<{ observation: AutoFixObservation; remote: RemoteSnapshot } | null> {
   const { pr, cwd, previous, now, live = () => true } = opts;
-  const refreshMs = opts.refreshMs ?? BABYSIT_REMOTE_REFRESH_MS;
+  const refreshMs = opts.refreshMs ?? AUTO_FIX_REMOTE_REFRESH_MS;
   const remote = remoteIsFresh(previous, pr, now, refreshMs)
     ? previous
     : await refreshRemote(opts, refreshMs, live);

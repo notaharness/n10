@@ -17,7 +17,7 @@ export type { AgentId, ReviewEvent };
 import type {
   SessionLaunchContext,
   SessionIncarnation,
-  BabysitStatus,
+  AutoFixStatus,
   LaunchIntent,
   SidebarItem,
   WorktreeRemovalCheck,
@@ -58,7 +58,7 @@ export type {
   RemoteCommentThread,
 };
 export type {
-  BabysitStatus,
+  AutoFixStatus,
   PullRequestLookup,
   SidebarItem,
   WorktreeRemovalCheck,
@@ -142,7 +142,7 @@ import type {
   VisitRequest,
 } from './contract-pull-requests.js';
 import type {
-  BabysitChangedEvent,
+  AutoFixChangedEvent,
   DiscoveryChangedEvent,
   LaunchStepEvent,
   MachinesChangedEvent,
@@ -696,15 +696,15 @@ export interface N10HostApi {
    *  push, not returned here. */
   dismissInboundMail(id: string): Promise<void>;
 
-  // ── Babysitting ──────────────────────────────────────────────
+  // ── Auto-fixing ──────────────────────────────────────────────
   /** Watch a pull request and brief its agent — CI, unresolved review
    *  threads, conflicts — once the news has settled and the agent is
    *  idle. Rejects when the pull request is not in the sidebar. */
-  startBabysit(prId: number): Promise<BabysitStatus>;
-  stopBabysit(prId: number): Promise<void>;
-  /** Fires when a babysitter started an agent or ended. Its status
-   *  otherwise travels on the sidebar item (`SidebarItem.babysit`). */
-  onBabysitChanged(cb: (event: BabysitChangedEvent) => void): () => void;
+  startAutoFix(prId: number): Promise<AutoFixStatus>;
+  stopAutoFix(prId: number): Promise<void>;
+  /** Fires when an auto-fixer started an agent or ended. Its status
+   *  otherwise travels on the sidebar item (`SidebarItem.autoFix`). */
+  onAutoFixChanged(cb: (event: AutoFixChangedEvent) => void): () => void;
   getDesktopPrefs(): Promise<DesktopPrefs>;
   setDesktopPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
   /** The theme in effect; its changes arrive on `onThemeChanged`. */
@@ -812,8 +812,8 @@ export const IPC = {
   setKeybinding: 'n10/keybindings/set',
   holdMenuShortcuts: 'n10/keybindings/hold-menu',
   showAbout: 'n10/shell/about',
-  startBabysit: 'n10/babysit/start',
-  stopBabysit: 'n10/babysit/stop',
+  startAutoFix: 'n10/auto-fix/start',
+  stopAutoFix: 'n10/auto-fix/stop',
   listMachines: 'n10/machines/list',
   getBeamStatus: 'n10/machines/beam-status',
   setNetworkOnline: 'n10/machines/network-online',

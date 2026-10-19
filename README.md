@@ -88,11 +88,11 @@ Add the review comments you want addressed to a plan, with a note on each if you
 
 ![Adding review comments and instructions to a plan, previewing the prompt, and sending it to an agent](docs/media/plan.gif)
 
-### Babysit a pull request
+### Auto-fix pull requests
 
-Right-click a pull request and choose **Babysit pull request**. While n10 runs with that repository open, it tells the pull request's agent about failing checks, new review comments and conflicts, in batches sent when the agent's terminal has gone quiet.
+Right-click a pull request and choose **Turn on Auto-fix**. While n10 runs with that repository open, it tells the pull request's agent about failing checks, new review comments and conflicts, in batches sent when the agent's terminal has gone quiet.
 
-![Enabling Babysit on a pull request and sending CI failures and review comments to its agent](docs/media/babysit.gif)
+![Turning on Auto-fix and sending failing checks and review comments to a pull request's agent](docs/media/auto-fix.gif)
 
 ### Review pull requests in n10
 

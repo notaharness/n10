@@ -1,5 +1,5 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
-import type { BabysitStatus } from './babysit/babysit-model.js';
+import type { AutoFixStatus } from './auto-fix/auto-fix-model.js';
 
 export type Focus = 'sidebar' | 'terminal';
 
@@ -26,8 +26,8 @@ export type SidebarItem =
       branch?: string;
       isMerged: boolean;
       conflictCount?: number;
-      /** Set while the pull request is being babysat. */
-      babysit?: BabysitStatus;
+      /** Set while the pull request is under auto-fix. */
+      autoFix?: AutoFixStatus;
     }
   | {
       kind: 'orphan-pr';
@@ -35,7 +35,7 @@ export type SidebarItem =
       running?: boolean;
       /** PTY session name when the PR's branch has a worktree session. */
       sessionName?: string;
-      babysit?: BabysitStatus;
+      autoFix?: AutoFixStatus;
     }
   | {
       kind: 'review-pr';
@@ -44,7 +44,7 @@ export type SidebarItem =
       running?: boolean;
       /** PTY session name when the PR's branch has a worktree session. */
       sessionName?: string;
-      babysit?: BabysitStatus;
+      autoFix?: AutoFixStatus;
     };
 
 /** Extract the PR from any sidebar item kind. */

@@ -1,10 +1,10 @@
 import type { BuildStatusState, PullRequestInfo } from '@n10/vcs-core';
-import type { BabysitReport, BabysitThread } from './babysit-model.js';
+import type { AutoFixReport, AutoFixThread } from './auto-fix-model.js';
 
-// ── Babysit update prompt ────────────────────────────────────────
+// ── Auto-fix update prompt ────────────────────────────────────────
 //
-// The message typed into the agent's session when a babysat pull
-// request has news. Same conventions as the plan prompt: every thread
+// The message typed into the agent's session when a pull request under
+// auto-fix has news. Same conventions as the plan prompt: every thread
 // is numbered and carries the provider's own id, so the agent can
 // answer the conversation it fixed, and the file:line it was left on.
 
@@ -26,7 +26,7 @@ function verdictWord(status: BuildStatusState | undefined): string {
   }
 }
 
-function ciLine(report: BabysitReport): string {
+function ciLine(report: AutoFixReport): string {
   const { buildStatus, lastToldBuildStatus, ciChanged } = report;
   const changed = ciChanged ? ' (new verdict since you were last told)' : '';
   switch (buildStatus) {
@@ -43,7 +43,7 @@ function ciLine(report: BabysitReport): string {
   }
 }
 
-function conflictLine(report: BabysitReport, targetBranch: string): string {
+function conflictLine(report: AutoFixReport, targetBranch: string): string {
   const { conflictCount } = report;
   if (conflictCount === null) {
     return (
@@ -61,7 +61,7 @@ function conflictLine(report: BabysitReport, targetBranch: string): string {
   );
 }
 
-function threadBlock(thread: BabysitThread, index: number): string {
+function threadBlock(thread: AutoFixThread, index: number): string {
   const location =
     thread.line != null
       ? `${thread.file ?? 'general'}:${thread.line}`
@@ -76,9 +76,9 @@ function threadBlock(thread: BabysitThread, index: number): string {
 }
 
 /** Compose the update typed into the agent's session. */
-export function composeBabysitPrompt(
+export function composeAutoFixPrompt(
   pr: PromptPr,
-  report: BabysitReport
+  report: AutoFixReport
 ): string {
   const parts: string[] = [
     `Status update for PR #${pr.id} ("${pr.title || pr.sourceBranch}", ` +

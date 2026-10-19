@@ -147,20 +147,20 @@ export const DISCOVERY_EVENTS = {
   changed: 'n10/sidebar/discovered',
 } as const;
 
-// ── Babysitting ──────────────────────────────────────────────────
+// ── Auto-fixing ──────────────────────────────────────────────────
 
-export const BABYSIT_EVENTS = {
+export const AUTO_FIX_EVENTS = {
   /**
-   * A babysitter did something the sidebar cannot wait a poll to show:
+   * An auto-fixer did something the sidebar cannot wait a poll to show:
    * started an agent to receive an update, or ended because the pull
    * request merged or closed. A status that merely moved — a poll, a
    * hold, a delivery into a running agent — reaches the renderer on
    * the sidebar item and needs no event.
    */
-  changed: 'n10/babysit/changed',
+  changed: 'n10/auto-fix/changed',
 } as const;
 
-export interface BabysitChangedEvent {
+export interface AutoFixChangedEvent {
   /** An agent was started in the branch's worktree; a sidebar row and
    *  a session appeared with it. */
   spawned?: { prId: number; name: string };

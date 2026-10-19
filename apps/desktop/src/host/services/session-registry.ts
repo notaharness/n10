@@ -59,7 +59,7 @@ export function isOwnSessionAlive(name: string): boolean {
 }
 
 /** Whether a session under `name` is another repository's — known to
- *  this host, and not the open repository's. The babysitter asks
+ *  this host, and not the open repository's. The auto-fixer asks
  *  before typing into one; the launch paths throw on the same test. */
 export function isForeignSession(name: string): boolean {
   return known.has(name) && !ownSession(name);
