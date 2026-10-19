@@ -33,7 +33,7 @@ The first launch of the desktop app downloads Electron's binary (~100–200 MB);
 
 ### Windows (experimental)
 
-Run n10 inside WSL 2, with Node.js, Git, tmux and your agents installed in the Linux distribution. Use `n10 --tui` for the terminal UI or WSLg for n10 Desktop; both are experimental on Windows. Keep repositories and worktrees on the Linux filesystem, such as `~/src`. See [Windows (WSL)](https://n10.is/docs/windows) for setup and limits.
+Run n10 inside WSL 2, with Node.js, Git, tmux and your agents installed in the Linux distribution. `n10` opens its window through WSLg; without WSLg, use `n10 --tui`. Both are experimental on Windows. Keep repositories and worktrees on the Linux filesystem, such as `~/src`. See [Windows (WSL)](https://n10.is/docs/windows) for setup and limits.
 
 ## What it does
 

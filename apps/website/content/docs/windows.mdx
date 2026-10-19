@@ -1,15 +1,18 @@
 ---
-title: Windows (WSL)
+title: Windows (WSL, experimental)
 description: Experimental support for running n10 on Windows inside WSL 2.
 ---
 
+<Callout type="warn" title="Experimental">
+  Windows support through WSL 2 is experimental, for n10 on WSLg and for the
+  terminal UI. Report problems in an
+  [issue](https://github.com/notaharness/n10/issues).
+</Callout>
+
 On Windows, run n10 inside WSL 2. Install Node.js, Git, tmux and your agents
 in the Linux distribution, and keep repositories and worktrees there too.
-Use Windows Terminal for the terminal UI or WSLg for n10 Desktop.
-
-Windows support through WSL 2 is experimental, including both the terminal
-UI and n10 Desktop through WSLg. Report problems in an
-[issue](https://github.com/notaharness/n10/issues).
+n10 opens its window on the Windows desktop through WSLg; without WSLg, the
+terminal UI runs in Windows Terminal.
 
 ## Recommended setup
 
@@ -29,7 +32,7 @@ In PowerShell:
 wsl --install -d Ubuntu-24.04
 ```
 
-Restart Windows if asked, then open **Ubuntu 24.04** from the Start menu and
+Restart Windows if asked, then open **Ubuntu 24.04 LTS** from the Start menu and
 create your Linux user. To confirm it runs on WSL 2:
 
 ```powershell
@@ -93,11 +96,43 @@ Git integration.
 ```sh
 npm install -g @notaharness/n10
 cd ~/src/app
-n10 --tui
+n10
 ```
 
 With nvm, global packages install into your home directory, so neither the
 install nor n10's own updates need `sudo`.
+
+n10 opens as a window on the Windows desktop through WSLg, which WSL 2
+includes on Windows 11. If n10 reports no display, check your WSLg setup. To
+update and restart WSL, save your work first: `wsl --shutdown` stops all WSL
+distributions and ends their tmux and agent sessions. Then run these commands
+in PowerShell:
+
+```powershell
+wsl --update
+wsl --shutdown
+```
+
+Open a new Ubuntu terminal and run `n10` again.
+
+If n10 prints `n10: running without Chromium's sandbox.` as it starts, the
+`.deb` package can set the sandbox up. Download and install it inside WSL,
+then start n10 with `n10-desktop`; `n10` keeps starting the npm install:
+
+```sh
+curl -LO https://github.com/notaharness/n10/releases/latest/download/n10-desktop_amd64.deb
+sudo apt install ./n10-desktop_amd64.deb
+n10-desktop
+```
+
+If n10 stops as it starts and the error says no sandbox is usable, run
+`N10_NO_SANDBOX=1 n10` to start without Chromium's sandbox.
+
+System notifications, image paste and graphics-driver compatibility are
+untested. Report problems in an
+[issue](https://github.com/notaharness/n10/issues).
+
+Without WSLg, use `n10 --tui`.
 
 ## Sessions
 
@@ -113,46 +148,11 @@ ends its sessions. n10 does not automatically restart the agents.
 Clicking a pull request link opens it in your Windows default browser,
 through `wslview` when the `wslu` package is installed and through
 `explorer.exe` otherwise. If you set `BROWSER`, n10 uses that instead. If
-nothing opens, hold Shift while dragging to select the link, then press
-Ctrl+Shift+C to copy it.
+nothing opens in the terminal UI, hold Shift while dragging to select the
+link, then press Ctrl+Shift+C to copy it.
 
-With Windows Terminal's default shortcuts, copy selected text with
-Ctrl+Shift+C and paste with Ctrl+Shift+V.
-
-## n10 Desktop
-
-On Windows 11, WSL 2 includes WSLg, which shows Linux windows on the Windows
-desktop. From a repository:
-
-```sh
-n10
-```
-
-If n10 reports no display, check your WSLg setup. To update and restart WSL,
-save your work first: `wsl --shutdown` stops all WSL distributions and ends
-their tmux and agent sessions. Then run these commands in PowerShell:
-
-```powershell
-wsl --update
-wsl --shutdown
-```
-
-Open a new Ubuntu terminal and run `n10` again. You can use `n10 --tui`
-without WSLg.
-
-In WSL 2, an npm install uses Chromium's sandbox when unprivileged user
-namespaces are available. If n10 warns that it is running without the
-sandbox, install the `.deb` from [Download](/download), which sets up the
-sandbox:
-
-```sh
-sudo apt install ./n10-desktop_amd64.deb
-n10-desktop
-```
-
-System notifications, image paste and graphics-driver compatibility are
-untested. Report problems in an
-[issue](https://github.com/notaharness/n10/issues).
+In the terminal UI, with Windows Terminal's default shortcuts, copy selected
+text with Ctrl+Shift+C and paste with Ctrl+Shift+V.
 
 ## Not supported
 
