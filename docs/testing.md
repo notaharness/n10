@@ -233,7 +233,7 @@ starting another. Browser launch may require the agent environment's approval.
 and a paced demo agent, then records GIFs into `docs/media/`. The TUI capture
 uses the wterm bridge. Raw captures are ignored under `docs/media/raw/`.
 Read the demo directory's README before recording. The hero stills are
-screenshots of the website's desktop demo: `record-media/record.mjs hero` in
+screenshots of the website's desktop demo: `hero-stills/record.mjs` in
 `apps/website/scripts`.
 
 ## Integration Tests

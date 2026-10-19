@@ -36,21 +36,8 @@ function fit([x, y, w, h]: Box, height: number, pad: number) {
   };
 }
 
-/**
- * TEMPORARY (mockup review): `?motion=1` plays the illustrations even when
- * the browser asks for reduced motion, so they can be watched on a desktop
- * with animations turned off. Remove before this ships; production follows
- * `prefers-reduced-motion` alone.
- */
-function motionOverride(): boolean {
-  return new URLSearchParams(window.location.search).get('motion') === '1';
-}
-
 function motionAllowed(): boolean {
-  return (
-    motionOverride() ||
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 /**
