@@ -1,44 +1,39 @@
 import { superviseChild } from './child-supervision.js';
 export { superviseChild, exitStatus } from './child-supervision.js';
 import { desktopUpdateHandoff } from './desktop-update.js';
-import { spawn, type SpawnOptions } from 'node:child_process';
 import {
-  accessSync,
-  constants as fsConstants,
-  existsSync,
-  statSync,
-  type Stats,
-} from 'node:fs';
+  sandboxAbortHint,
+  sandboxArgs,
+  unsandboxedWarning,
+} from './desktop-sandbox.js';
+import { wslEnvironment, type WslEnvironment } from '@n10/core/wsl';
+import { spawn, type SpawnOptions } from 'node:child_process';
+import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 /**
- * Electron's setuid sandbox helper works only when root owns it with the
- * setuid bit. An npm install leaves it owned by the user, and Electron then
- * aborts with SIGTRAP, so the app runs unsandboxed instead.
- *
- * An Electron the user points at with ELECTRON_OVERRIDE_DIST_PATH may be a
- * distribution's build, which has no helper and sandboxes through user
- * namespaces, so Chromium's sandbox stays on. An unpacked stock release has
- * the helper, and is held to the same rule as an npm install.
+ * Why Electron would find no display to open a window on, or null when
+ * it has one. Inside WSL 2 the display comes from WSLg, which sets
+ * `DISPLAY` and `WAYLAND_DISPLAY` in every process it starts; without
+ * either, Electron dies with an X error that names neither WSLg nor the
+ * terminal UI. WSL 1 has no WSLg.
  */
-export function sandboxArgs(
-  electron: string,
+export function missingDisplay(
   platform: NodeJS.Platform = process.platform,
-  stat: (path: string) => Pick<Stats, 'uid' | 'mode'> = statSync,
-  env: NodeJS.ProcessEnv = process.env
-): string[] {
-  if (platform !== 'linux') return [];
-  try {
-    const helper = stat(join(dirname(electron), 'chrome-sandbox'));
-    return helper.uid === 0 && (helper.mode & 0o4755) === 0o4755
-      ? []
-      : ['--no-sandbox'];
-  } catch {
-    // No helper: a supplied build sandboxes without it, and an npm one
-    // has nothing to sandbox with.
-    return env.ELECTRON_OVERRIDE_DIST_PATH ? [] : ['--no-sandbox'];
+  env: NodeJS.ProcessEnv = process.env,
+  wsl: WslEnvironment | null = platform === 'linux' ? wslEnvironment() : null
+): string | null {
+  if (platform !== 'linux' || env.DISPLAY || env.WAYLAND_DISPLAY) return null;
+  if (wsl?.version === 1) {
+    return `n10: no display is available in this WSL 1 session. To use WSLg, upgrade to WSL 2 by running \`wsl --set-version ${
+      wsl.distro ?? '<distro>'
+    } 2\` from Windows. You can also run \`n10 --tui\`.`;
   }
+  if (wsl) {
+    return 'n10: no display is available in this WSL session. Run `n10 --tui`, or check your WSLg setup (`wsl --update` from Windows).';
+  }
+  return 'n10: no graphical session is available (DISPLAY and WAYLAND_DISPLAY are unset). Run `n10 --tui`.';
 }
 
 /**
@@ -106,6 +101,11 @@ export function launchDesktop(root: string, version: string): Promise<number> {
     );
     return Promise.resolve(1);
   }
+  const noDisplay = missingDisplay();
+  if (noDisplay) {
+    console.error(noDisplay);
+    return Promise.resolve(1);
+  }
   const require = createRequire(import.meta.url);
   let electron: string;
   try {
@@ -117,16 +117,16 @@ export function launchDesktop(root: string, version: string): Promise<number> {
     return Promise.resolve(1);
   }
   const args = sandboxArgs(electron);
-  if (args.length > 0) {
-    console.warn(
-      '[n10] SUID sandbox unavailable — launching with --no-sandbox'
-    );
-  }
+  if (args.length > 0) console.warn(unsandboxedWarning());
   const handoff = desktopUpdateHandoff(root);
   const options = electronSpawnOptions(version, {
     ...process.env,
     N10_UPDATE_HANDOFF: handoff.request,
   });
   const child = spawn(electron, [...args, root], options);
-  return superviseChild(child).then((code) => handoff.finish(code));
+  return superviseChild(child).then((code) => {
+    const hint = sandboxAbortHint(code, args);
+    if (hint) console.error(hint);
+    return handoff.finish(code);
+  });
 }

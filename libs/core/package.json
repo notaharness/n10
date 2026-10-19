@@ -21,6 +21,11 @@
       "import": "./src/open-url.ts",
       "default": "./src/open-url.ts"
     },
+    "./wsl": {
+      "types": "./src/wsl.ts",
+      "import": "./src/wsl.ts",
+      "default": "./src/wsl.ts"
+    },
     "./readiness": {
       "types": "./src/readiness.ts",
       "import": "./src/readiness.ts",

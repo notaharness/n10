@@ -1316,6 +1316,20 @@ sessions that outlive it fail until it runs again; the deb has fixed paths.
 Where AppArmor blocks user namespaces (Ubuntu 24.04 and later), the deb
 installs a profile, and the AppImage's launcher adds `--no-sandbox`.
 
+The npm package's launcher (`apps/cli/src/commands/desktop-sandbox.ts`) keeps
+Chromium's sandbox when root owns a setuid `chrome-sandbox`, or when Electron
+can create the sandbox's namespaces; otherwise it adds `--no-sandbox` and says
+so. The probe is `unshare --user --map-root-user --net --pid --fork`, as the
+sandbox itself does it: a bare `unshare --user` succeeds under AppArmor's
+user-namespace restriction while withholding the capabilities inside. Where
+`apparmor_restrict_unprivileged_userns` is 1 the answer is no without probing,
+because AppArmor confines per program: a profile may let `unshare` through
+while an npm install's Electron stays confined, and Chromium then aborts with
+no usable sandbox rather than falling back. WSL 2 has no such restriction, so
+an npm install there runs sandboxed. `N10_NO_SANDBOX=1` turns the sandbox off
+where this rule misjudges a system, and a SIGTRAP exit with the sandbox on
+names it.
+
 Release assets have versionless names, listed in
 `apps/desktop/release-assets.json`, so
 `https://github.com/notaharness/n10/releases/latest/download/<name>` always
