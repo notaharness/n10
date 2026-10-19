@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { ReviewWorkspaceIllustration } from '@/components/illustrations/review-workspace';
 import { AgentReviewIllustration } from '@/components/illustrations/agent-review';
 import { FeedbackPlanIllustration } from '@/components/illustrations/feedback-plan';
-import { BabysitIllustration } from '@/components/illustrations/babysit';
+import { AutoFixIllustration } from '@/components/illustrations/auto-fix';
 import { WorktreeSessionIllustration } from '@/components/illustrations/worktree-session';
 import { PersistentSessionIllustration } from '@/components/illustrations/persistent-session';
 import { TerminalUiIllustration } from '@/components/illustrations/terminal-ui';
@@ -126,9 +126,9 @@ export function PurposeSections() {
           <Story
             title="When the next check fails"
             body="Enable Auto-fix in n10 to send failed checks and review feedback while the repository is open. If needed, n10 checks out the branch and starts an agent. Enable it again after restarting n10."
-            href="/docs/guides/babysit"
+            href="/docs/guides/auto-fix"
             link="Guide: Auto-fix a pull request"
-            illustration={<BabysitIllustration />}
+            illustration={<AutoFixIllustration />}
           />
         </div>
       </section>

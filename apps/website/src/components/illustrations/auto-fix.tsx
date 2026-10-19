@@ -10,7 +10,7 @@ const WAIT_DX = -164;
 /** The session's output rows; the first three exist before Auto-fix acts. */
 const ROWS = [0.7, 0.45, 0.8, 0.55, 0.85, 0.4, 0.65];
 
-const css = timeline('babysit', 12000, {
+const css = timeline('auto-fix', 12000, {
   compressed: transient(600, 11000, 300),
   check: [
     [700, 'opacity:0;transform:translate(-162px,20px)'],
@@ -47,10 +47,10 @@ const css = timeline('babysit', 12000, {
   delivered: appear(10700),
 });
 
-export function BabysitIllustration() {
+export function AutoFixIllustration() {
   return (
     <Illustration
-      name="babysit"
+      name="auto-fix"
       box={BOX}
       css={css}
       title="Auto-fix batches feedback and waits for a quiet terminal"
