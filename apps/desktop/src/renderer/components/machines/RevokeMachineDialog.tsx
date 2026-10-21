@@ -98,6 +98,11 @@ export function RevokeMachineDialog({ machine }: { machine: MachineView }) {
         }}
         className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg"
         showCloseButton={!ceremony.outcome}
+        // As in the enrolment dialog: a double click on Revoke access
+        // must not hide the request it started, or its result.
+        onPointerDownOutside={(event) => {
+          if (ceremony.view) event.preventDefault();
+        }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           if (document.hasFocus()) section.reveal();
