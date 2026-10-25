@@ -5,12 +5,12 @@
 n10 is one program with two frontends. Each layer depends only on the ones
 below it, and the ESLint module boundaries enforce the direction.
 
-| Layer                      | Role                                                                                                                                                                                                                       |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node entry plus explicit browser-safe subpaths.                                                                                      |
-| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                                             |
-| `@n10/app-core`            | React contexts/hooks over the engine, including config snapshots; the desktop renderer also uses the browser-safe plan binding. Browser-safe hooks receive structural engine clients; terminal-only hooks live in the CLI. |
-| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge. Two open shells share the implementation, not the state.                   |
+| Layer                      | Role                                                                                                                                                                                                                                                  |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@n10/core`                | Primitive operations: Git, filesystem, tmux and PTY, config, providers, pure helpers. Node entry plus explicit browser-safe subpaths.                                                                                                                 |
+| `@n10/engine`              | The program: state, scheduling, caching and the events that announce them, over core. Node only; never React, Ink or Electron.                                                                                                                        |
+| `@n10/app-core`            | React contexts/hooks over the engine, including config snapshots; the desktop renderer also uses the browser-safe plan binding. Browser-safe hooks receive structural engine clients; terminal-only hooks live in the CLI.                            |
+| `apps/cli`, `apps/desktop` | Rendering and input. The TUI runs the engine in its own process; the desktop runs it in the `n10 host` utility process, behind the host bridge, or as `n10 host --stdio` in WSL or over SSH. Two open shells share the implementation, not the state. |
 
 The engine owns config, repository handles, worktrees, remote sync, the PR
 list, review reads/commands, worktree sessions, directory terminals, auto-fixers, fleet state and plan delivery. Repository handles own config,
@@ -38,6 +38,10 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
   src/main/                      — Electron main: window chrome + security posture (window.ts), N10_QA_STEPS hook
   src/main/host-worker.ts        — The session host: a utility process running every host service and PTY client
   src/main/host-process.ts       — Forks the host, forwards the contract to it, answers its ShellCalls, respawns it
+  src/main/host-target.ts        — Where the host runs (local, WSL, SSH) and the wsl.exe/ssh command that starts it
+  src/main/host-link.ts          — The main process's end of a host: utility process or pipe, with the hello handshake
+  src/main/host-wire.ts          — The host protocol on a byte stream: marked JSON lines, version, noise tolerance
+  src/main/host-channel.ts       — The host's end: parentPort, or stdin/stdout for `n10 host --stdio`
   src/main/beam/                 — Client of the beam daemon's control socket: machines, remote exec/pty, ceremonies, mail relay, and the daemon the app starts
   src/preload/preload.ts         — Typed contextBridge → window.n10
   src/host/menu-template.ts      — Pure native app menu template, used by main and the web demo

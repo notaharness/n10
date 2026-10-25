@@ -1524,6 +1524,25 @@ Require an attributed CPU profile and identical-fixture before/after evidence
 before adding another worker; asynchronous I/O or smaller payloads may address
 the measured cost without a new lifetime and queue.
 
+### Remote hosts
+
+The desktop's frontend and host meet at the existing host protocol, so a
+host elsewhere is a transport, not a second architecture: the same
+`host-worker.js`, run as `n10 host --stdio` behind `wsl.exe` or `ssh`, in
+the target's login shell so its PATH finds n10, node, tmux and the agents.
+Stdio pipes, not a listening socket: nothing is exposed, and SSH supplies
+authentication. Login shells print, so frames are marked lines and anything
+unmarked is noise; nothing is written to the host before its hello, which
+carries `HOST_PROTOCOL`. Independently installed frontends and hosts can
+differ, so a mismatch is refused with the install command rather than
+mixing contracts. A frontend that vanishes closes the pipe; the host treats
+EOF as quitting, which detaches tmux clients and never kills sessions. The
+respawn policy doubles as reconnect: a dropped link is a host that died,
+and windows reload against the next one. A WSL path from the Windows
+dialog is translated to the distro's own; an SSH host's files are browsed
+through the host, since Windows cannot see them. The host's updater stays
+off: the frontend cannot replace a remote install.
+
 ## App updates and release channels
 
 The engine's `updates` domain owns checks, persistence, retry policy and the

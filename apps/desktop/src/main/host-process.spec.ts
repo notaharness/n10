@@ -73,6 +73,11 @@ function start(
       appMenuPopup: async () => undefined,
       aboutBox: async () => undefined,
       prefsChanged: async () => undefined,
+      hostTarget: async () => ({
+        kind: 'local',
+        label: 'this computer',
+        folders: 'native',
+      }),
       holdMenuShortcuts: async () => undefined,
       takeLaunchRepo: async () => null,
       ...shell,

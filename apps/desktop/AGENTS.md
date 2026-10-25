@@ -23,6 +23,24 @@ Every rule below has its reasoning in `docs/decisions.md`.
   tmux sessions survive, discovery re-attaches them, windows reload to
   watch again. Calls wait out a restart; after giving up they fail and
   the user is told. Tests load a module into the host first with `N10_HOST_REQUIRE`.
+- The host may run elsewhere (`main/host-target.ts`): `--host=` or `N10_HOST`
+  names `local`, `wsl[:<distro>]` or `ssh:<destination>`, and Windows
+  defaults to WSL. A remote host is `n10 host --stdio` (`apps/cli`
+  `commands/host.ts`, the same `host-worker.js`) behind `wsl.exe` or `ssh`,
+  started through the target's login shell. `main/host-link.ts` hides
+  which: `utilityLink` or `pipeLink`. On a pipe, `main/host-wire.ts` frames
+  each message as one marked JSON line, tags byte arrays and `undefined`
+  arguments, and ignores unmarked lines (login-shell output); the host's
+  `HELLO` comes first, nothing is written before it, and a protocol
+  mismatch or a Windows host is refused. `host-channel.ts` is the host's
+  end: stdout is the protocol's, so console output goes to stderr; stdin
+  EOF is a shutdown that detaches. A remote host forks beam itself
+  (`beam/direct-daemon.ts`), skips the frontend's updater, and gets only
+  a start directory naming its own files (`remoteStartDir`). Folders: the
+  OS dialog locally and in WSL (`\\wsl.localhost` paths translated by
+  `wslPath`), the renderer's `FolderBrowserDialog` over `listDirectory`
+  over SSH (`HostTargetView.folders`, `lib/folders/pick-host-folder.ts`).
+  Bump `HOST_PROTOCOL` when a message's shape changes.
 - The host creates tmux servers itself: a utility process does not hand
   Chromium's descriptors to the persistent server, as spawning straight
   from the main process on Linux would.

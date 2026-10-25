@@ -12,12 +12,13 @@
  * the user is told.
  */
 import { join } from 'node:path';
-import { app, ipcMain, utilityProcess, type UtilityProcess } from 'electron';
+import { app, ipcMain, utilityProcess } from 'electron';
 import { IPC, type ResolvedTheme } from '../host/contract.js';
 import type { HostPushes } from '../host/host-pushes.js';
 import { spawnOwnedDaemon, type OwnedDaemon } from './beam/owned-daemon.js';
 import { newGate, within } from './host-gate.js';
 import { hostEnv } from './host-env.js';
+import { spawnPipeHost, utilityLink, type HostLink } from './host-link.js';
 import {
   errorText,
   type HostToMain,
@@ -25,6 +26,8 @@ import {
   type ShellCalls,
 } from './host-protocol.js';
 import { RestartPolicy } from './host-restarts.js';
+import { hostCommand, remoteStartDir, type HostTarget } from './host-target.js';
+import type { HostHello } from './host-wire.js';
 
 /** How long quitting waits for the host to let go of its sessions. */
 const STOP_TIMEOUT_MS = 10_000;
@@ -43,6 +46,12 @@ export const HOST_UNAVAILABLE = {
 type Shell = Omit<ShellCalls, 'spawnDaemon' | 'stopDaemon' | 'killDaemon'>;
 
 export interface HostProcessOptions {
+  /** Where the host runs (`host-target.ts`); this computer by default. */
+  target?: HostTarget;
+  /** This app's version, which a host behind a pipe must speak. */
+  version?: string;
+  /** A host behind a pipe said who it is. */
+  onHello?: (hello: HostHello) => void;
   startDir?: string;
   shell: Shell;
   pushes: HostPushes;
@@ -77,7 +86,7 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
   const pending = new Map<number, Pending>();
   const restarts = new RestartPolicy();
   let nextInvoke = 0;
-  let child: UtilityProcess | null = null;
+  let child: HostLink | null = null;
   let gate = newGate();
   let failed: Error | null = null;
   let respawn: ReturnType<typeof setTimeout> | null = null;
@@ -90,7 +99,7 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
     startedReject = reject;
   });
 
-  const post = (message: MainToHost) => child?.postMessage(message);
+  const post = (message: MainToHost) => child?.post(message);
 
   const shellCalls: ShellCalls = {
     ...options.shell,
@@ -112,7 +121,7 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
   // its calls from the start again: the answer goes to the host that
   // asked, or nowhere.
   async function serve(
-    host: UtilityProcess,
+    host: HostLink,
     { id, method, args }: Extract<HostToMain, { t: 'call' }>
   ) {
     const reply = (message: MainToHost) => {
@@ -144,13 +153,13 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
 
   // A host that cannot start says why and is stopped; its exit decides
   // what happens next.
-  function onFatal(host: UtilityProcess, message: string): void {
+  function onFatal(host: HostLink, message: string): void {
     if (first) startedReject(new Error(message));
     else console.error('[desktop] host could not start again:', message);
     host.kill();
   }
 
-  function onMessage(host: UtilityProcess, message: HostToMain): void {
+  function onMessage(host: HostLink, message: HostToMain): void {
     switch (message.t) {
       case 'result':
         return settle(message);
@@ -180,7 +189,7 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
     options.onFailed(HOST_UNAVAILABLE.failed);
   }
 
-  function onExit(host: UtilityProcess, code: number): void {
+  function onExit(host: HostLink, code: number): void {
     if (child !== host) return;
     child = null;
     for (const call of pending.values()) {
@@ -201,11 +210,9 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
     }, delay);
   }
 
-  function fork(): void {
-    const host = utilityProcess.fork(
-      join(import.meta.dirname, 'host-worker.js'),
-      [],
-      {
+  function forkLocal(): HostLink {
+    return utilityLink(
+      utilityProcess.fork(join(import.meta.dirname, 'host-worker.js'), [], {
         serviceName: 'n10 host',
         stdio: 'inherit',
         env: hostEnv(
@@ -217,11 +224,33 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
           app.getPath('userData'),
           options.startDir
         ),
-      }
+      })
     );
+  }
+
+  // Only the first host opens the start directory; one started again
+  // opens what it remembers.
+  function startPipe(target: Exclude<HostTarget, { kind: 'local' }>) {
+    const startDir = first
+      ? remoteStartDir(target, options.startDir)
+      : undefined;
+    return spawnPipeHost({
+      target,
+      frontendVersion: options.version ?? 'dev',
+      onHello: (hello) => options.onHello?.(hello),
+      ...hostCommand(target, {
+        startDir,
+        command: process.env.N10_HOST_COMMAND,
+      }),
+    });
+  }
+
+  function fork(): void {
+    const target = options.target ?? { kind: 'local' };
+    const host = target.kind === 'local' ? forkLocal() : startPipe(target);
     child = host;
-    host.on('message', (message: HostToMain) => onMessage(host, message));
-    host.once('exit', (code) => onExit(host, code));
+    host.onMessage((message) => onMessage(host, message));
+    host.onceExit((code) => onExit(host, code));
     // Queued until the host listens, so it arrives before any call.
     post({ t: 'theme', theme: options.theme() });
   }
@@ -249,7 +278,7 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
     const host = child;
     if (host) {
       const exited = new Promise<void>((resolve) =>
-        host.once('exit', () => resolve())
+        host.onceExit(() => resolve())
       );
       post({ t: 'shutdown' });
       const timer = setTimeout(() => host.kill(), STOP_TIMEOUT_MS);

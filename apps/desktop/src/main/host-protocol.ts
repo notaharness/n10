@@ -10,6 +10,7 @@ import type { NpmUpdatePlan } from '@n10/engine/contract';
 import type {
   ContextMenuItem,
   DesktopPrefs,
+  HostTargetView,
   ResolvedTheme,
 } from '../host/contract.js';
 import type { DaemonExit } from './beam/owned-daemon.js';
@@ -24,6 +25,8 @@ export interface ShellCalls {
   appMenuPopup(): Promise<void>;
   aboutBox(): Promise<void>;
   prefsChanged(next: DesktopPrefs): Promise<void>;
+  /** Where this host runs, as the frontend started it. */
+  hostTarget(): Promise<HostTargetView>;
   /** `viewer`'s window ignores (or again obeys) menu accelerators. */
   holdMenuShortcuts(viewer: number, held: boolean): Promise<void>;
   /** `viewer`'s page claims later launches (`main/launch-repo.ts`). */
