@@ -61,6 +61,9 @@ export type HostToMain =
   | { t: 'call'; id: number; method: keyof ShellCalls; args: unknown[] }
   | { t: 'broadcast'; channel: string; payload?: unknown }
   | { t: 'send'; viewer: number; channel: string; payload: unknown }
+  // A host on the same machine started after it took over; this one
+  // is stopping, and is not to be started again.
+  | { t: 'replaced' }
   | { t: 'stopped' };
 
 export function errorText(err: unknown): string {

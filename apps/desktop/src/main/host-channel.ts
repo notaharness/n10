@@ -52,6 +52,7 @@ function stdioChannel(env: NodeJS.ProcessEnv): HostChannel {
       platform: process.platform,
       home: homedir(),
       ...(env.WSL_DISTRO_NAME ? { distro: env.WSL_DISTRO_NAME } : {}),
+      ...(process.argv[1] ? { entry: process.argv[1] } : {}),
     })
   );
   return {
@@ -73,6 +74,8 @@ function stdioChannel(env: NodeJS.ProcessEnv): HostChannel {
       );
       process.stdin.on('data', read);
       process.stdin.once('end', ended);
+      // How a later host takes over (`host-lock.ts`).
+      process.once('SIGTERM', ended);
       // A frontend that is gone leaves nothing to write to.
       process.stdout.on('error', ended);
     },

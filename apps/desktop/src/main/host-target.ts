@@ -52,6 +52,31 @@ export function launchHostTarget(
   );
 }
 
+/**
+ * The launch's target, or why it cannot run, which the app shows once
+ * it can. A test's fakes and network guard (`N10_HOST_REQUIRE`) load
+ * into a host on this computer only; with a remote one the test would
+ * reach the real network, tmux and auth.
+ */
+export function resolveHostTarget(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform
+): { target: HostTarget; error: Error | null } {
+  try {
+    const target = launchHostTarget(argv, env, platform);
+    if (target.kind !== 'local' && env.N10_HOST_REQUIRE) {
+      throw new Error(
+        'n10: N10_HOST_REQUIRE only loads into a host on this computer. Set N10_HOST=local.'
+      );
+    }
+    return { target, error: null };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    return { target: { kind: 'local' }, error };
+  }
+}
+
 /** The target in the user's words. */
 export function hostLabel(target: HostTarget, distro?: string): string {
   switch (target.kind) {
@@ -77,6 +102,9 @@ export interface HostCommand {
 export interface HostCommandOptions {
   /** A directory on the target to open first. */
   startDir?: string;
+  /** The WSL distro whose files `startDir` names, when the target does
+   *  not say which distro it runs in: the host opens it only there. */
+  startDistro?: string;
   /** How the target runs n10: `N10_HOST_COMMAND`, else `n10`. A path
    *  to a checkout's build works too (`node ~/src/n10/dist/main.js`). */
   command?: string;
@@ -90,11 +118,18 @@ export function remoteScript(options: HostCommandOptions): string {
   const start = options.startDir
     ? ` --start-dir ${shellQuote(options.startDir)}`
     : '';
-  return `exec ${command} host --stdio${start}`;
+  const distro =
+    options.startDir && options.startDistro
+      ? ` --start-distro ${shellQuote(options.startDistro)}`
+      : '';
+  return `exec ${command} host --stdio${start}${distro}`;
 }
 
-/** Runs `script` under the target user's login shell, from `sh`. */
-const LOGIN_SHELL = 'exec "${SHELL:-/bin/sh}" -lc "$1"';
+/** Runs `script` under the target user's interactive login shell, from
+ *  `sh`: as `loginShellPath` (`launch-env.ts`) finds, version managers
+ *  such as nvm set PATH up in `~/.bashrc`, which returns early for a
+ *  shell that is not interactive. What it prints is noise to the wire. */
+const LOGIN_SHELL = 'exec "${SHELL:-/bin/sh}" -ilc "$1"';
 
 export function hostCommand(
   target: Exclude<HostTarget, { kind: 'local' }>,
@@ -166,22 +201,46 @@ export function windowsPathInWsl(distro: string, linuxPath: string): string {
   return `\\\\wsl.localhost\\${distro}${linuxPath.replaceAll('/', '\\')}`;
 }
 
+export interface RemoteDir {
+  path: string;
+  /** The WSL distro whose files `path` names, when that was not known
+   *  to be the host's: the host checks it. */
+  distro?: string;
+}
+
 /**
- * The start directory to hand a host on `target`, from one the
- * frontend was given. A remote host only takes a directory that names
- * its own files: a WSL path a Windows terminal started in, or a POSIX
- * path given outright. Not a Windows drive: where a Windows terminal
- * happened to be, most often the home folder, is not a repository the
- * user means to open in Linux.
+ * The directory to hand a host on `target`, from one the frontend was
+ * given. A remote host only takes a directory that names its own files:
+ * a WSL path a Windows terminal started in, or a POSIX path given
+ * outright. Not a Windows drive: where a Windows terminal happened to
+ * be, most often the home folder, is not a repository the user means to
+ * open in Linux. `distro` is the host's distro when known (the target's,
+ * else its hello's); a WSL path of another is refused.
  */
 export function remoteStartDir(
   target: HostTarget,
-  dir: string | undefined
-): string | undefined {
-  if (!dir || target.kind === 'local') return dir;
-  if (dir.startsWith('/')) return dir;
-  if (target.kind === 'wsl' && WSL_UNC.test(dir)) {
-    return wslPath(dir, target.distro) ?? undefined;
-  }
-  return undefined;
+  dir: string | undefined,
+  distro: string | undefined = target.kind === 'wsl' ? target.distro : undefined
+): RemoteDir | undefined {
+  if (!dir) return undefined;
+  if (target.kind === 'local' || dir.startsWith('/')) return { path: dir };
+  const unc = target.kind === 'wsl' ? WSL_UNC.exec(dir) : null;
+  if (!unc) return undefined;
+  const path = wslPath(dir, distro);
+  if (path === null) return undefined;
+  return distro ? { path } : { path, distro: unc[1] };
+}
+
+/** A folder the frontend was handed, as the running host names it; null
+ *  when it is not the host's, or not known to be. `hostDistro` is the
+ *  distro the host said it runs in. */
+export function hostPath(
+  target: HostTarget,
+  dir: string,
+  hostDistro?: string
+): string | null {
+  const distro =
+    target.kind === 'wsl' ? target.distro ?? hostDistro : undefined;
+  const mapped = remoteStartDir(target, dir, distro);
+  return mapped && !mapped.distro ? mapped.path : null;
 }

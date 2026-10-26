@@ -32,6 +32,7 @@ import { appBeamClient } from './beam/app-beam.js';
 import { spawnDirectDaemon } from './beam/direct-daemon.js';
 import type { DaemonExit, OwnedDaemon } from './beam/owned-daemon.js';
 import { openHostChannel } from './host-channel.js';
+import { takeHostLock, type HostLock } from './host-lock.js';
 import {
   errorText,
   type HostToMain,
@@ -125,9 +126,12 @@ function settle(message: Extract<MainToHost, { t: 'reply' }>): void {
 // Terminal clients go; the tmux sessions behind them stay. Then the
 // daemon this host started stops (D15).
 let shuttingDown = false;
+/** Behind a pipe: this user's one host on the machine. */
+let lock: HostLock | null = null;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  if (lock?.replaced()) post({ t: 'replaced' });
   stopUpdates();
   const removals = stopRemoteSyncLoop();
   stopDiscovery();
@@ -139,6 +143,7 @@ async function shutdown(): Promise<void> {
   }
   await beam.shutdown().catch(logFailure('beam shutdown'));
   await removals;
+  lock?.release();
   post({ t: 'stopped' });
   setImmediate(() => process.exit(0));
 }
@@ -176,6 +181,7 @@ async function start(): Promise<void> {
   const startDir = process.env.N10_START_DIR;
   delete process.env.N10_START_DIR;
   const userData = process.env.N10_USER_DATA;
+  if (channel.remote && userData) lock = await takeHostLock(userData);
   if (userData) installSessionBin(userData);
   installHostPushes({
     broadcast: (channel, payload) => post({ t: 'broadcast', channel, payload }),

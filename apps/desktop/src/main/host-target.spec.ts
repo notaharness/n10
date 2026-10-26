@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   hostCommand,
   hostLabel,
+  hostPath,
   launchHostTarget,
   parseHostTarget,
   remoteScript,
   remoteStartDir,
+  resolveHostTarget,
   shellQuote,
   windowsPathInWsl,
   wslPath,
@@ -53,6 +55,23 @@ describe('parseHostTarget', () => {
     ).toEqual({ kind: 'wsl', distro: 'D' });
   });
 
+  it('keeps a test’s preload to a host on this computer', () => {
+    const preload = { N10_HOST_REQUIRE: '/fixtures/host-preload.cjs' };
+    expect(
+      resolveHostTarget(['electron'], preload, 'win32').error?.message
+    ).toMatch(/N10_HOST=local/);
+    expect(
+      resolveHostTarget(
+        ['electron'],
+        { ...preload, N10_HOST: 'local' },
+        'win32'
+      )
+    ).toEqual({ target: { kind: 'local' }, error: null });
+    expect(
+      resolveHostTarget(['electron', '--host=nope'], {}, 'linux').error?.message
+    ).toMatch(/unknown host/);
+  });
+
   it('names each target', () => {
     expect(hostLabel({ kind: 'local' })).toBe('this computer');
     expect(hostLabel({ kind: 'wsl' }, 'Ubuntu')).toBe('WSL (Ubuntu)');
@@ -70,7 +89,7 @@ describe('host commands', () => {
     );
   });
 
-  it('runs WSL’s login shell from the distro’s home, argv only', () => {
+  it('runs WSL’s interactive login shell from the distro’s home, argv only', () => {
     expect(hostCommand({ kind: 'wsl', distro: 'Ubuntu' }, {})).toEqual({
       file: 'wsl.exe',
       args: [
@@ -81,7 +100,7 @@ describe('host commands', () => {
         '--exec',
         'sh',
         '-c',
-        'exec "${SHELL:-/bin/sh}" -lc "$1"',
+        'exec "${SHELL:-/bin/sh}" -ilc "$1"',
         'n10-host',
         'exec n10 host --stdio',
       ],
@@ -147,13 +166,49 @@ describe('WSL paths', () => {
 
   it('starts a remote host only in a directory of its own', () => {
     const wsl = { kind: 'wsl' as const, distro: 'Ubuntu' };
-    expect(remoteStartDir(wsl, '\\\\wsl.localhost\\Ubuntu\\home\\me')).toBe(
-      '/home/me'
-    );
+    expect(remoteStartDir(wsl, '\\\\wsl.localhost\\Ubuntu\\home\\me')).toEqual({
+      path: '/home/me',
+    });
+    expect(
+      remoteStartDir(wsl, '\\\\wsl.localhost\\Debian\\home\\me')
+    ).toBeUndefined();
     expect(remoteStartDir(wsl, 'C:\\Users\\me')).toBeUndefined();
-    expect(remoteStartDir(wsl, '/srv/repo')).toBe('/srv/repo');
+    expect(remoteStartDir(wsl, '/srv/repo')).toEqual({ path: '/srv/repo' });
     const ssh = { kind: 'ssh' as const, destination: 'box' };
     expect(remoteStartDir(ssh, 'C:\\Users\\me')).toBeUndefined();
-    expect(remoteStartDir({ kind: 'local' }, 'C:\\x')).toBe('C:\\x');
+    expect(
+      remoteStartDir(ssh, '\\\\wsl.localhost\\Ubuntu\\home')
+    ).toBeUndefined();
+    expect(remoteStartDir({ kind: 'local' }, 'C:\\x')).toEqual({
+      path: 'C:\\x',
+    });
+  });
+
+  it('names a later launch’s folder as the running host would', () => {
+    const dir = '\\\\wsl.localhost\\Ubuntu\\home\\me\\repo';
+    expect(hostPath({ kind: 'wsl' }, dir, 'Ubuntu')).toBe('/home/me/repo');
+    expect(hostPath({ kind: 'wsl' }, dir, 'Debian')).toBeNull();
+    // Not known yet which distro the host is in.
+    expect(hostPath({ kind: 'wsl' }, dir)).toBeNull();
+    expect(hostPath({ kind: 'wsl' }, 'C:\\src\\proj', 'Ubuntu')).toBeNull();
+    expect(hostPath({ kind: 'local' }, 'C:\\src\\proj')).toBe('C:\\src\\proj');
+  });
+
+  it('leaves the default distro to check a WSL path names its files', () => {
+    const dir = '\\\\wsl.localhost\\Debian\\home\\me\\repo';
+    expect(remoteStartDir({ kind: 'wsl' }, dir)).toEqual({
+      path: '/home/me/repo',
+      distro: 'Debian',
+    });
+    // Its hello named it: checked here.
+    expect(remoteStartDir({ kind: 'wsl' }, dir, 'Ubuntu')).toBeUndefined();
+    expect(remoteStartDir({ kind: 'wsl' }, dir, 'debian')).toEqual({
+      path: '/home/me/repo',
+    });
+    expect(
+      remoteScript({ startDir: '/home/me/repo', startDistro: 'Debian' })
+    ).toBe(
+      `exec n10 host --stdio --start-dir '/home/me/repo' --start-distro 'Debian'`
+    );
   });
 });

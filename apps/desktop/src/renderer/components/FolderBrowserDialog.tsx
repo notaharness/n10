@@ -24,7 +24,7 @@ interface Props {
 /**
  * The app's folder browser, for a host whose files the OS dialog cannot
  * see (`HostTargetView.folders`). A row opens its folder; Open chooses
- * the folder shown. A path can be typed outright.
+ * the folder in the path field, shown or typed outright.
  */
 export function FolderBrowserDialog({ title, where, list, onDone }: Props) {
   const [listing, setListing] = useState<DirectoryListing | null>(null);
@@ -53,6 +53,23 @@ export function FolderBrowserDialog({ title, where, list, onDone }: Props) {
   const submit = (event: SyntheticEvent) => {
     event.preventDefault();
     if (typed.trim()) go(typed.trim());
+  };
+
+  // Open chooses what the path field says: the folder shown, or one
+  // typed and not yet gone to, once the host has resolved it.
+  const choose = () => {
+    const path = typed.trim();
+    if (listing && (!path || path === listing.path)) {
+      return onDone(listing.path);
+    }
+    if (!path) return;
+    setBusy(true);
+    void list(path)
+      .then((next) => onDone(next.path))
+      .catch((err: unknown) => {
+        setError(errorMessage(err));
+        setBusy(false);
+      });
   };
 
   return (
@@ -114,8 +131,8 @@ export function FolderBrowserDialog({ title, where, list, onDone }: Props) {
             Cancel
           </Button>
           <Button
-            disabled={busy || !listing}
-            onClick={() => listing && onDone(listing.path)}
+            disabled={busy || (!listing && !typed.trim())}
+            onClick={choose}
           >
             Open
           </Button>

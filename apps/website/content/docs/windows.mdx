@@ -157,10 +157,11 @@ n10
 ```
 
 On Windows, `n10` opens its window natively and starts `n10 host --stdio` in
-your default WSL distribution through your Linux login shell, so the `PATH`
-nvm sets up finds it. Git, tmux, agents and repositories stay in Linux, and
-the window does not need WSLg. Install the same n10 version on both sides: a
-host speaking another version is refused, with the command that fixes it.
+your default WSL distribution through your Linux shell, as an interactive
+login shell, so the `PATH` nvm sets up in `~/.bashrc` finds it. Git, tmux,
+agents and repositories stay in Linux, and the window does not need WSLg.
+Install the same n10 version on both sides: a host of another version is
+refused, with the command that fixes it.
 
 To choose a distribution, run `n10 --host=wsl:Ubuntu-24.04`, or set
 `N10_HOST` to the same value. If the host cannot start, n10 shows the shell's
@@ -172,6 +173,12 @@ checkout's build, set `N10_HOST_COMMAND`, for example to
 Linux home under `\\wsl.localhost\`; n10 translates the folder you choose to
 its Linux path. Closing the window detaches the host from your sessions, as
 quitting n10 inside WSL does.
+
+If the connection to the host drops, for example while the computer sleeps,
+n10 keeps trying to reconnect, every 30 seconds at most, and reattaches your
+sessions when it does. Each user on a machine has one host: opening n10
+against it from a second window or computer takes it over, and the first
+window says so instead of reconnecting.
 
 ### On another machine over SSH
 

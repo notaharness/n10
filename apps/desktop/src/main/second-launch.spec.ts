@@ -138,6 +138,18 @@ describe('installSecondLaunch', () => {
     expect(open).toHaveBeenCalledExactlyOnceWith(PAGE, repo);
   });
 
+  it('opens a launch as the host names it, and not one it cannot open', () => {
+    app.removeAllListeners('second-instance');
+    const toHost = vi.fn((dir: string) => (dir === repo ? '/on/host' : null));
+    installSecondLaunch(open, openWindow, toHost);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    claimLaunchRepo(PAGE);
+    launch({ startDir: other });
+    expect(open).not.toHaveBeenCalled();
+    launch({ startDir: repo });
+    expect(open).toHaveBeenCalledExactlyOnceWith(PAGE, '/on/host');
+  });
+
   it('keeps the claim through a navigation that has only started', () => {
     // main's will-navigate may yet refuse it, leaving the page in place.
     claimLaunchRepo(PAGE);

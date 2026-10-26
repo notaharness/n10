@@ -132,10 +132,43 @@ describe('refuseHello', () => {
     expect(refuseHello({ ...HELLO, platform: 'win32' }, '1.0.0')).toMatch(
       /Windows install/
     );
+    const shim = '/mnt/c/Users/me/AppData/Roaming/npm/node_modules/n10/x.js';
+    expect(refuseHello({ ...HELLO, entry: shim }, '1.0.0')).toMatch(
+      /Windows install/
+    );
+    expect(
+      refuseHello(
+        { ...HELLO, entry: '/usr/lib/node_modules/n10/x.js' },
+        '1.0.0'
+      )
+    ).toBeNull();
+  });
+
+  it('refuses another release, whose calls this one would not know', () => {
+    expect(refuseHello({ ...HELLO, version: '1.0.1' }, '1.0.0')).toMatch(
+      /n10 1\.0\.1, and this is n10 1\.0\.0.*@notaharness\/n10@1\.0\.0/
+    );
+    // A checkout on either side.
+    expect(refuseHello({ ...HELLO, version: 'dev' }, '1.0.0')).toBeNull();
+    expect(refuseHello(HELLO, 'dev')).toBeNull();
+    expect(
+      refuseHello({ ...HELLO, version: 'dev', protocol: 1 }, 'dev')
+    ).not.toBeNull();
   });
 });
 
 describe('missingHint', () => {
+  it('knows each shell’s way of saying n10 is missing', () => {
+    for (const said of [
+      'sh: 1: exec: n10: not found',
+      'bash: line 1: exec: n10: not found',
+      'zsh:1: command not found: n10',
+      'fish: Unknown command: n10',
+    ]) {
+      expect(missingHint(said)).toMatch(/n10 is not installed there/);
+    }
+  });
+
   it('passes other errors through', () => {
     expect(missingHint('tmux: not found')).toBe('tmux: not found');
     expect(missingHint('')).toMatch(/without saying why/);

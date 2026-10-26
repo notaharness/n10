@@ -11,22 +11,25 @@
  * that keeps dying is given up on: every call fails from then on, and
  * the user is told.
  */
-import { join } from 'node:path';
-import { app, ipcMain, utilityProcess } from 'electron';
+import { ipcMain } from 'electron';
 import { IPC, type ResolvedTheme } from '../host/contract.js';
 import type { HostPushes } from '../host/host-pushes.js';
 import { spawnOwnedDaemon, type OwnedDaemon } from './beam/owned-daemon.js';
 import { newGate, within } from './host-gate.js';
-import { hostEnv } from './host-env.js';
-import { spawnPipeHost, utilityLink, type HostLink } from './host-link.js';
+import { forkHost } from './host-fork.js';
+import type { HostLink } from './host-link.js';
 import {
   errorText,
   type HostToMain,
   type MainToHost,
   type ShellCalls,
 } from './host-protocol.js';
-import { RestartPolicy } from './host-restarts.js';
-import { hostCommand, remoteStartDir, type HostTarget } from './host-target.js';
+import {
+  LOCAL_RESTARTS,
+  REMOTE_RESTARTS,
+  RestartPolicy,
+} from './host-restarts.js';
+import type { HostTarget } from './host-target.js';
 import type { HostHello } from './host-wire.js';
 
 /** How long quitting waits for the host to let go of its sessions. */
@@ -41,6 +44,8 @@ export const HOST_UNAVAILABLE = {
     'n10 stopped working and could not start again. Your agents are still running: quit n10 and open it again.',
   stoppedStarting:
     'n10 stopped while starting. Open it again, and if it keeps happening, run it from a terminal to see why.',
+  replaced:
+    'n10 was opened on the same host from another window, which took over. Your agents are still running: open n10 again here to take them back.',
 };
 
 type Shell = Omit<ShellCalls, 'spawnDaemon' | 'stopDaemon' | 'killDaemon'>;
@@ -84,7 +89,14 @@ interface Pending {
 export function startHostProcess(options: HostProcessOptions): HostProcess {
   const daemons = new Map<number, OwnedDaemon>();
   const pending = new Map<number, Pending>();
-  const restarts = new RestartPolicy();
+  const target = options.target ?? { kind: 'local' };
+  const restarts = new RestartPolicy(
+    Date.now,
+    target.kind === 'local' ? LOCAL_RESTARTS : REMOTE_RESTARTS
+  );
+  // The host a later one on the same machine took over from: it is not
+  // started again, or the two would take turns.
+  let replaced: HostLink | null = null;
   let nextInvoke = 0;
   let child: HostLink | null = null;
   let gate = newGate();
@@ -178,15 +190,18 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
         return onReady(message.repo);
       case 'fatal':
         return onFatal(host, message.message);
+      case 'replaced':
+        replaced = host;
+        return;
       case 'stopped':
         return;
     }
   }
 
-  function giveUp(): void {
-    failed = new Error(HOST_UNAVAILABLE.failed);
+  function giveUp(message: string): void {
+    failed = new Error(message);
     gate.fail(failed);
-    options.onFailed(HOST_UNAVAILABLE.failed);
+    options.onFailed(message);
   }
 
   function onExit(host: HostLink, code: number): void {
@@ -201,8 +216,9 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
       return startedReject(new Error(HOST_UNAVAILABLE.stoppedStarting));
     // Calls from here on wait for the next host.
     if (gate.settled) gate = newGate();
+    if (replaced === host) return giveUp(HOST_UNAVAILABLE.replaced);
     const delay = restarts.ended();
-    if (delay === null) return giveUp();
+    if (delay === null) return giveUp(HOST_UNAVAILABLE.failed);
     console.error(`[desktop] host exited (${code}); starting it again`);
     respawn = setTimeout(() => {
       respawn = null;
@@ -210,44 +226,14 @@ export function startHostProcess(options: HostProcessOptions): HostProcess {
     }, delay);
   }
 
-  function forkLocal(): HostLink {
-    return utilityLink(
-      utilityProcess.fork(join(import.meta.dirname, 'host-worker.js'), [], {
-        serviceName: 'n10 host',
-        stdio: 'inherit',
-        env: hostEnv(
-          {
-            ...process.env,
-            N10_UPDATE_ROOT: app.getAppPath(),
-            N10_UPDATE_PACKAGED: app.isPackaged ? '1' : '0',
-          },
-          app.getPath('userData'),
-          options.startDir
-        ),
-      })
-    );
-  }
-
-  // Only the first host opens the start directory; one started again
-  // opens what it remembers.
-  function startPipe(target: Exclude<HostTarget, { kind: 'local' }>) {
-    const startDir = first
-      ? remoteStartDir(target, options.startDir)
-      : undefined;
-    return spawnPipeHost({
-      target,
-      frontendVersion: options.version ?? 'dev',
-      onHello: (hello) => options.onHello?.(hello),
-      ...hostCommand(target, {
-        startDir,
-        command: process.env.N10_HOST_COMMAND,
-      }),
-    });
-  }
-
   function fork(): void {
-    const target = options.target ?? { kind: 'local' };
-    const host = target.kind === 'local' ? forkLocal() : startPipe(target);
+    const host = forkHost({
+      target,
+      startDir: options.startDir,
+      first,
+      version: options.version ?? 'dev',
+      onHello: (hello) => options.onHello?.(hello),
+    });
     child = host;
     host.onMessage((message) => onMessage(host, message));
     host.onceExit((code) => onExit(host, code));

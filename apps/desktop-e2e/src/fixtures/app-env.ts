@@ -84,6 +84,10 @@ export function appEnv(opts: {
     N10_HOST_REQUIRE: HOST_PRELOAD,
     ...(opts.networkGuard ? { N10_NETWORK_GUARD: opts.networkGuard } : {}),
     PATH: [opts.ghEnv.PATH, env.PATH].filter(Boolean).join(delimiter),
+    // The host this HOME, PATH and preload reach: on this computer.
+    // Windows would otherwise start it in WSL, which none of them cross
+    // into, with the developer's real tmux, `~/.n10` and `gh` auth.
+    N10_HOST: 'local',
     // Last, and not negotiable. A tmux server is identified by its
     // socket directory, and the default one is the developer's own —
     // holding their real work and every persisted agent session. A

@@ -131,6 +131,19 @@ describe('the session host process', () => {
     expect(hosts()).toHaveLength(1 + MAX_RESTARTS);
   });
 
+  it('does not start again a host that another window’s host replaced', async () => {
+    const { host, onFailed } = start();
+    latest().say({ t: 'ready', repo: null });
+    await host.started;
+
+    latest().say({ t: 'replaced' });
+    latest().emit('exit', 0);
+    await vi.advanceTimersByTimeAsync(MAX_DELAY_MS * 4);
+    expect(hosts()).toHaveLength(1);
+    expect(onFailed).toHaveBeenCalledWith(HOST_UNAVAILABLE.replaced);
+    await expect(call()).rejects.toThrow(HOST_UNAVAILABLE.replaced);
+  });
+
   it('tells every host the theme in effect when it starts, and when it changes', async () => {
     theme = 'dark';
     const { host } = start();

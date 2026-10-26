@@ -27,16 +27,24 @@ Every rule below has its reasoning in `docs/decisions.md`.
   names `local`, `wsl[:<distro>]` or `ssh:<destination>`, and Windows
   defaults to WSL. A remote host is `n10 host --stdio` (`apps/cli`
   `commands/host.ts`, the same `host-worker.js`) behind `wsl.exe` or `ssh`,
-  started through the target's login shell. `main/host-link.ts` hides
-  which: `utilityLink` or `pipeLink`. On a pipe, `main/host-wire.ts` frames
+  started through the target's interactive login shell (`-ilc`).
+  `main/host-fork.ts` starts it; `main/host-link.ts` hides which:
+  `utilityLink` or `pipeLink`. On a pipe, `main/host-wire.ts` frames
   each message as one marked JSON line, tags byte arrays and `undefined`
-  arguments, and ignores unmarked lines (login-shell output); the host's
-  `HELLO` comes first, nothing is written before it, and a protocol
-  mismatch or a Windows host is refused. `host-channel.ts` is the host's
-  end: stdout is the protocol's, so console output goes to stderr; stdin
-  EOF is a shutdown that detaches. A remote host forks beam itself
-  (`beam/direct-daemon.ts`), skips the frontend's updater, and gets only
-  a start directory naming its own files (`remoteStartDir`). Folders: the
+  arguments, and ignores unmarked lines (shell output); the host's
+  `HELLO` comes first, nothing is written before it, and another
+  protocol, another n10 release (`dev` excepted) or a Windows install
+  (win32, or a script under `/mnt/<drive>`) is refused. `host-channel.ts`
+  is the host's end: stdout is the protocol's, so console output goes to
+  stderr; stdin EOF or SIGTERM is a shutdown that detaches. A remote host
+  holds `host-lock.ts`'s lock, one per user, taking over from the host
+  before it, which posts `replaced` and is not restarted; otherwise a
+  remote host is reconnected without giving up (`REMOTE_RESTARTS`). It
+  forks beam itself (`beam/direct-daemon.ts`), skips the frontend's
+  updater, and gets only a directory naming its own files, first launch
+  or second (`remoteStartDir`, `hostPath`; `--start-distro` when the
+  distro is not yet known). Tests and `scripts/dev.mjs` pin
+  `N10_HOST=local`. Folders: the
   OS dialog locally and in WSL (`\\wsl.localhost` paths translated by
   `wslPath`), the renderer's `FolderBrowserDialog` over `listDirectory`
   over SSH (`HostTargetView.folders`, `lib/folders/pick-host-folder.ts`).

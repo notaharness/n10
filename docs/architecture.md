@@ -42,6 +42,8 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
   src/main/host-link.ts          — The main process's end of a host: utility process or pipe, with the hello handshake
   src/main/host-wire.ts          — The host protocol on a byte stream: marked JSON lines, version, noise tolerance
   src/main/host-channel.ts       — The host's end: parentPort, or stdin/stdout for `n10 host --stdio`
+  src/main/host-fork.ts          — Starts one host where the target says: utility process or pipe
+  src/main/host-lock.ts          — One host behind a pipe per user on a machine; a later one takes over
   src/main/beam/                 — Client of the beam daemon's control socket: machines, remote exec/pty, ceremonies, mail relay, and the daemon the app starts
   src/preload/preload.ts         — Typed contextBridge → window.n10
   src/host/menu-template.ts      — Pure native app menu template, used by main and the web demo

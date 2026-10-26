@@ -17,7 +17,7 @@
 
 /** Bumped whenever a message's shape changes: a frontend and a host
  *  speaking different versions refuse each other. */
-export const HOST_PROTOCOL = 1;
+export const HOST_PROTOCOL = 2;
 
 export const FRAME = '\x1eN10 ';
 export const HELLO = '\x1eN10HELLO ';
@@ -34,6 +34,8 @@ export interface HostHello {
   home: string;
   /** `WSL_DISTRO_NAME`, inside WSL. */
   distro?: string;
+  /** The script node ran (`process.argv[1]`): where n10 is installed. */
+  entry?: string;
 }
 
 const TAG = '$n10';

@@ -1,5 +1,5 @@
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { hostEnvironment, hostWorkerPath, parseHostArgs } from './host.js';
 import { parseArgs } from './parse-args.js';
 
@@ -45,5 +45,22 @@ describe('n10 host', () => {
     expect(
       hostEnvironment({ N10_USER_DATA: '/d' }, '1', {}, '/home/me')
     ).not.toHaveProperty('N10_START_DIR');
+  });
+
+  it('opens a start directory of another WSL distro’s files nowhere', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const args = parseHostArgs([
+      '--stdio',
+      '--start-dir',
+      '/home/me/repo',
+      '--start-distro',
+      'Debian',
+    ]);
+    expect(args).toEqual({ startDir: '/home/me/repo', startDistro: 'Debian' });
+    if (typeof args === 'string') return;
+    const inDistro = (name: string) =>
+      hostEnvironment({ WSL_DISTRO_NAME: name }, '1', args, '/home/me');
+    expect(inDistro('debian').N10_START_DIR).toBe('/home/me/repo');
+    expect(inDistro('Ubuntu')).not.toHaveProperty('N10_START_DIR');
   });
 });

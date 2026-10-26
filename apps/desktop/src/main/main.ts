@@ -32,7 +32,7 @@ import {
   hostTargetView,
   type HostIdentity,
 } from './folder-picker.js';
-import { launchHostTarget, type HostTarget } from './host-target.js';
+import { hostPath, resolveHostTarget } from './host-target.js';
 import { buildMenuTemplate } from '../host/menu-template.js';
 import { installSecondLaunch, secondLaunchData } from './second-launch.js';
 import { claimLaunchRepo } from './launch-repo.js';
@@ -80,13 +80,11 @@ delete process.env.N10_START_DIR;
 // Where the session host runs: here, in WSL or over SSH
 // (host-target.ts). A launch naming no host it knows says so once the
 // app can show it, and quits.
-let HOST_TARGET: HostTarget = { kind: 'local' };
-let hostTargetError: Error | null = null;
-try {
-  HOST_TARGET = launchHostTarget(process.argv, process.env, process.platform);
-} catch (err) {
-  hostTargetError = err instanceof Error ? err : new Error(String(err));
-}
+const { target: HOST_TARGET, error: hostTargetError } = resolveHostTarget(
+  process.argv,
+  process.env,
+  process.platform
+);
 /** What a host behind a pipe said of itself (its distro, its home). */
 let hostIdentity: HostIdentity | null = null;
 
@@ -310,7 +308,8 @@ if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
       webContents
         .fromId(viewer)
         ?.send(MENU_EVENTS.command, { command: 'open-repo', arg: cwd }),
-    () => reopenWindow()
+    () => reopenWindow(),
+    (repo) => hostPath(HOST_TARGET, repo, hostIdentity?.distro)
   );
 
   // A throw in here leaves the app running with no window and no

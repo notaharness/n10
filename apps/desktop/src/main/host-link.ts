@@ -32,16 +32,31 @@ export function utilityLink(host: UtilityProcess): HostLink {
   };
 }
 
-/** Why a host's hello is refused, or null when it is not. */
+/** A Windows drive as WSL mounts it. */
+const WINDOWS_DRIVE = /^\/mnt\/[a-z]\//i;
+
+/**
+ * Why a host's hello is refused, or null when it is not. The host and
+ * this frontend must be the same n10 release: the contract between them
+ * (`N10HostApi`, `ShellCalls`) changes from one release to the next
+ * without the wire's protocol changing. A `dev` build on either side is
+ * a checkout, held only to the protocol.
+ */
 export function refuseHello(
   hello: HostHello,
   frontendVersion: string
 ): string | null {
-  if (hello.platform === 'win32') {
+  // A Windows install found on WSL's PATH through interop: run by
+  // Windows node it says so; by Linux node, its path does.
+  if (hello.platform === 'win32' || WINDOWS_DRIVE.test(hello.entry ?? '')) {
     return 'The n10 found there is a Windows install. Install n10 inside Linux, with Linux Node.js and npm.';
   }
-  if (hello.protocol !== HOST_PROTOCOL) {
-    return `It runs n10 ${hello.version}, which this n10 (${frontendVersion}) cannot talk to. Install the same version there: npm install -g @notaharness/n10@${frontendVersion}`;
+  const dev = hello.version === 'dev' || frontendVersion === 'dev';
+  if (
+    hello.protocol !== HOST_PROTOCOL ||
+    (!dev && hello.version !== frontendVersion)
+  ) {
+    return `It runs n10 ${hello.version}, and this is n10 ${frontendVersion}. Install the same version there: npm install -g @notaharness/n10@${frontendVersion}`;
   }
   return null;
 }
@@ -155,7 +170,10 @@ function spawnFailure(target: HostTarget, error: Error): string {
 /** The host's last words, with the fix when they say n10 is missing. */
 export function missingHint(stderr: string): string {
   const said = stderr.trim();
-  if (/n10: (command )?not found|n10: No such file/i.test(said)) {
+  // sh and bash, zsh, fish.
+  const missing =
+    /n10: (command )?not found|n10: No such file|command not found: n10|Unknown command: n10/i;
+  if (missing.test(said)) {
     return `n10 is not installed there. Install it with Linux npm: npm install -g @notaharness/n10\n\n${said}`;
   }
   return said || 'It ended without saying why.';
@@ -170,6 +188,9 @@ export function spawnPipeHost(
   const child = spawn(options.file, options.args, {
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
+    // wsl.exe writes its own errors (no such distro, WSL not set up) in
+    // UTF-16 unless told otherwise; they are read as UTF-8.
+    env: { ...process.env, WSL_UTF8: '1' },
   });
   return pipeLink({ ...options, child });
 }
