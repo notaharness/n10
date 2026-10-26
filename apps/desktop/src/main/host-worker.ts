@@ -1,9 +1,10 @@
 /**
  * The session host: every host service, every PTY attach client and
  * its emulator, ring buffer and relay, discovery, auto-fixers and the
- * beam client, in an Electron utility process named `n10 host`. The
- * main process keeps the windows and forwards the contract to it
- * (`host-process.ts`). A utility process, not a worker thread: node-pty
+ * beam client, in an Electron utility process named `n10 host` or,
+ * behind a pipe, as `n10 host --stdio` in WSL or on an SSH machine
+ * (`host-channel.ts`). The main process keeps the windows and forwards
+ * the contract to it (`host-process.ts`). A utility process, not a worker thread: node-pty
  * is not safe off the main thread of its process, and a utility
  * process may create the tmux server without inheriting the browser's
  * descriptors.
@@ -28,7 +29,10 @@ import { dropViewer } from '../host/services/session-watch.js';
 import { setTheme } from '../host/services/theme.js';
 import { setLaunchRepoClaim, setMenuShortcutHold } from '../host/viewer-api.js';
 import { appBeamClient } from './beam/app-beam.js';
+import { spawnDirectDaemon } from './beam/direct-daemon.js';
 import type { DaemonExit, OwnedDaemon } from './beam/owned-daemon.js';
+import { openHostChannel } from './host-channel.js';
+import { takeHostLock, type HostLock } from './host-lock.js';
 import {
   errorText,
   type HostToMain,
@@ -37,8 +41,8 @@ import {
 } from './host-protocol.js';
 import { installSessionBin } from './session-env.js';
 
-const port = process.parentPort;
-const post = (message: HostToMain) => port.postMessage(message);
+const channel = openHostChannel();
+const post = (message: HostToMain) => channel.post(message);
 
 // ── Calls into the main process ──────────────────────────────────
 
@@ -87,7 +91,9 @@ function remoteDaemon(env: Record<string, string>): OwnedDaemon {
   };
 }
 
-const beam = appBeamClient(remoteDaemon);
+// Behind a pipe there is no Electron main process to fork it, and no
+// browser descriptors to keep from it.
+const beam = appBeamClient(channel.remote ? spawnDirectDaemon : remoteDaemon);
 
 // ── The contract ─────────────────────────────────────────────────
 
@@ -119,7 +125,13 @@ function settle(message: Extract<MainToHost, { t: 'reply' }>): void {
 
 // Terminal clients go; the tmux sessions behind them stay. Then the
 // daemon this host started stops (D15).
+let shuttingDown = false;
+/** Behind a pipe: this user's one host on the machine. */
+let lock: HostLock | null = null;
 async function shutdown(): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  if (lock?.replaced()) post({ t: 'replaced' });
   stopUpdates();
   const removals = stopRemoteSyncLoop();
   stopDiscovery();
@@ -131,11 +143,12 @@ async function shutdown(): Promise<void> {
   }
   await beam.shutdown().catch(logFailure('beam shutdown'));
   await removals;
+  lock?.release();
   post({ t: 'stopped' });
   setImmediate(() => process.exit(0));
 }
 
-port.on('message', ({ data }: { data: MainToHost }) => {
+function onMessage(data: MainToHost): void {
   switch (data.t) {
     case 'invoke':
       void answer(data);
@@ -156,7 +169,11 @@ port.on('message', ({ data }: { data: MainToHost }) => {
       void shutdown();
       return;
   }
-});
+}
+
+// A frontend that went without saying so (its app crashed, the
+// connection dropped) is a shutdown too: sessions detach, never end.
+channel.listen(onMessage, () => void shutdown());
 
 // ── Startup ──────────────────────────────────────────────────────
 
@@ -164,6 +181,7 @@ async function start(): Promise<void> {
   const startDir = process.env.N10_START_DIR;
   delete process.env.N10_START_DIR;
   const userData = process.env.N10_USER_DATA;
+  if (channel.remote && userData) lock = await takeHostLock(userData);
   if (userData) installSessionBin(userData);
   installHostPushes({
     broadcast: (channel, payload) => post({ t: 'broadcast', channel, payload }),
@@ -178,6 +196,7 @@ async function start(): Promise<void> {
     contextMenu: (items) => callMain('contextMenu', items),
     appMenuPopup: () => callMain('appMenuPopup'),
     aboutBox: () => callMain('aboutBox'),
+    hostTarget: () => callMain('hostTarget'),
     prefsChanged: (next) =>
       void callMain('prefsChanged', next).catch(logFailure('prefs')),
   });
@@ -190,7 +209,9 @@ async function start(): Promise<void> {
   applySessionBackend();
   beam.start();
   const opened = openStartupRepo({ N10_START_DIR: startDir });
-  startUpdates();
+  // A host behind a pipe is updated where it is installed, not by the
+  // frontend's updater.
+  if (!channel.remote) startUpdates();
   post({ t: 'ready', repo: opened ? opened.cwd : null });
 }
 

@@ -1524,6 +1524,46 @@ Require an attributed CPU profile and identical-fixture before/after evidence
 before adding another worker; asynchronous I/O or smaller payloads may address
 the measured cost without a new lifetime and queue.
 
+### Remote hosts
+
+The desktop's frontend and host meet at the existing host protocol, so a
+host elsewhere is a transport, not a second architecture: the same
+`host-worker.js`, run as `n10 host --stdio` behind `wsl.exe` or `ssh`, in
+the target's interactive login shell (`-ilc`, as `loginShellPath`: nvm and
+its kin set PATH in a `~/.bashrc` that returns early otherwise) so its PATH
+finds n10, node, tmux and the agents.
+Stdio pipes, not a listening socket: nothing is exposed, and SSH supplies
+authentication. Shells print, so frames are marked lines and anything
+unmarked is noise; nothing is written to the host before its hello, which
+carries `HOST_PROTOCOL`, the n10 version and the script node ran.
+Independently installed frontends and hosts can differ, and the contract
+between them (`N10HostApi`, `ShellCalls`) changes between releases without
+the wire's protocol changing, so another release is refused with the
+install command rather than mixing contracts; a `dev` checkout on either
+side is held only to the protocol. So is a Windows install that WSL's
+interop PATH found, by platform or by a script under `/mnt/<drive>`.
+A frontend that vanishes closes the pipe; the host treats EOF, or SIGTERM,
+as quitting, which detaches tmux clients and never kills sessions. Respawn
+doubles as reconnect: a dropped link is a host that died, and windows
+reload against the next one. A remote host is reconnected for as long as
+the app runs, at most every 30 s, since a laptop asleep or a network gone
+is not a crash loop. A host behind a pipe holds `~/.n10/host/host.lock`:
+one per user on a machine, because a dropped link leaves the old host
+running (sshd may not notice for hours, a host blocked on a full pipe
+never does) while the reconnect starts another, and two would both run
+discovery, auto-fixers and beam. The new host writes the lock, then stops
+the one it named (SIGTERM, then SIGKILL), checking by its command line that
+the pid is still a host. The old host, finding the lock not its own, tells
+its frontend it was replaced, and that frontend does not start it again,
+or two windows on one machine would take turns. A WSL path from the
+Windows dialog, a first launch or a second one is translated to the
+distro's own, and opened only by a host in that distro; an SSH host's
+files are browsed through the host, since Windows cannot see them. The
+host's updater stays off: the frontend cannot replace a remote install.
+Tests and the dev launcher pin `N10_HOST=local`, and `N10_HOST_REQUIRE`
+with a remote target is refused: a test's HOME, tmux socket and fakes do
+not cross into WSL.
+
 ## App updates and release channels
 
 The engine's `updates` domain owns checks, persistence, retry policy and the

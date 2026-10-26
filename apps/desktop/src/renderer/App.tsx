@@ -22,6 +22,7 @@ import { TabsProvider, useTabs } from './lib/tabs/tabs.js';
 import { useRepoFollowsTabs } from './lib/tabs/use-repo-follows-tabs.js';
 import { useTabSwitching } from './lib/tabs/use-tab-switching.js';
 import { useEnvironmentNotices } from './lib/use-environment-notices.js';
+import { pickHostFolder } from './lib/folders/pick-host-folder.js';
 
 declare global {
   interface Window {
@@ -142,8 +143,7 @@ function Gate() {
   useTabSwitching(Boolean(repo));
 
   const pickRepoFolder = useCallback(() => {
-    window.n10
-      .selectRepoDirectory()
+    pickHostFolder('repository')
       .then((dir) => {
         if (dir) openRepo(dir);
       })

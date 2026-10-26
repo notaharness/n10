@@ -20,11 +20,19 @@ import {
   type MenuCommand,
   type ResolvedTheme,
 } from '../host/contract.js';
-import { loadDesktopPrefs } from '../host/services/desktop-prefs.js';
+import {
+  loadDesktopPrefs,
+  saveDesktopPrefs,
+} from '../host/services/desktop-prefs.js';
 import { onPageGone, windowPushes } from './host-events.js';
 import { startHostProcess, type HostProcess } from './host-process.js';
 import { MAIN_MARKS, mark } from './boot-marks.js';
-import { pickFolderWithDialog } from './folder-picker.js';
+import {
+  folderPickerFor,
+  hostTargetView,
+  type HostIdentity,
+} from './folder-picker.js';
+import { hostPath, resolveHostTarget } from './host-target.js';
 import { buildMenuTemplate } from '../host/menu-template.js';
 import { installSecondLaunch, secondLaunchData } from './second-launch.js';
 import { claimLaunchRepo } from './launch-repo.js';
@@ -68,6 +76,17 @@ const START_DIR = launchStartDir({
   fromTerminal: FROM_TERMINAL,
 });
 delete process.env.N10_START_DIR;
+
+// Where the session host runs: here, in WSL or over SSH
+// (host-target.ts). A launch naming no host it knows says so once the
+// app can show it, and quits.
+const { target: HOST_TARGET, error: hostTargetError } = resolveHostTarget(
+  process.argv,
+  process.env,
+  process.platform
+);
+/** What a host behind a pipe said of itself (its distro, its home). */
+let hostIdentity: HostIdentity | null = null;
 
 let prefs: DesktopPrefs = loadDesktopPrefs();
 let host: HostProcess | null = null;
@@ -209,13 +228,22 @@ function createMainWindow(): BrowserWindow {
 
 function startHost(): HostProcess {
   const host = startHostProcess({
+    target: HOST_TARGET,
+    version: APP_VERSION,
+    onHello: ({ distro, home }) => {
+      hostIdentity = { home, ...(distro ? { distro } : {}) };
+      console.log(
+        `[desktop] host on ${hostTargetView(HOST_TARGET, hostIdentity).label}`
+      );
+    },
     startDir: START_DIR,
     pushes: windowPushes,
     theme: resolvedTheme,
     shell: {
       quitForUpdate,
       quitForNpmUpdate,
-      pickFolder: pickFolderWithDialog,
+      pickFolder: folderPickerFor(HOST_TARGET, () => hostIdentity),
+      hostTarget: async () => hostTargetView(HOST_TARGET, hostIdentity),
       openExternal,
       contextMenu: popupContextMenu,
       appMenuPopup: async () => {
@@ -226,6 +254,9 @@ function startHost(): HostProcess {
       aboutBox: () => showAbout(APP_VERSION),
       prefsChanged: async (next) => {
         prefs = next;
+        // A host elsewhere keeps its prefs there; the copy here is what
+        // the next launch paints its first window from.
+        if (HOST_TARGET.kind !== 'local') saveDesktopPrefs(next);
         nativeTheme.themeSource = next.theme; // recolors overlay + native menus
         installAppMenu(); // theme radio state lives in the menu
       },
@@ -277,7 +308,8 @@ if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
       webContents
         .fromId(viewer)
         ?.send(MENU_EVENTS.command, { command: 'open-repo', arg: cwd }),
-    () => reopenWindow()
+    () => reopenWindow(),
+    (repo) => hostPath(HOST_TARGET, repo, hostIdentity?.distro)
   );
 
   // A throw in here leaves the app running with no window and no
@@ -286,6 +318,7 @@ if (!app.requestSingleInstanceLock(secondLaunchData(START_DIR))) {
     .whenReady()
     .then(async () => {
       mark(MAIN_MARKS.ready);
+      if (hostTargetError) throw hostTargetError;
       installDockIcon(DIST);
       if (app.isPackaged && !FROM_TERMINAL) await importLoginShellPath();
       nativeTheme.themeSource = prefs.theme;

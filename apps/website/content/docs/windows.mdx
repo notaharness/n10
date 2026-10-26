@@ -4,15 +4,18 @@ description: Experimental support for running n10 on Windows inside WSL 2.
 ---
 
 <Callout type="warn" title="Experimental">
-  Windows support through WSL 2 is experimental, for n10 on WSLg and for the
-  TUI. Report problems in an
+  Windows support through WSL 2 is experimental: the Windows app with n10 in
+  WSL, n10 on WSLg, and the TUI. Report problems in an
   [issue](https://github.com/notaharness/n10/issues).
 </Callout>
 
-On Windows, run n10 inside WSL 2. Install Node.js, Git, tmux and your agents
-in the Linux distribution, and keep repositories and worktrees there too.
-n10 opens its window on the Windows desktop through WSLg; without WSLg, the
-TUI runs in Windows Terminal.
+On Windows, n10's work happens inside WSL 2. Install Node.js, Git, tmux and
+your agents in the Linux distribution, and keep repositories and worktrees
+there too. The window can run natively on Windows with n10's session host in
+WSL, much as an editor's remote server works
+([Run the window on Windows](#run-the-window-on-windows)), or the whole app can
+run in WSL and show its window through WSLg. Without either, the TUI runs in
+Windows Terminal.
 
 ## Recommended setup
 
@@ -143,6 +146,53 @@ untested. Report problems in an
 
 Without WSLg, use `n10 --tui`.
 
+## Run the window on Windows
+
+Install n10 in WSL as above, then install it with Windows Node.js too, from
+PowerShell:
+
+```powershell
+npm install -g @notaharness/n10
+n10
+```
+
+On Windows, `n10` opens its window natively and starts `n10 host --stdio` in
+your default WSL distribution through your Linux shell, as an interactive
+login shell, so the `PATH` nvm sets up in `~/.bashrc` finds it. Git, tmux,
+agents and repositories stay in Linux, and the window does not need WSLg.
+Install the same n10 version on both sides: a host of another version is
+refused, with the command that fixes it.
+
+To choose a distribution, run `n10 --host=wsl:Ubuntu-24.04`, or set
+`N10_HOST` to the same value. If the host cannot start, n10 shows the shell's
+last words, for example that `n10` is not installed inside WSL. To run a
+checkout's build, set `N10_HOST_COMMAND`, for example to
+`node ~/src/n10/apps/cli/dist/main.js`.
+
+**Open Repository** uses the Windows folder dialog, which starts in your
+Linux home under `\\wsl.localhost\`; n10 translates the folder you choose to
+its Linux path. Closing the window detaches the host from your sessions, as
+quitting n10 inside WSL does.
+
+If the connection to the host drops, for example while the computer sleeps,
+n10 keeps trying to reconnect, every 30 seconds at most, and reattaches your
+sessions when it does. Each user on a machine has one host: opening n10
+against it from a second window or computer takes it over, and the first
+window says so instead of reconnecting.
+
+### On another machine over SSH
+
+The same window can drive n10 on a Linux or macOS machine over SSH:
+
+```sh
+n10 --host=ssh:me@devbox
+```
+
+n10 runs `ssh -T -o BatchMode=yes`, so the machine must accept your key or SSH
+agent without a password prompt. Host aliases from your SSH config work.
+Install n10, tmux and your agents on that machine. Folders there are chosen in
+n10's own folder browser.
+
 ## Sessions
 
 Agents run in tmux inside WSL. Quitting n10 or closing Windows Terminal
@@ -168,4 +218,5 @@ text with Ctrl+Shift+C and paste with Ctrl+Shift+V.
 - WSL 1
 - Repositories or worktrees on a Windows drive (`/mnt/c/...`)
 - Windows-side Node.js, Git or agents
-- Running one n10 across several distributions or Linux users
+- Running one n10 across several distributions or Linux users at once
+- Updating a host in WSL or over SSH from the app: update it there with npm

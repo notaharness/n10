@@ -289,6 +289,30 @@ export interface RecentRepoEntry {
   color: number;
 }
 
+// ── Host target ──────────────────────────────────────────────────
+
+/** Where the session host runs (`main/host-target.ts`), as the
+ *  renderer needs to know it. */
+export interface HostTargetView {
+  kind: 'local' | 'wsl' | 'ssh';
+  /** In the user's words: "this computer", "WSL (Ubuntu)", a host name. */
+  label: string;
+  /** How a folder on the host is chosen: the OS dialog, which sees
+   *  the host's files (locally, and WSL's through `\wsl.localhost`),
+   *  or the app's own browser over `listDirectory`. */
+  folders: 'native' | 'in-app';
+}
+
+/** One directory on the host and the directories in it. */
+export interface DirectoryListing {
+  /** Absolute and real: symlinks resolved, as a repository's root is. */
+  path: string;
+  /** Null at the root. */
+  parent: string | null;
+  /** Names, sorted, hidden ones last. */
+  dirs: string[];
+}
+
 // ── Sync (remote PR data) ────────────────────────────────────────
 
 /**
@@ -418,6 +442,12 @@ export interface N10HostApi {
   /** The same picker, for any folder — a terminal's directory need not
    *  be a repository. */
   selectFolder(): Promise<string | null>;
+  /** Where the host runs, which decides how folders are chosen. */
+  getHostTarget(): Promise<HostTargetView>;
+  /** The directories in `path` on the host, or in its home directory
+   *  for null: the app's folder browser for a host the OS dialog cannot
+   *  see. */
+  listDirectory(path: string | null): Promise<DirectoryListing>;
   forgetRecent(cwd: string): Promise<void>;
 
   // ── Config / settings ────────────────────────────────────────
@@ -737,6 +767,8 @@ export const IPC = {
   listRecentRepos: 'n10/repo/recents',
   selectRepoDirectory: 'n10/repo/select-directory',
   selectFolder: 'n10/shell/select-folder',
+  getHostTarget: 'n10/shell/host-target',
+  listDirectory: 'n10/shell/list-directory',
   forgetRecent: 'n10/repo/forget',
   getRepo: 'n10/repo/get',
   takeLaunchRepo: 'n10/repo/take-launch',

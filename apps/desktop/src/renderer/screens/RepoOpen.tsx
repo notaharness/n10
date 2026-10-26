@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { useRecentRepos } from '../lib/data/queries.js';
 import { basename, errorMessage, relativeTime } from '../lib/utils.js';
+import { pickHostFolder } from '../lib/folders/pick-host-folder.js';
 
 /** Repo gate / switcher: open a folder, paste a path, or pick a recent. */
 export function RepoOpen({ onOpened }: { onOpened: (repo: RepoInfo) => void }) {
@@ -32,7 +33,7 @@ export function RepoOpen({ onOpened }: { onOpened: (repo: RepoInfo) => void }) {
 
   const pickFolder = async () => {
     try {
-      const dir = await window.n10.selectRepoDirectory();
+      const dir = await pickHostFolder('repository');
       if (dir) void open(dir);
     } catch (err: unknown) {
       toast.error(errorMessage(err));

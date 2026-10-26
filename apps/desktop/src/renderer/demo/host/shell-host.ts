@@ -7,7 +7,7 @@ import type {
   ResolvedTheme,
   SettingsFieldView,
 } from '../../../host/contract.js';
-import { VIEWER } from '../data/identity.js';
+import { HOME, VIEWER } from '../data/identity.js';
 import { requestedTheme } from '../embed.js';
 import { showAppMenu } from '../native/app-menu.js';
 import { showContextMenu } from '../native/context-menu.js';
@@ -91,6 +91,8 @@ type ShellHost = Pick<
   | 'listRecentRepos'
   | 'selectRepoDirectory'
   | 'selectFolder'
+  | 'getHostTarget'
+  | 'listDirectory'
   | 'forgetRecent'
   | 'getSettingsView'
   | 'updateSettingsField'
@@ -148,6 +150,11 @@ export function createShellHost(state: DemoState): ShellHost {
       ),
     selectRepoDirectory: () => pickFolder('Open a repository'),
     selectFolder: () => pickFolder('Choose a folder'),
+    getHostTarget: () =>
+      later({ kind: 'local', label: 'this computer', folders: 'native' }),
+    // The page's picker is its own; nothing lists folders.
+    listDirectory: () =>
+      later({ path: `${HOME}/code`, parent: HOME, dirs: [] }),
     forgetRecent: (cwd) => {
       state.forget(cwd);
       return later(undefined);

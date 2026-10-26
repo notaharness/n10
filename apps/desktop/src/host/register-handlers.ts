@@ -2,6 +2,7 @@ import type { NpmUpdatePlan } from '@n10/engine/contract';
 import { realpathSync } from 'node:fs';
 import type {
   ContextMenuItem,
+  HostTargetView,
   N10HostApi,
   ReplyRequest,
   ResolveRequest,
@@ -33,6 +34,7 @@ import * as reviewDrafts from './services/review-drafts.js';
 import * as autoFix from './services/auto-fix.js';
 import * as machines from './services/machines.js';
 import * as inboundMail from './services/inbound-mail.js';
+import * as folders from './services/folders.js';
 import { resolvePickedFolder } from './services/terminal-home.js';
 import {
   createViewerApi,
@@ -74,6 +76,8 @@ export function createHostApi(): HostApi {
     listRecentRepos: () => Promise.resolve(repo.listRecentRepos()),
     selectRepoDirectory: () => pickFolder('Open repository'),
     selectFolder: () => pickFolder('Open folder'),
+    getHostTarget: () => hostTarget(),
+    listDirectory: (path) => folders.listDirectory(path),
     forgetRecent: (cwd) => Promise.resolve(repo.forgetRecentRepo(cwd)),
 
     getSettingsView: () => Promise.resolve(settings.getSettingsView()),
@@ -227,6 +231,11 @@ let quitForNpmUpdate: (plan: NpmUpdatePlan) => Promise<void> = async () =>
 let quitForUpdate: () => Promise<void> = async () => undefined;
 let aboutBox: () => Promise<void> = async () => undefined;
 let prefsChanged: (next: prefs.DesktopPrefsLike) => void = () => undefined;
+let hostTarget: () => Promise<HostTargetView> = async () => ({
+  kind: 'local',
+  label: 'this computer',
+  folders: 'native',
+});
 
 export function setFolderPicker(
   fn: (title: string) => Promise<string | null>
@@ -254,7 +263,9 @@ export function setShellGlue(glue: {
   appMenuPopup: () => Promise<void>;
   aboutBox: () => Promise<void>;
   prefsChanged: (next: prefs.DesktopPrefsLike) => void;
+  hostTarget?: () => Promise<HostTargetView>;
 }): void {
+  hostTarget = glue.hostTarget ?? hostTarget;
   quitForUpdate = glue.quitForUpdate ?? quitForUpdate;
   quitForNpmUpdate = glue.quitForNpmUpdate ?? quitForNpmUpdate;
   contextMenu = glue.contextMenu;
