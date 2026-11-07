@@ -182,7 +182,7 @@ test('Orchestra context shows real report metadata only for Continue and preserv
   );
 });
 
-test('a stopped unknown agent has no Continue action; a recorded resumable agent does', async ({
+test('a stopped unknown or guessed agent has no Continue action; a recorded resumable agent does', async ({
   desktop,
 }) => {
   const { app, page, homeDir } = desktop;
@@ -199,7 +199,21 @@ test('a stopped unknown agent has no Continue action; a recorded resumable agent
     menu.getByRole('radio', { name: 'Continue', exact: true })
   ).toHaveCount(0);
   await menu.getByRole('button', { name: 'Cancel' }).click();
-  tagTmuxSession(name, { '@session-agent': 'codex' }, homeDir);
+  // Orchestra's guess at a harness it has not started is no record.
+  tagTmuxSession(
+    name,
+    {
+      '@session-agent': 'codex',
+      '@session-x-orchestra-agent-provisional': '1',
+    },
+    homeDir
+  );
+  menu = await openMenu(page, app);
+  await expect(
+    menu.getByRole('radio', { name: 'Continue', exact: true })
+  ).toHaveCount(0);
+  await menu.getByRole('button', { name: 'Cancel' }).click();
+  untagTmuxSession(name, ['@session-x-orchestra-agent-provisional'], homeDir);
   menu = await openMenu(page, app);
   await expect(
     menu.getByRole('button', { name: 'Continue with Codex', exact: true })

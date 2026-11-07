@@ -121,6 +121,16 @@ describe('taggedSession', () => {
     });
   });
 
+  // Orchestra records `claude` for a resume before it knows the harness.
+  it('reads an agent Orchestra has only guessed as unknown, and the session as ours', () => {
+    const session = read({
+      ...orchestraWorktree(),
+      '@session-x-orchestra-agent-provisional': '1',
+    });
+    expect(session).toMatchObject({ spawner: 'orchestra', type: 'worktree' });
+    expect(session).not.toHaveProperty('agent');
+  });
+
   it('leaves out the Orchestra routing a session does not carry', () => {
     const session = read(n10Worktree())!;
     expect(session).not.toHaveProperty('orchestrator');

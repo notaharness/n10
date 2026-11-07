@@ -148,7 +148,10 @@ session-scoped user options. The names live in `session-identity.ts`.
 The `@session-x-n10-*` rows are n10's extension contract. Orchestra's
 `@session-x-orchestra-*` extensions are Orchestra's. n10 reads branch,
 orchestrator, last report and target, and for a fresh conversation clears
-orchestrator, orchestrator config, last report and target. n10 does not publish
+orchestrator, orchestrator config, last report and target. While
+`@session-x-orchestra-agent-provisional` is `1`, `@session-agent` is only
+Orchestra's guess: n10 treats the agent as unknown and offers no Continue,
+as for any agent it cannot name, rather than resuming the guess. n10 does not publish
 `@session-status*`; replacing an agent clears them.
 
 A session is ours when it carries a version-1 record with a token agent,

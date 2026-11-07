@@ -84,6 +84,10 @@ export const ORCHESTRA_EXT = {
    *  its players carry as their orchestrator, which names a
    *  conversation, not a session. Never beam-qualified. */
   target: '@session-x-orchestra-target',
+  /** `1` while `@session-agent` is only Orchestra's guess (a resume
+   *  that has not found its harness yet). n10 then treats the agent as
+   *  unknown. */
+  agentProvisional: '@session-x-orchestra-agent-provisional',
 } as const;
 
 /** Every tag a listing asks tmux for, in the one fork. */
@@ -99,6 +103,7 @@ export const LISTED_TAGS: readonly string[] = [
   ORCHESTRA_EXT.orchestrator,
   ORCHESTRA_EXT.lastReport,
   ORCHESTRA_EXT.target,
+  ORCHESTRA_EXT.agentProvisional,
 ];
 
 /** What n10 writes as `@session-launcher`. */

@@ -5,6 +5,7 @@ const state = vi.hoisted(() => ({
   dead: true,
   exists: true,
   report: 'PROGRESS 2026-01-01T00:00:00Z inbox',
+  provisional: '',
 }));
 vi.mock('../session-resolver.js', () => ({
   resolveWorktreeSession: () => ({ name: 'player' }),
@@ -31,6 +32,7 @@ vi.mock('@n10/terminal-tmux', () => ({
             '@session-x-orchestra-branch': 'feature',
             '@session-worktree': '/repo/worktree',
             '@session-agent': state.agent,
+            '@session-x-orchestra-agent-provisional': state.provisional,
             '@session-x-orchestra-orchestrator': 'tmux:boss',
             '@session-x-orchestra-last-report': state.report,
           },
@@ -49,6 +51,7 @@ beforeEach(() => {
   state.dead = true;
   state.exists = true;
   state.report = 'PROGRESS 2026-01-01T00:00:00Z inbox';
+  state.provisional = '';
 });
 it.each(['test', 'unknown', 'gemini'])(
   'does not promise continuation for a stopped %s agent',
@@ -62,6 +65,16 @@ it.each(['test', 'unknown', 'gemini'])(
     ).toMatchObject({ exists: true, running: false, canResume: false });
   }
 );
+// Orchestra's guess at the harness of a resume it has not started yet.
+it('does not promise continuation for an agent Orchestra only guessed', () => {
+  state.provisional = '1';
+  const context = getSessionLaunchContext(
+    worktreeSessionKey('/repo/worktree', '/repo'),
+    config
+  );
+  expect(context).toMatchObject({ exists: true, canResume: false });
+  expect(context.recordedAgent).toBeUndefined();
+});
 it('reads named resume capability and reporting details from the native snapshot', () => {
   expect(
     getSessionLaunchContext(

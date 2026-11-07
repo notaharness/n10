@@ -66,11 +66,16 @@ function isShellTab(tags: Tags): boolean {
   );
 }
 
-/** The agent and Orchestra routing values, carried only when set. */
+/** The agent and Orchestra routing values, carried only when set. An
+ *  agent Orchestra has only guessed is no agent: nothing may resume or
+ *  restart a conversation on its say-so. */
 function optionalFields(
   tags: Tags
 ): Pick<TaggedSession, 'agent' | 'orchestrator' | 'lastReport' | 'target'> {
-  const agent = tag(tags, SESSION_KEY.agent);
+  const agent =
+    tag(tags, ORCHESTRA_EXT.agentProvisional) === '1'
+      ? ''
+      : tag(tags, SESSION_KEY.agent);
   const orchestrator = tag(tags, ORCHESTRA_EXT.orchestrator);
   const lastReport = tag(tags, ORCHESTRA_EXT.lastReport);
   const target = tag(tags, ORCHESTRA_EXT.target);
