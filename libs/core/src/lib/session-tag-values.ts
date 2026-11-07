@@ -2,8 +2,7 @@
  * The convention's encoding rules for the values n10 publishes: single
  * line UTF-8 with no C0/C1 control characters, at most 4,096 bytes;
  * tokens `[a-z][a-z0-9-]{0,63}`; paths absolute and canonical. A value
- * that fails is left out of the convention half, never escaped or
- * truncated.
+ * that fails is left out, never escaped or truncated.
  */
 
 const TOKEN = /^[a-z][a-z0-9-]{0,63}$/;

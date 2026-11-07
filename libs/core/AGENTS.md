@@ -38,7 +38,8 @@ The reasoning behind each rule is in `docs/decisions.md`.
   checkout in `@session-worktree`, never `#{session_path}` or its branch
   extension (only the branch it was created for). Only a valid record, or an
   n10 shell tab's extensions, is ours; `@orchestra-*` tags alone are foreign,
-  with no migration between the formats.
+  with no migration between the formats: users close running sessions before
+  upgrading. A create whose record would be incomplete throws.
   Attach and continuation preserve creator/reporting tags. Fresh
   conversations preserve creator/repo/branch but clear supervisor and
   last-report tags; record the actual launched agent.

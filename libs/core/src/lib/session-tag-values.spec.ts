@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isTagPath, isTagToken, isTagValue } from './session-tag-values.js';
+import { AGENTS } from './agents/registry.js';
 
 describe('the convention encoding', () => {
   it.each([
@@ -41,5 +42,11 @@ describe('the convention encoding', () => {
     ['/home/h/re\npo', false],
   ])('path %j → %s', (value, valid) => {
     expect(isTagPath(value)).toBe(valid);
+  });
+
+  // `@session-agent` must hold every agent n10 can launch, or its
+  // sessions would have no record.
+  it.each(AGENTS.map((agent) => agent.id))('agent id %s is a token', (id) => {
+    expect(isTagToken(id)).toBe(true);
   });
 });

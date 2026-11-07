@@ -146,9 +146,9 @@ session-scoped user options. The names live in `session-identity.ts`.
 | `@session-version`            | worktree sessions and agent tabs | `1`, written last, only on a complete record                |
 
 The `@session-x-n10-*` rows are n10's extension contract. Orchestra's
-`@session-x-orchestra-*` extensions (branch, orchestrator, orchestrator config,
-last report, target) are Orchestra's; n10 reads them and, for a fresh
-conversation, clears the routing ones. n10 does not publish
+`@session-x-orchestra-*` extensions are Orchestra's. n10 reads branch,
+orchestrator, last report and target, and for a fresh conversation clears
+orchestrator, orchestrator config, last report and target. n10 does not publish
 `@session-status*`; replacing an agent clears them.
 
 A session is ours when it carries a version-1 record with a token agent,
@@ -156,12 +156,16 @@ launcher `n10` or `orchestra` and absolute paths, or — a shell tab, which has
 no agent and so no record — `@session-x-n10-session-type shell` with a
 directory and no version. Anything else is foreign, including a session with
 only the `@orchestra-*` tags of releases before the convention: there is no
-migration between the formats. A record naming both `@session-worktree` and
+migration between the formats, so users close running sessions before
+upgrading. One left running keeps its agent but is foreign to the new release:
+it is not listed or attached, Launch Agent starts a second agent in the same
+checkout, and removing the worktree cannot stop the old one. A record naming both `@session-worktree` and
 `@session-repo` is a worktree session; any other is an agent in a directory,
 scoped by `@session-x-n10-dir` when n10 launched it and by `@session-cwd`
 otherwise (Orchestra's `dir` players). Values are single-line UTF-8 within the
-convention's limits; one that fails is left out, never escaped or truncated,
-and a record missing a required value gets no version. Tags contain data,
+convention's limits; one that fails is left out, never escaped or truncated.
+n10 refuses to create a session whose record would lack a required value,
+since it could not find that session again. Tags contain data,
 never commands. They live only as long as the tmux session, and do not
 provide persistence after reboot. Listing reads them as `#{@key}` format
 columns in one fork, which tmux also resolves from global options; the

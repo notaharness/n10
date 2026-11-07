@@ -59,6 +59,39 @@ describe('launchPlan', () => {
     );
   });
 
+  // A session n10 could not read back would be lost on the next open,
+  // and the open after it would start a second agent beside it.
+  it.each([
+    [
+      'a checkout tags cannot hold',
+      { ...worktree, path: `${WT}\nx` },
+      'claude',
+    ],
+    ['an agent name tags cannot hold', worktree, 'My Agent'],
+    ['no agent', worktree, undefined],
+  ] as const)(
+    'refuses to create a session with %s',
+    (_label, request, agent) => {
+      expect(() =>
+        launchPlan(request, null, agent, false, undefined, request.path)
+      ).toThrow("Couldn't start the session");
+    }
+  );
+
+  it('refuses a shell tab whose directory tags cannot hold', () => {
+    const dir = `${REPO}\nx`;
+    expect(() =>
+      launchPlan(
+        { type: 'terminal', kind: 'shell', repo: dir },
+        null,
+        undefined,
+        false,
+        undefined,
+        dir
+      )
+    ).toThrow("Couldn't start the session");
+  });
+
   it('relaunches an existing session without rewriting its record', () => {
     const plan = launchPlan(
       worktree,

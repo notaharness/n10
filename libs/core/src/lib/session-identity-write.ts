@@ -109,6 +109,14 @@ export function sessionTags(
     : tags;
 }
 
+/** Whether n10 will find a session with these tags again: a record
+ *  with its version, or a shell tab's directory. */
+export function isRecordable(identity: SessionIdentity, tags: Tags): boolean {
+  return identity.type === 'shell'
+    ? !!tags[N10_EXT.dir]
+    : tags[SESSION_KEY.version] === SESSION_VERSION;
+}
+
 /** Whether a session n10 creates records its pane. */
 export function recordsPane(identity: SessionIdentity): boolean {
   return identity.type !== 'shell';

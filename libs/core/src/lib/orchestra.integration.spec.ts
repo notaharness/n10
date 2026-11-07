@@ -1,6 +1,13 @@
-import { worktreeSessionKey } from './session-key.js';
+import { terminalSessionKey, worktreeSessionKey } from './session-key.js';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { orchestraFixture } from '../../tests/orchestra-fixture.js';
@@ -10,6 +17,9 @@ import { getSessionLaunchContext } from './session/session-launch-context.js';
 import { launchSession } from './session/launch-session.js';
 import { openSession } from './session/open-session.js';
 import { listOurSessions, resolveWorktreeSession } from './session-resolver.js';
+import { orchestratorGroups } from './discovery/orchestrator-groups.js';
+import { isTerminalSession, registryNameOf } from './session-identity.js';
+import { sessionTags } from './session-identity-write.js';
 
 const target = 'codex:11111111-2222-4333-8444-555555555555';
 const branch = 'feature/integration';
@@ -431,6 +441,24 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         .toBe(true);
       const player = resolveWorktreeSession(fixture.repo, fixture.repo)!;
       expect(player.spawner).toBe('n10');
+      // The record names the pane the agent runs in.
+      expect(
+        fixture.tmux(
+          'show-options',
+          '-qv',
+          '-t',
+          `=${player.name}:`,
+          '@session-pane'
+        )
+      ).toBe(
+        fixture.tmux(
+          'display-message',
+          '-p',
+          '-t',
+          `=${player.name}:`,
+          '#{pane_id}'
+        )
+      );
       const adopted = fixture.script(
         'adopt.sh',
         player.name,
@@ -462,6 +490,83 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       expect(fixture.script('kill.sh', player.name).status).toBe(0);
       await expect.poll(() => entry.exited, PROCESS_WAIT).toBe(true);
       expect(resolveWorktreeSession(fixture.repo, fixture.repo)).toBeNull();
+    });
+
+    // `spawn.sh --dir` records a dir player: Orchestra's record with its
+    // directory in `@session-cwd` and no checkout. n10 shows it as an
+    // agent terminal scoped by that directory.
+    it("reads Orchestra's dir player as an agent terminal in its directory", async () => {
+      const dir = mkdtempSync(join(fixture.home, 'notes-'));
+      const result = fixture.script(
+        'spawn.sh',
+        '--dir',
+        dir,
+        '--agent',
+        'codex',
+        '--prompt',
+        'Review the notes',
+        '--orchestrator',
+        target
+      );
+      expect({ status: result.status, stderr: result.stderr }).toEqual({
+        status: 0,
+        stderr: '',
+      });
+      const player = listOurSessions().find(
+        (s) => s.spawner === 'orchestra' && s.type === 'agent'
+      );
+      expect(player).toMatchObject({
+        repo: realpathSync(dir),
+        worktreePath: '',
+        branch: '',
+        agent: 'codex',
+        orchestrator: target,
+      });
+      expect(isTerminalSession(player!)).toBe(true);
+    });
+
+    // An orchestrator run by hand in an n10 shell tab: spawning from
+    // inside it marks the tab with its own target, and its player
+    // groups under that tab.
+    it('groups a player under the shell tab its orchestrator spawned it from', async () => {
+      const own = '7c0ffee0-1234-4abc-8def-0123456789ab';
+      fixture.tmux('new-session', '-d', '-s', 'conductor', 'sleep', '300');
+      for (const [key, value] of Object.entries(
+        sessionTags(fixture.home, { type: 'shell' })
+      ))
+        fixture.tmux('set-option', '-t', '=conductor:', key, value);
+      const result = fixture.scriptInside(
+        'conductor',
+        { CLAUDE_CODE_SESSION_ID: own },
+        'spawn.sh',
+        '--branch',
+        branch,
+        '--from',
+        'main',
+        '--agent',
+        'codex',
+        '--prompt',
+        'Do the fixture task',
+        '--orchestrator',
+        `claude:${own}`,
+        '--no-node-modules'
+      );
+      expect({ status: result.status, stderr: result.stderr }).toEqual({
+        status: 0,
+        stderr: '',
+      });
+      const sessions = listOurSessions();
+      expect(sessions.find((s) => s.name === 'conductor')).toMatchObject({
+        type: 'shell',
+        target: `claude:${own}`,
+      });
+      const player = sessions.find((s) => s.branch === branch)!;
+      expect(player.orchestrator).toBe(`claude:${own}`);
+      const [group] = orchestratorGroups(sessions);
+      expect(group!.orchestrator.key).toBe(terminalSessionKey('conductor'));
+      expect(group!.players.map((p) => p.key)).toEqual([
+        registryNameOf(player),
+      ]);
     });
   }
 );

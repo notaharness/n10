@@ -8,6 +8,7 @@ import { LOCAL_MACHINE, sessionIdentity } from '../session-key.js';
 import { SESSION_KEY, type TaggedSession } from '../session-identity.js';
 import {
   identityGuard,
+  isRecordable,
   recordsPane,
   relaunchTags,
   sessionTags,
@@ -93,13 +94,20 @@ export function launchPlan(
   if (existing)
     return relaunchPlan(existing, agent, !!fresh, expected, retainOnExit);
   const record = { agent, cwd: worktree ? undefined : recordCwd(request, cwd) };
+  const tags = sessionTags(request.repo, identity, record);
+  // A session without a record n10 can read back would be lost on the
+  // next open, which would start a second agent beside it.
+  if (!isRecordable(identity, tags))
+    throw new Error(
+      "Couldn't start the session: tmux session tags can't hold its directory or agent name."
+    );
   return {
     mode: 'create',
     label:
       request.type === 'worktree'
         ? worktreeSessionLabel(request.repo, worktree!.branch)
         : terminalSessionLabel(request.repo, request.kind),
-    tags: sessionTags(request.repo, identity, record),
+    tags,
     paneOption: recordsPane(identity) ? SESSION_KEY.pane : undefined,
     retainOnExit,
     excludedNames:
