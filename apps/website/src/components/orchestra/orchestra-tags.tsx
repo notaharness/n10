@@ -72,11 +72,10 @@ export function OrchestraTags() {
           <p className="text-fd-muted-foreground mt-4 leading-relaxed text-pretty">
             Orchestra stores player state as user options on its tmux session.
             There are no state files or daemons, the tags end with the session,
-            and anything connected to the tmux server can read them. The{' '}
-            <code className="whitespace-nowrap">@session-*</code> keys follow a
-            shared convention for agent sessions;{' '}
-            <code className="whitespace-nowrap">@session-x-orchestra-*</code>{' '}
-            are Orchestra’s own.
+            and anything connected to the tmux server can read them. The keys
+            follow a shared convention for agent sessions; those under{' '}
+            <code className="whitespace-nowrap">@session-x-orchestra-</code> are
+            Orchestra’s extensions.
           </p>
           <p className="text-fd-muted-foreground mt-4 leading-relaxed text-pretty">
             n10 reads the same tags, and Beam carries commands and reports
