@@ -15,7 +15,7 @@ import { killAll } from '../src/lib/pty-registry.js';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const archiveHash =
-  '38a05c4d610c549519c0fbbeaa54856ecc36c146e604731b1c1575b02ad80c20';
+  'be059b791cf05a37b2f39a2e096d29fc2167905ea5518e5f3b65046022dcc8c0';
 
 /** One plugin install, repository and tmux server per test. */
 export function orchestraFixture() {
