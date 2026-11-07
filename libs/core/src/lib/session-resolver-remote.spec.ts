@@ -1,6 +1,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { worktreeSessionTags } from '../testing/session-tags.js';
 import type { MachineExecutor } from '@n10/terminal-tmux';
 import {
   LIST_SESSIONS_TIMEOUT_MS,
@@ -81,13 +82,13 @@ function tags(
   branch: string,
   worktreePath: string
 ): Record<string, string> {
-  return {
-    '@orchestra-spawner': 'n10',
-    '@orchestra-repo': repo,
-    '@orchestra-session-type': 'worktree',
-    '@orchestra-branch': branch,
-    '@orchestra-worktree-path': worktreePath,
-  };
+  return worktreeSessionTags({
+    launcher: 'n10',
+    repo,
+    worktreePath,
+    branch,
+    agent: 'claude',
+  });
 }
 
 beforeAll(() => {

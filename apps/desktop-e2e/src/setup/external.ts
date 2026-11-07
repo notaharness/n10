@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { worktreeSessionTags } from '@n10/core/testing/session-tags';
 import { listTaggedSessions, socketEnv, tagTmuxSession } from './tmux.js';
 
 /**
@@ -35,7 +36,7 @@ export function uniqueExternalBranch(): string {
   return `${E2E_BRANCH_PREFIX}${randomBytes(3).toString('hex')}`;
 }
 
-/** The main checkout as n10 records it in `@orchestra-repo`: the
+/** The main checkout as n10 records it in `@session-repo`: the
  *  symlink-resolved git toplevel, not the fixture's `repoPath`, which
  *  can differ when tmpdir is a symlink. */
 export function repoRootOf(repoPath: string): string {
@@ -66,7 +67,7 @@ export function addExternalWorktree(repoPath: string, branch: string): string {
 
 /**
  * Start a detached tmux session tagged the way n10 tags a worktree
- * session. Returns its name.
+ * session running Claude. Returns its name.
  *
  * `HOME` and `PATH` are pinned per session for the reason the backend
  * pins them: a tmux server keeps the environment it was started with,
@@ -107,13 +108,13 @@ export function startExternalTmuxSession(opts: {
   );
   tagTmuxSession(
     name,
-    {
-      '@orchestra-spawner': 'n10',
-      '@orchestra-repo': repoRootOf(opts.repoPath),
-      '@orchestra-session-type': 'worktree',
-      '@orchestra-branch': opts.branch,
-      '@orchestra-worktree-path': realpathSync(opts.worktreePath),
-    },
+    worktreeSessionTags({
+      launcher: 'n10',
+      repo: repoRootOf(opts.repoPath),
+      worktreePath: realpathSync(opts.worktreePath),
+      branch: opts.branch,
+      agent: 'claude',
+    }),
     opts.homeDir
   );
   return name;

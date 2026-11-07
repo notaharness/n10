@@ -42,6 +42,7 @@ const liveAgentPane: TaggedSession = {
   created: 1,
   paneDead: false,
   machine: 'local',
+  identityTags: {},
 };
 
 beforeEach(() => {

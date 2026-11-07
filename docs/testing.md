@@ -348,7 +348,7 @@ not model responses, authentication, or exact Codex screen rendering.
 Reporting uses Orchestra's `codex queue --thread ID --message TEXT` adapter;
 `orchestra.integration.spec.ts` runs the pinned Orchestra 1.6.0 report scripts
 with a fake queue and checks success, failure and retained reporting metadata.
-n10 reads `@orchestra-last-report` only in Orchestra's `KIND TIMESTAMP OUTCOME`
+n10 reads `@session-x-orchestra-last-report` only in Orchestra's `KIND TIMESTAMP OUTCOME`
 form; unit tests cover each outcome, including `delivered` for a direct `codex:`
 target and `queue` for a tmux-hosted Codex TUI. Claude's inbox is a separate
 transport. Desktop's inbound relay deliberately refuses `codex:` targets

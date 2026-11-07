@@ -110,7 +110,8 @@ libs/core/                       — Shell-agnostic operations. No React, Ink, E
   src/lib/agents/                — Agent registry
   src/lib/activity.ts            — Agent activity registry; pty-registry.ts — PTY session lifecycle
   src/lib/session-backend.ts     — Required tmux availability, tagged-session observations and cleanup
-  src/lib/session-identity.ts    — `@orchestra-*` tag names, session labels and matching rules shared with Orchestra
+  src/lib/session-identity.ts    — `@session-*` tag names and matching rules shared with Orchestra; -read.ts and -write.ts apply them
+  src/lib/session-label.ts       — Session labels (`<repo>-<branch>`), the naming rule shared with Orchestra
   src/lib/session-resolver.ts    — The one `list-sessions` fork every tmux lookup goes through
   src/lib/session/open-session.ts — Explicit session requests → create, attach or restart plans
   src/lib/discovery/             — Pure observation diff, live worktree lookup and worktree HEAD reader

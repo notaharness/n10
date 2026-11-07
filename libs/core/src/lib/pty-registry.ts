@@ -6,7 +6,7 @@ import { remove as removeInactiveAlert } from './inactive-alerts.js';
 export interface PtyEntry {
   pty: SessionBackend;
   agent?: string;
-  /** A worktree session's `@orchestra-branch`: the branch it was
+  /** A worktree session's `@session-x-n10-branch`: the branch it was
    *  created for, which its checkout may since have switched away from. */
   createdFor?: string;
   emu: TerminalEmulator;

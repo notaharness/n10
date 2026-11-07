@@ -85,7 +85,8 @@ Next.js requires otherwise).
   deletes the shells' own implementations of it.
 - Terminal backends implement `SessionBackend` without n10-specific names.
   tmux session names are labels; `libs/core/src/lib/session-identity.ts`
-  owns the `@orchestra-*` tags that identify a session and the label rules.
+  owns the `@session-*` tags that identify a session (the shared tmux
+  agent-session convention), and `session-label.ts` the label rules.
 
 ## Working conventions
 

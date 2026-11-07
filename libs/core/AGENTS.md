@@ -31,11 +31,14 @@ The reasoning behind each rule is in `docs/decisions.md`.
   connections, rendering and activity, not launch policy. `dispose()`
   detaches; `kill()` terminates; shutdown must dispose.
 - **Shared identity** (`session-identity.ts`, `session-resolver.ts`): names are
-  labels, `@orchestra-*` tags are identity. A worktree session belongs to the
-  checkout in `@orchestra-worktree-path`, never `#{session_path}` or
-  `@orchestra-branch` (only the branch it was created for); one without the
-  tag is foreign. No migration paths for session tags: users close sessions
-  before upgrading.
+  labels, `@session-*` tags (the shared tmux agent-session convention) are
+  identity. `session-identity.ts` owns every tag name; `-read.ts` decides what
+  is ours, `-write.ts` what n10 writes, in one queue with `@session-version`
+  last and only on a complete record. A worktree session belongs to the
+  checkout in `@session-worktree`, never `#{session_path}` or its branch
+  extension (only the branch it was created for). Only a valid record, or an
+  n10 shell tab's extensions, is ours; `@orchestra-*` tags alone are foreign,
+  with no migration between the formats.
   Attach and continuation preserve creator/reporting tags. Fresh
   conversations preserve creator/repo/branch but clear supervisor and
   last-report tags; record the actual launched agent.

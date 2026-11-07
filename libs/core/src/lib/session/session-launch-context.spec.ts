@@ -25,14 +25,14 @@ vi.mock('@n10/terminal-tmux', () => ({
             serverPid: 11,
           },
           options: {
-            '@orchestra-spawner': 'orchestra',
-            '@orchestra-repo': '/repo',
-            '@orchestra-branch': 'feature',
-            '@orchestra-worktree-path': '/repo/worktree',
-            '@orchestra-session-type': 'worktree',
-            '@orchestra-agent': state.agent,
-            '@orchestra-orchestrator': 'tmux:boss',
-            '@orchestra-last-report': state.report,
+            '@session-version': '1',
+            '@session-launcher': 'orchestra',
+            '@session-repo': '/repo',
+            '@session-x-orchestra-branch': 'feature',
+            '@session-worktree': '/repo/worktree',
+            '@session-agent': state.agent,
+            '@session-x-orchestra-orchestrator': 'tmux:boss',
+            '@session-x-orchestra-last-report': state.report,
           },
         }
       : null,
@@ -50,7 +50,7 @@ beforeEach(() => {
   state.exists = true;
   state.report = 'PROGRESS 2026-01-01T00:00:00Z inbox';
 });
-it.each(['test', '', 'unknown', 'gemini'])(
+it.each(['test', 'unknown', 'gemini'])(
   'does not promise continuation for a stopped %s agent',
   (agent) => {
     state.agent = agent;

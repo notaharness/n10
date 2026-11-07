@@ -2,6 +2,10 @@ import { worktreeSessionKey } from './session-key.js';
 import { execFileSync } from 'node:child_process';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
+  terminalSessionTags,
+  worktreeSessionTags,
+} from '../testing/session-tags.js';
+import {
   listOurSessions,
   resolveRegistrySession,
   resolveSessionByName,
@@ -64,13 +68,19 @@ function tags(
   branch?: string,
   worktreePath = branch ? wt(branch) : undefined
 ): Record<string, string> {
-  return {
-    '@orchestra-spawner': 'n10',
-    '@orchestra-repo': repo,
-    '@orchestra-session-type': type,
-    ...(branch ? { '@orchestra-branch': branch } : {}),
-    ...(worktreePath ? { '@orchestra-worktree-path': worktreePath } : {}),
-  };
+  if (type !== 'worktree')
+    return terminalSessionTags({
+      kind: type,
+      dir: repo,
+      ...(type === 'agent' ? { agent: 'claude' } : {}),
+    });
+  return worktreeSessionTags({
+    launcher: 'n10',
+    repo,
+    worktreePath: worktreePath!,
+    branch: branch!,
+    agent: 'claude',
+  });
 }
 
 beforeAll(() => {
@@ -113,12 +123,19 @@ describe.skipIf(SKIP)('session resolver', () => {
     });
   });
 
-  // The name n10 would have chosen, on a session nobody tagged: not
+  // The name n10 would have chosen, on a session nobody tagged — or
+  // tagged only the way releases before the shared convention did: not
   // ours. Neither the checkout lookup nor the registry-key lookup may
   // land on it.
   it('does not find an untagged session that carries the expected name', () => {
-    startSession(`alpha-${RUN}-feat-a`, {});
-    startSession(name('half'), { '@orchestra-spawner': 'n10' });
+    startSession(`alpha-${RUN}-feat-a`, {
+      '@orchestra-spawner': 'n10',
+      '@orchestra-repo': REPO,
+      '@orchestra-session-type': 'worktree',
+      '@orchestra-branch': 'feat/a',
+      '@orchestra-worktree-path': process.cwd(),
+    });
+    startSession(name('half'), { '@session-launcher': 'n10' });
     expect(resolveWorktreeSession(REPO, process.cwd())).toBeNull();
     expect(resolveRegistrySession(REPO, `alpha-${RUN}-feat-a`)).toBeNull();
     expect(resolveSessionByName(`alpha-${RUN}-feat-a`)).toBeNull();
@@ -170,15 +187,15 @@ describe.skipIf(SKIP)('session resolver', () => {
     expect(resolveSessionByName(name('shel'))).toBeNull();
   });
 
-  // The listing must never ask for `@orchestra-undelivered` or
-  // `@orchestra-launching`: the first carries newlines, which would split
-  // a session across lines and shift every column after it. Pinned
-  // against a real tmux, with such a value set.
-  it('lists cleanly beside a session carrying a multi-line undelivered tag', () => {
+  // The listing asks only for the tags it reads: a tag it does not
+  // read may carry newlines, which would split a session across lines
+  // and shift every column after it. Pinned against a real tmux, with
+  // such a value set.
+  it('lists cleanly beside a session carrying a multi-line tag it does not read', () => {
     startSession(name('noisy'), {
       ...tags('worktree', REPO, 'noisy'),
-      '@orchestra-launching': '1',
-      '@orchestra-undelivered':
+      '@session-x-orchestra-launching': '1',
+      '@session-x-orchestra-undelivered':
         '2026-09-14T10:00:00Z first line\n2026-09-14T10:01:00Z second line',
     });
     startSession(name('quiet'), tags('worktree', REPO, 'quiet'));

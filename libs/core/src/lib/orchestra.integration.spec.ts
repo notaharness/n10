@@ -1,12 +1,6 @@
 import { worktreeSessionKey } from './session-key.js';
 import { spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { orchestraFixture } from '../../tests/orchestra-fixture.js';
@@ -63,27 +57,6 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
           PROCESS_WAIT
         )
         .toBe(true);
-      // The pinned plugin (tests/fixtures/orchestra.tar.gz) predates
-      // `@orchestra-worktree-path`, which notaharness/plugins#11 writes at
-      // spawn; without it the player is foreign to n10. Write it the way
-      // that change does, `pwd -P` of the checkout. Drop this once the
-      // fixture includes plugins#11.
-      const [name, path] = fixture
-        .tmux(
-          'list-sessions',
-          '-F',
-          '#{session_name}\t#{session_path}\t#{@orchestra-branch}'
-        )
-        .split('\n')
-        .map((line) => line.split('\t'))
-        .find((cols) => cols[2] === branch)!;
-      fixture.tmux(
-        'set-option',
-        '-t',
-        `=${name}:`,
-        '@orchestra-worktree-path',
-        realpathSync(path!)
-      );
       // Found by the branch Orchestra tagged it with, once: from here on
       // it is addressed by its checkout, as n10 addresses it.
       const session = listOurSessions().find(
@@ -92,7 +65,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
           s.repo === fixture.repo &&
           s.branch === branch
       );
-      expect(session).toBeDefined();
+      expect(session).toMatchObject({ spawner: 'orchestra' });
       expect(
         resolveWorktreeSession(fixture.repo, session!.worktreePath)
       ).toEqual(session);
@@ -326,7 +299,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         'set-option',
         '-t',
         `=${player.name}:`,
-        '@orchestra-last-report',
+        '@session-x-orchestra-last-report',
         'PROGRESS 2026-01-01T00:00:00Z delivered'
       );
       // A stale server/session environment must not point the new conversation
@@ -335,7 +308,7 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         'set-option',
         '-t',
         '=fixture-anchor:',
-        '@orchestra-orchestrator',
+        '@session-x-orchestra-orchestrator',
         target
       );
       fixture.tmux(

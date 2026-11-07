@@ -14,7 +14,7 @@ import {
 } from '../pty-registry.js';
 import { resolveSessionByName } from '../session-resolver.js';
 import { terminalSessionKey } from '../session-key.js';
-import { sessionTags } from '../session-identity.js';
+import { sessionTags } from '../session-identity-write.js';
 import { launchTerminalSession } from './launch-terminal.js';
 
 describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(

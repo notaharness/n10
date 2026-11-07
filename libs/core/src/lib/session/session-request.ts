@@ -15,7 +15,7 @@ export type SessionRequest =
       path: string;
       /** The branch the caller expects checked out there. Set, it is
        *  checked against the worktree's HEAD and recorded as the new
-       *  session's `@orchestra-branch`; unset (attaching to what
+       *  session's `@session-x-n10-branch`; unset (attaching to what
        *  discovery found), the checkout's own HEAD is recorded. */
       branch?: string;
       machine?: string;

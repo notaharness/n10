@@ -4,8 +4,9 @@ import { terminalSessionKey, worktreeSessionKey } from '../session-key.js';
 import { orchestratorGroups } from './orchestrator-groups.js';
 
 /**
- * An orchestrator is the session its players' `@orchestra-orchestrator`
- * names: by name for `tmux:`, by its `@orchestra-target` for a
+ * An orchestrator is the session its players'
+ * `@session-x-orchestra-orchestrator` names: by name for `tmux:`, by its
+ * `@session-x-orchestra-target` for a
  * conversation. Nothing else makes a session one.
  */
 
@@ -30,6 +31,7 @@ function terminal(
     branch: '',
     worktreePath: '',
     machine: 'local',
+    identityTags: {},
     ...tags,
   };
 }

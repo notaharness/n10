@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
  *
  *  The desktop is not: it can open another repository in place, and
  *  must call {@link resetRepoRoot} when it does. This value is the
- *  `@orchestra-repo` every tmux session is identified by, so a stale
+ *  `@session-repo` every worktree session is identified by, so a stale
  *  root makes two repos that share a branch name resolve to the *same*
  *  tmux session — attaching to, and killing, the other repo's live
  *  agent.

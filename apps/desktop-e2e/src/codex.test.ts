@@ -9,6 +9,7 @@ import {
   openAgentMenuFromCard,
   sessionMenu,
 } from './setup/app.js';
+import { orchestraTags } from '@n10/core/testing/session-tags';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
 import {
   confirmNewTerminal,
@@ -49,10 +50,10 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
   const name = findN10SessionFor('codex-life', homeDir)!;
   tagTmuxSession(
     name,
-    {
-      '@orchestra-orchestrator': 'codex:11111111-2222-4333-8444-555555555555',
-      '@orchestra-last-report': 'PROGRESS 2026-09-09T14:32:00Z delivered',
-    },
+    orchestraTags({
+      orchestrator: 'codex:11111111-2222-4333-8444-555555555555',
+      lastReport: 'PROGRESS 2026-09-09T14:32:00Z delivered',
+    }),
     homeDir
   );
   codex.control(cwd, 'exit');
@@ -95,7 +96,7 @@ test('Codex worktree launch, activity and recorded-agent continuation in Desktop
         '-p',
         '-t',
         `=${name}:`,
-        '#{@orchestra-agent}\t#{@orchestra-orchestrator}\t#{@orchestra-last-report}',
+        '#{@session-agent}\t#{@session-x-orchestra-orchestrator}\t#{@session-x-orchestra-last-report}',
       ],
       { env: socketEnv(homeDir), encoding: 'utf8' }
     ).trim()

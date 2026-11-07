@@ -9,6 +9,7 @@ import {
 } from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
 import type { ElectronApplication } from '@playwright/test';
+import { orchestraTags } from '@n10/core/testing/session-tags';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
 import { fakeCli } from './setup/fake-cli.js';
 
@@ -117,9 +118,11 @@ test('Orchestra context shows real report metadata only for Continue and preserv
   tagTmuxSession(
     name,
     {
-      '@orchestra-spawner': 'orchestra',
-      '@orchestra-orchestrator': 'planning',
-      '@orchestra-last-report': `DONE ${REPORT_TIME} inbox`,
+      '@session-launcher': 'orchestra',
+      ...orchestraTags({
+        orchestrator: 'planning',
+        lastReport: `DONE ${REPORT_TIME} inbox`,
+      }),
     },
     homeDir
   );
@@ -137,10 +140,10 @@ test('Orchestra context shows real report metadata only for Continue and preserv
   await expect(menu.getByLabel('Additional instructions')).toBeVisible();
   await menu.getByRole('radio', { name: 'Continue', exact: true }).click();
   await menu.getByRole('button', { name: 'Open Custom', exact: true }).click();
-  expect(await pane(homeDir, name, '#{@orchestra-orchestrator}')).toBe(
-    'planning'
-  );
-  expect(await pane(homeDir, name, '#{@orchestra-last-report}')).toBe(
+  expect(
+    await pane(homeDir, name, '#{@session-x-orchestra-orchestrator}')
+  ).toBe('planning');
+  expect(await pane(homeDir, name, '#{@session-x-orchestra-last-report}')).toBe(
     `DONE ${REPORT_TIME} inbox`
   );
 });
@@ -156,13 +159,13 @@ test('a stopped unknown agent has no Continue action; a recorded resumable agent
   const pid = Number(await pane(homeDir, name, '#{pane_pid}'));
   process.kill(pid, 'SIGTERM');
   await expect.poll(() => pane(homeDir, name, '#{pane_dead}')).toBe('1');
-  tagTmuxSession(name, { '@orchestra-agent': 'unknown-tool' }, homeDir);
+  tagTmuxSession(name, { '@session-agent': 'unknown-tool' }, homeDir);
   let menu = await openMenu(page, app);
   await expect(
     menu.getByRole('radio', { name: 'Continue', exact: true })
   ).toHaveCount(0);
   await menu.getByRole('button', { name: 'Cancel' }).click();
-  tagTmuxSession(name, { '@orchestra-agent': 'codex' }, homeDir);
+  tagTmuxSession(name, { '@session-agent': 'codex' }, homeDir);
   menu = await openMenu(page, app);
   await expect(
     menu.getByRole('button', { name: 'Continue with Codex', exact: true })
@@ -181,9 +184,11 @@ test('Review sends its selected agent and instructions to the same guarded workt
   tagTmuxSession(
     name,
     {
-      '@orchestra-spawner': 'orchestra',
-      '@orchestra-orchestrator': 'planning',
-      '@orchestra-last-report': `DONE ${REPORT_TIME} inbox`,
+      '@session-launcher': 'orchestra',
+      ...orchestraTags({
+        orchestrator: 'planning',
+        lastReport: `DONE ${REPORT_TIME} inbox`,
+      }),
     },
     homeDir
   );
@@ -223,10 +228,14 @@ test('Review sends its selected agent and instructions to the same guarded workt
   expect(args.join('\n')).toContain('42');
   expect(args).not.toContain('resume');
   expect(findN10SessionFor(BRANCH, homeDir)).toBe(name);
-  expect(await pane(homeDir, name, '#{@orchestra-agent}')).toBe('codex');
-  expect(await pane(homeDir, name, '#{@orchestra-spawner}')).toBe('orchestra');
-  expect(await pane(homeDir, name, '#{@orchestra-orchestrator}')).toBe('');
-  expect(await pane(homeDir, name, '#{@orchestra-last-report}')).toBe('');
+  expect(await pane(homeDir, name, '#{@session-agent}')).toBe('codex');
+  expect(await pane(homeDir, name, '#{@session-launcher}')).toBe('orchestra');
+  expect(
+    await pane(homeDir, name, '#{@session-x-orchestra-orchestrator}')
+  ).toBe('');
+  expect(await pane(homeDir, name, '#{@session-x-orchestra-last-report}')).toBe(
+    ''
+  );
   expect(await openSessions(page)).toHaveLength(1);
 });
 

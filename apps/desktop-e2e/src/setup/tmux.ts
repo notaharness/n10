@@ -12,10 +12,10 @@ import { basename, dirname, resolve } from 'node:path';
  *
  * A session's name is a label (`<repo>-<branch>`, `<repo>-shell`, with
  * a numeric suffix on collision) and is never parsed. What makes a
- * session n10's is its tags — `@orchestra-spawner`,
- * `@orchestra-session-type`, `@orchestra-repo`, `@orchestra-branch` —
- * so every helper here lists with the tags and matches on them,
- * exactly as the app does.
+ * session n10's is its tags — the `@session-*` record of the shared
+ * tmux agent-session convention and n10's `@session-x-n10-*`
+ * extensions — so every helper here lists with the tags and matches on
+ * them, as the app does.
  */
 
 /** Basename prefix of the temp homes the fixture creates. The tmux
@@ -90,14 +90,45 @@ export interface TaggedTmuxSession {
   worktreePath: string;
 }
 
-const LISTING = [
-  '#{session_name}',
-  '#{@orchestra-spawner}',
-  '#{@orchestra-session-type}',
-  '#{@orchestra-repo}',
-  '#{@orchestra-branch}',
-  '#{@orchestra-worktree-path}',
-].join('\t');
+const TAGS = [
+  '@session-launcher',
+  '@session-x-n10-session-type',
+  '@session-worktree',
+  '@session-repo',
+  '@session-cwd',
+  '@session-x-n10-dir',
+  '@session-x-n10-branch',
+  '@session-x-orchestra-branch',
+] as const;
+const LISTING = ['#{session_name}', ...TAGS.map((tag) => `#{${tag}}`)].join(
+  '\t'
+);
+
+/** The first of `values` that is set. */
+const first = (...values: string[]): string => values.find(Boolean) ?? '';
+
+/** One listing row. A shell tab has only n10's extensions; a record
+ *  naming both checkouts is a worktree session, any other an agent. */
+function taggedRow(line: string): TaggedTmuxSession {
+  const [name = '', ...values] = line.split('\t');
+  const tag = (key: (typeof TAGS)[number]) => values[TAGS.indexOf(key)] ?? '';
+  const worktree = !!tag('@session-worktree') && !!tag('@session-repo');
+  const launcher = tag('@session-launcher');
+  const shell = tag('@session-x-n10-session-type') === 'shell';
+  return {
+    name,
+    spawner: shell ? 'n10' : launcher,
+    type: shell ? 'shell' : worktree ? 'worktree' : launcher ? 'agent' : '',
+    repo: worktree
+      ? tag('@session-repo')
+      : first(tag('@session-x-n10-dir'), tag('@session-cwd')),
+    branch: first(
+      tag('@session-x-n10-branch'),
+      tag('@session-x-orchestra-branch')
+    ),
+    worktreePath: worktree ? tag('@session-worktree') : '',
+  };
+}
 
 /** Every session on the test's tmux server, tags included. Empty when
  *  no server is running — tmux exits non-zero for that, which is not
@@ -117,17 +148,7 @@ export function listTaggedSessions(tmuxTmpdir: string): TaggedTmuxSession[] {
     })
       .split('\n')
       .filter((line) => line.trim())
-      .map((line) => {
-        const [
-          name = '',
-          spawner = '',
-          type = '',
-          repo = '',
-          branch = '',
-          worktreePath = '',
-        ] = line.split('\t');
-        return { name, spawner, type, repo, branch, worktreePath };
-      });
+      .map(taggedRow);
   } catch {
     return [];
   }
@@ -160,7 +181,8 @@ export function n10SessionExists(branch: string, tmuxTmpdir: string): boolean {
   return findN10SessionFor(branch, tmuxTmpdir) !== undefined;
 }
 
-/** Write n10's identity tags on a session the test created itself. */
+/** Write tags on a session the test created itself, in order, one
+ *  `set-option` each. */
 export function tagTmuxSession(
   name: string,
   tags: Record<string, string>,

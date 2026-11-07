@@ -58,6 +58,7 @@ function session(
     branch,
     worktreePath: path,
     machine: 'local',
+    identityTags: {},
     ...extra,
   };
 }

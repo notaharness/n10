@@ -45,7 +45,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - `main/n10-shim.ts` is an entry point in both `build-main` and
   `scripts/dev.mjs`. The shim gets no `beam` subcommand (D16).
 - The host selects one repo (`requireRepo`, memoized root, the
-  `@orchestra-repo` every tmux session it creates is tagged with) and keeps
+  `@session-repo` every worktree session it creates is tagged with) and keeps
   the others it has read parked. The tab strip spans repos: a foreign tab's
   pane renders against its own repo (`EditorPane`, a `RepoProvider` over
   `useRepoInfo` and that repo's sidebar rows), and activating it opens that
@@ -81,7 +81,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - `libs/engine/src/lib/sessions/terminal-service.ts` owns process-wide terminal lifecycle;
   `services/terminals.ts` supplies output relays, recents and tab grouping.
   Terminal tabs have no state file; tmux is the record: the kind is the
-  `@orchestra-session-type` tag (`shell` | `agent`), the name is a label
+  `@session-x-n10-session-type` tag (`shell` | `agent`), the name is a label
   (`<directory>-shell`, suffixed on collision) and the key, the directory is
   `#{session_path}`. The tab group is derived at read time
   (`services/terminal-home.ts`). Closing a terminal tab confirms and kills;

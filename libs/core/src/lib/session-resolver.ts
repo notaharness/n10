@@ -9,9 +9,9 @@ import {
   isWorktreeSessionFor,
   LISTED_TAGS,
   registryNameOf,
-  taggedSession,
   type TaggedSession,
 } from './session-identity.js';
+import { taggedSession } from './session-identity-read.js';
 
 /**
  * The one way a tmux session is found: one `tmux -u list-sessions -F`

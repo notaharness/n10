@@ -4,11 +4,8 @@ import {
   type TmuxSessionIncarnation,
 } from '@n10/terminal-tmux';
 import type { AppConfig } from '@n10/vcs-core';
-import {
-  LISTED_TAGS,
-  taggedSession,
-  isWorktreeSessionFor,
-} from '../session-identity.js';
+import { LISTED_TAGS, isWorktreeSessionFor } from '../session-identity.js';
+import { taggedSession } from '../session-identity-read.js';
 import { resolveWorktreeSession } from '../session-resolver.js';
 import { getSession } from '../pty-registry.js';
 import { LOCAL_MACHINE, sessionIdentity } from '../session-key.js';

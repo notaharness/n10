@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
+import { worktreeSessionTags } from '@n10/core/testing/session-tags';
 
 /**
  * Helpers for asserting on the tmux sessions n10 creates.
@@ -15,9 +16,10 @@ import { basename, join, resolve } from 'node:path';
  *
  * A session's name is a label (`<repo>-<branch>`, with a numeric suffix
  * on collision) and is never parsed. What makes a session n10's is
- * its tags — `@orchestra-spawner`, `@orchestra-session-type`,
- * `@orchestra-repo`, `@orchestra-branch` — so every helper here lists
- * with the tags and matches on them, exactly as the app does.
+ * its tags — the `@session-*` record of the shared tmux agent-session
+ * convention and n10's `@session-x-n10-*` extensions — so every helper
+ * here lists with the tags and matches on them, as the app does. A
+ * shell tab has only the extensions.
  */
 
 /** Prefix for branches created by tmux e2e tests. Cleanup only ever
@@ -100,10 +102,10 @@ export interface TaggedTmuxSession {
 
 const LISTING = [
   '#{session_name}',
-  '#{@orchestra-spawner}',
-  '#{@orchestra-session-type}',
-  '#{@orchestra-repo}',
-  '#{@orchestra-branch}',
+  '#{@session-launcher}',
+  '#{@session-x-n10-session-type}',
+  '#{@session-repo}#{@session-x-n10-dir}',
+  '#{@session-x-n10-branch}',
   '#{pane_dead}',
   '#{pane_pid}',
   '#{pane_start_command}',
@@ -140,7 +142,7 @@ export function listTaggedSessions(tmuxTmpdir: string): TaggedTmuxSession[] {
         ] = line.split('\t');
         return {
           name,
-          spawner,
+          spawner: spawner || (type ? 'n10' : ''),
           type,
           repo,
           branch,
@@ -237,7 +239,7 @@ export function killFixtureSessions(homeDir: string): void {
 // script or an operator at a shell would create them: any name, and
 // the identity tags.
 
-/** The main checkout as n10 records it in `@orchestra-repo`: the
+/** The main checkout as n10 records it in `@session-repo`: the
  *  symlink-resolved git toplevel, not the fixture's `repoPath`, which
  *  can differ when tmpdir is a symlink (macOS /tmp → /private/tmp). */
 function repoRootOf(repoPath: string): string {
@@ -270,7 +272,8 @@ export function addExternalWorktree(repoPath: string, branch: string): string {
 
 /**
  * Start a detached tmux session tagged the way n10 tags a worktree
- * session, on the test's own tmux server. Returns its name.
+ * session running Claude, on the test's own tmux server. Returns its
+ * name.
  *
  * `HOME` and `PATH` are pinned per session for the reason the backend
  * pins them: a tmux server keeps the environment it was started with
@@ -311,13 +314,13 @@ export function startExternalTmuxSession(opts: {
     ],
     { stdio: 'ignore', env }
   );
-  const tags: Record<string, string> = {
-    '@orchestra-spawner': 'n10',
-    '@orchestra-repo': repoRootOf(opts.repoPath),
-    '@orchestra-session-type': 'worktree',
-    '@orchestra-branch': opts.branch,
-    '@orchestra-worktree-path': realpathSync(opts.worktreePath),
-  };
+  const tags = worktreeSessionTags({
+    launcher: 'n10',
+    repo: repoRootOf(opts.repoPath),
+    worktreePath: realpathSync(opts.worktreePath),
+    branch: opts.branch,
+    agent: 'claude',
+  });
   for (const [key, value] of Object.entries(tags)) {
     execFileSync('tmux', ['set-option', '-t', `=${name}:`, key, value], {
       stdio: 'ignore',

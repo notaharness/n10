@@ -12,7 +12,7 @@ export function isGitRepo(cwd: string): boolean {
   }
 }
 
-/** Canonical paths agree with Git toplevels, @orchestra-repo tags, worktree
+/** Canonical paths agree with Git toplevels, @session-repo tags, worktree
  * origins and tab groups. Every user-selected entry path crosses this boundary. */
 export function canonicalRepoPath(cwd: string): string {
   try {

@@ -8,7 +8,7 @@ import type { TmuxSessionInfo } from '@n10/terminal-tmux';
  * A worktree session belongs to its checkout, not to the branch it was
  * created for: `git switch`, a branch rename or a restart leave it the
  * checkout's, a second worktree on its original branch never claims
- * it. The `@orchestra-worktree-path` tag is the association, over
+ * it. The `@session-worktree` tag is the association, over
  * tmux's own `session_path` and never falling back to the branch; a
  * worktree session without it is foreign.
  */
@@ -39,7 +39,7 @@ vi.mock('./pty-registry.js', () => ({
 
 import { observeTmuxSessions, resetRepoRoot } from './session-backend.js';
 import { resolveWorktreeSession } from './session-resolver.js';
-import { taggedSession } from './session-identity.js';
+import { taggedSession } from './session-identity-read.js';
 import {
   keyForWorktree,
   resolveRemoteWorktreePath,
@@ -70,11 +70,12 @@ function session(
     paneDead: false,
     path: opts.path,
     options: {
-      '@orchestra-spawner': 'orchestra',
-      '@orchestra-repo': REPO,
-      '@orchestra-session-type': 'worktree',
-      '@orchestra-branch': opts.branch,
-      ...(opts.tag ? { '@orchestra-worktree-path': opts.tag } : {}),
+      '@session-version': '1',
+      '@session-launcher': 'orchestra',
+      '@session-agent': 'claude',
+      '@session-repo': REPO,
+      '@session-x-orchestra-branch': opts.branch,
+      ...(opts.tag ? { '@session-worktree': opts.tag } : {}),
     },
   };
 }
@@ -116,11 +117,13 @@ describe('discovery matches a session to its checkout', () => {
     expect([...seen.persisted]).toEqual([keyForWorktree({ path: WT }, REPO)]);
   });
 
-  it('treats a worktree session without the tag as foreign', () => {
+  // A record without a checkout is an agent in a directory: never this
+  // worktree's session, whatever its path or branch.
+  it('never takes a session without the checkout tag for the worktree', () => {
     listMock.mockReturnValue([session({ branch: 'feature', path: WT })]);
     const seen = observed(REPO, [worktree(WT, 'feature')]);
     expect(seen.persisted.size).toBe(0);
-    expect(seen.terminals).toEqual([]);
+    expect(seen.terminals).toMatchObject([{ kind: 'agent', path: WT }]);
   });
 
   it('trusts the tag over a session_path that has since changed', () => {
@@ -161,10 +164,10 @@ describe('resolving a checkout’s session', () => {
     expect(
       tagged(session({ branch: 'b', path: '/p', tag: WT })).worktreePath
     ).toBe(WT);
-    expect(taggedSession(session({ branch: 'b', path: WT }))).toBeNull();
+    // Without a checkout the session is an agent in a directory, not
+    // a worktree session found by its path.
     const terminal = session({ branch: 'b', path: WT });
-    terminal.options!['@orchestra-session-type'] = 'shell';
-    expect(tagged(terminal).worktreePath).toBe('');
+    expect(tagged(terminal)).toMatchObject({ type: 'agent', worktreePath: '' });
   });
 });
 
