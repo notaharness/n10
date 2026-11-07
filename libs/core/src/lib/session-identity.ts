@@ -2,90 +2,122 @@ import {
   canonicalWorktreePath,
   worktreeSessionKey,
   terminalSessionKey,
-  LOCAL_MACHINE,
 } from './session-key.js';
-import { createHash } from 'node:crypto';
-import { basename } from 'node:path';
-import type { TmuxSessionInfo } from '@n10/terminal-tmux';
 
 /**
  * What a tmux session *is*, and what it is merely *called*.
  *
  * Names are labels, tags are identity. A session's name is chosen once
- * at creation, for a human reading `tmux ls`, and never parsed: every
- * lookup — attach, exists, kill, adopt, list — goes through the
- * session user options ("tags") below, which both n10 and Orchestra
- * write on the sessions they create and read on each other's. A
- * session whose name n10 would have chosen but that lacks the tags is
- * foreign: never attached to, killed, adopted or listed.
+ * at creation, for a human reading `tmux ls` (`session-label.ts`), and
+ * never parsed: every lookup — attach, exists, kill, adopt, list — goes
+ * through the session user options ("tags") of the shared tmux
+ * agent-session convention, which both n10 and Orchestra write on the
+ * sessions they create and read on each other's: the core record
+ * ({@link SESSION_KEY}) and vendor extensions (`@session-x-<vendor>-*`).
+ * A session without them is foreign: never attached to, killed, adopted
+ * or listed, whatever it is called and whatever other tags it carries.
+ * This file owns every tag name; `session-identity-read.ts` reads them
+ * and `session-identity-write.ts` writes them.
  *
- * Tags: `set-option -t '=<name>:' @orchestra-x value` to write,
- * `#{@orchestra-x}` in a format string to read. They die with the
- * session and need no file. A value is a plain string without tabs;
- * an absent tag is unset, never a sentinel.
+ * Tags: `set-option -t '=<name>:' @key value` to write, `#{@key}` in a
+ * format string to read. They die with the session and need no file.
+ * A value is a single-line string; an absent tag is unset, never empty
+ * or a sentinel.
  */
-export const ORCHESTRA_TAG = {
-  /** `n10` or `orchestra`: whichever program created the session. */
-  spawner: '@orchestra-spawner',
-  /** The absolute, symlink-resolved path of the main checkout — what
-   *  `git rev-parse --show-toplevel` prints there. */
-  repo: '@orchestra-repo',
-  /** `worktree`, `shell` or `agent` — see {@link SessionType}.
-   *  Orchestra's `dir` is read as `agent`. */
-  sessionType: '@orchestra-session-type',
-  /** `worktree` sessions only: the branch the session was spawned
-   *  under, unsanitized (`feature/x`); a detached-HEAD worktree's
-   *  directory name. Written once, as the session's task context — the
-   *  worktree may since have switched to another branch, so it never
-   *  says which checkout the session belongs to. */
-  branch: '@orchestra-branch',
-  /** `worktree` sessions only: the canonical checkout directory the
-   *  session belongs to — its identity. Written before the agent
-   *  starts. More exact than `#{session_path}`, which
-   *  `attach-session -c` can change. A worktree session without it is
-   *  foreign. */
-  worktreePath: '@orchestra-worktree-path',
-  /** Orchestra's: the harness in the pane (`claude`, `codex`, …). */
-  agent: '@orchestra-agent',
-  /** Orchestra's: the player's reporting target — `tmux:<session>`,
-   *  `codex:<thread>` or `claude:<session id>`, optionally under
-   *  `beam:<peerId>/`. */
-  orchestrator: '@orchestra-orchestrator',
-  /** Orchestra's: a local `claude:` target's Claude config directory,
-   *  which stays out of the target string. n10 only clears it, with the
-   *  target. */
-  orchestratorConfig: '@orchestra-orchestrator-config',
-  /** Orchestra's: `<KIND> <ISO-8601 UTC>` of the last delivered report. */
-  lastReport: '@orchestra-last-report',
-  /** Orchestra's, on an orchestrator's own session: the `claude:` or
-   *  `codex:` target its players carry in `@orchestra-orchestrator`,
-   *  which names a conversation, not a session. Never beam-qualified. */
-  target: '@orchestra-target',
+
+/** The convention's core record. Only version, agent and launcher are
+ *  required; n10 neither publishes nor reads the status keys yet, and
+ *  only clears them when it replaces an agent. */
+export const SESSION_KEY = {
+  /** `1`, written last: a record without it is not participating. */
+  version: '@session-version',
+  /** The harness token (`claude`, `codex`, …). */
+  agent: '@session-agent',
+  /** `n10` or `orchestra`: the tool that registered the session. */
+  launcher: '@session-launcher',
+  /** The native ID (`%N`) of the pane the agent runs in. */
+  pane: '@session-pane',
+  /** The canonical primary working directory. */
+  cwd: '@session-cwd',
+  /** A worktree session's canonical checkout: its identity. */
+  worktree: '@session-worktree',
+  /** A worktree session's canonical main checkout. */
+  repo: '@session-repo',
+  status: '@session-status',
+  statusKind: '@session-status-kind',
+  statusAt: '@session-status-at',
+} as const;
+
+/** The convention's schema major n10 reads and writes. */
+export const SESSION_VERSION = '1';
+
+/** n10's extensions; their contract is the tag table in
+ *  `docs/decisions.md`. */
+export const N10_EXT = {
+  /** `worktree`, `shell` or `agent`. */
+  sessionType: '@session-x-n10-session-type',
+  /** Worktree sessions: the branch the session was created for,
+   *  unsanitized (`feature/x`); a detached-HEAD worktree's directory
+   *  name. Written once, as task context — the worktree may since have
+   *  switched to another branch, so it never says which checkout the
+   *  session belongs to. */
+  branch: '@session-x-n10-branch',
+  /** Terminal tabs: the directory the tab was opened in. */
+  dir: '@session-x-n10-dir',
+} as const;
+
+/** The Orchestra extensions n10 reads or clears; their contract is
+ *  Orchestra's. */
+export const ORCHESTRA_EXT = {
+  /** Worktree players: the branch the player was spawned for. */
+  branch: '@session-x-orchestra-branch',
+  /** The player's reporting target — `tmux:<session>`, `codex:<thread>`
+   *  or `claude:<session id>`, optionally under `beam:<peerId>/`. */
+  orchestrator: '@session-x-orchestra-orchestrator',
+  /** A local `claude:` target's Claude config directory, which stays
+   *  out of the target string. n10 only clears it, with the target. */
+  orchestratorConfig: '@session-x-orchestra-orchestrator-config',
+  /** `<KIND> <ISO-8601 UTC> <OUTCOME>` of the last delivered report.
+   *  Not agent status. */
+  lastReport: '@session-x-orchestra-last-report',
+  /** On an orchestrator's own session: the `claude:` or `codex:` target
+   *  its players carry as their orchestrator, which names a
+   *  conversation, not a session. Never beam-qualified. */
+  target: '@session-x-orchestra-target',
+  /** `1` while `@session-agent` is only Orchestra's guess (a resume
+   *  that has not found its harness yet). n10 then treats the agent as
+   *  unknown. */
+  agentProvisional: '@session-x-orchestra-agent-provisional',
 } as const;
 
 /** Every tag a listing asks tmux for, in the one fork. */
-export const LISTED_TAGS: readonly string[] = Object.values(ORCHESTRA_TAG);
+export const LISTED_TAGS: readonly string[] = [
+  SESSION_KEY.version,
+  SESSION_KEY.agent,
+  SESSION_KEY.launcher,
+  SESSION_KEY.cwd,
+  SESSION_KEY.worktree,
+  SESSION_KEY.repo,
+  ...Object.values(N10_EXT),
+  ORCHESTRA_EXT.branch,
+  ORCHESTRA_EXT.orchestrator,
+  ORCHESTRA_EXT.lastReport,
+  ORCHESTRA_EXT.target,
+  ORCHESTRA_EXT.agentProvisional,
+];
 
-/** What n10 writes as `@orchestra-spawner` on the sessions it creates. */
+/** What n10 writes as `@session-launcher`. */
 export const N10_SPAWNER = 'n10';
 
 /**
  * - `worktree`: an agent bound to one git worktree (n10's worktree
  *   sessions, Orchestra's players). Identity = (repo, worktree path).
  * - `shell` / `agent`: a n10 terminal tab — the user's shell, or an
- *   agent CLI not bound to a worktree. Identity = the name, which is
- *   unique on the server and stable for the session's life.
+ *   agent CLI not bound to a worktree — or an Orchestra `dir` player.
+ *   Identity = the name, which is unique on the server and stable for
+ *   the session's life.
  */
 export type SessionType = 'worktree' | 'shell' | 'agent';
-
-/** Tag value to the type it is read as. `dir` is Orchestra's name for an
- *  agent in a directory; n10 never writes it. */
-const SESSION_TYPES: ReadonlyMap<string, SessionType> = new Map([
-  ['worktree', 'worktree'],
-  ['shell', 'shell'],
-  ['agent', 'agent'],
-  ['dir', 'agent'],
-]);
 
 /** One of our sessions, as the tags describe it. */
 export interface TaggedSession {
@@ -99,89 +131,31 @@ export interface TaggedSession {
   /** `#{session_path}` — the directory the session runs in. */
   path: string;
   spawner: string;
+  /** A worktree session's main checkout; a terminal's directory. */
   repo: string;
   type: SessionType;
   /** Set on `worktree` sessions; `''` when the tag is missing. The
    *  branch it was created for, not necessarily the one checked out. */
   branch: string;
-  /** `worktree` sessions: the checkout it belongs to, from the
-   *  `@orchestra-worktree-path` tag; `''` for a terminal. It holds even
-   *  when it names a directory that is gone: such a session belongs to
-   *  no worktree, and is never re-associated by its branch. */
+  /** `worktree` sessions: the checkout it belongs to; `''` for a
+   *  terminal. It holds even when it names a directory that is gone:
+   *  such a session belongs to no worktree, and is never re-associated
+   *  by its branch. */
   worktreePath: string;
   agent?: string;
   orchestrator?: string;
   lastReport?: string;
-  /** Set on an orchestrator's own session — see `ORCHESTRA_TAG.target`. */
+  /** Set on an orchestrator's own session — see `ORCHESTRA_EXT.target`. */
   target?: string;
+  /** The tags the session was identified by, as read (`''` when
+   *  unset): what replacing its process guards. */
+  identityTags: Readonly<Record<string, string>>;
   /** The machine this session lives on — a beam `peerId`, or `'local'`.
    *  Set by whoever listed the session: the local resolver always says
    *  `'local'`; a remote poller (D3) stamps its peerId. Tags themselves
-   *  carry no machine — `@orchestra-repo` holds the path as it exists
-   *  on this machine, whichever one that is. */
+   *  carry no machine — `@session-repo` holds the path as it exists on
+   *  this machine, whichever one that is. */
   machine: string;
-}
-
-/** Orchestra's own tags, carried along only when set. Split out of
- *  {@link taggedSession} to keep its own complexity within budget. */
-function orchestraTagFields(
-  tags: Record<string, string>
-): Pick<TaggedSession, 'agent' | 'orchestrator' | 'lastReport' | 'target'> {
-  const agent = tags[ORCHESTRA_TAG.agent];
-  const orchestrator = tags[ORCHESTRA_TAG.orchestrator];
-  const lastReport = tags[ORCHESTRA_TAG.lastReport];
-  const target = tags[ORCHESTRA_TAG.target];
-  return {
-    ...(agent ? { agent } : {}),
-    ...(orchestrator ? { orchestrator } : {}),
-    ...(lastReport ? { lastReport } : {}),
-    ...(target ? { target } : {}),
-  };
-}
-
-/** A worktree session's checkout tag — `null` when it lacks the repo
- *  or checkout tag and so is not ours — or `''` for a terminal. */
-function checkoutTag(
-  type: string,
-  tags: Record<string, string>
-): string | null {
-  if (type !== 'worktree') return '';
-  const path = tags[ORCHESTRA_TAG.worktreePath];
-  return tags[ORCHESTRA_TAG.repo] && path ? path : null;
-}
-
-/**
- * Read a listed session's tags, or `null` when it is not one of ours:
- * "ours" is `@orchestra-spawner` set and `@orchestra-session-type` one
- * of the known values; worktrees also require nonempty repo and
- * worktree-path tags.
- * Nothing about the name is consulted.
- */
-export function taggedSession(
-  info: TmuxSessionInfo,
-  machine: string = LOCAL_MACHINE
-): TaggedSession | null {
-  const tags = info.options ?? {};
-  const spawner = tags[ORCHESTRA_TAG.spawner];
-  const type = SESSION_TYPES.get(tags[ORCHESTRA_TAG.sessionType] ?? '');
-  const repo = tags[ORCHESTRA_TAG.repo];
-  if (!spawner || !type) return null;
-  const worktreePath = checkoutTag(type, tags);
-  if (worktreePath === null) return null;
-  return {
-    name: info.name,
-    created: info.created,
-    paneDead: info.paneDead,
-    exitCode: info.exitCode,
-    path: info.path,
-    spawner,
-    repo: repo ?? '',
-    type,
-    branch: tags[ORCHESTRA_TAG.branch] ?? '',
-    worktreePath,
-    machine,
-    ...orchestraTagFields(tags),
-  };
 }
 
 /** The worktree session for a repository and checkout: string
@@ -220,72 +194,4 @@ export function registryNameOf(session: TaggedSession): string {
   return session.type === 'worktree'
     ? worktreeSessionKey(session.worktreePath, session.repo, session.machine)
     : terminalSessionKey(session.name, session.machine);
-}
-
-/** The tags n10 writes on a session it creates. */
-export function sessionTags(
-  repoRoot: string,
-  identity:
-    | { type: 'worktree'; branch: string; worktreePath: string }
-    | { type: 'shell' | 'agent' }
-): Record<string, string> {
-  return {
-    [ORCHESTRA_TAG.spawner]: N10_SPAWNER,
-    [ORCHESTRA_TAG.repo]: repoRoot,
-    [ORCHESTRA_TAG.sessionType]: identity.type,
-    ...(identity.type === 'worktree'
-      ? {
-          [ORCHESTRA_TAG.branch]: identity.branch,
-          [ORCHESTRA_TAG.worktreePath]: identity.worktreePath,
-        }
-      : {}),
-  };
-}
-
-// ── Labels ────────────────────────────────────────────────────────
-//
-// The rule both programs implement (Orchestra in bash, pinned as a
-// table in Orchestra's tests/test_port.py and in session-identity.spec.ts):
-// the preferred label is `<basename(repo)>-<branch>` (or `-shell` /
-// `-agent`) with every `/`, `.` and `:` replaced by `-`, capped at 200
-// characters. On overflow the label is the first 195 characters, `-`,
-// and the first four hex digits of the SHA-256 of the *unsanitized*
-// `<basename>-<branch>` string — the same "hash what you were given"
-// rule the tmux lib's own sanitizer follows for the raw names it caps.
-
-/** Every character tmux refuses in a name, plus `/`, which it accepts
- *  but which reads as a target separator to a human. */
-const REPLACED = /[/.:]/g;
-const MAX_LABEL = 200;
-const HASH_TAIL = 4;
-
-/** `sanitize(x)` from the shared convention, without the cap: the cap
- *  applies to the assembled name, not to each part. */
-export function sanitizeLabelPart(part: string): string {
-  return part.replace(REPLACED, '-');
-}
-
-/** `<basename>-<rest>`, sanitized and capped. */
-function sessionLabel(repoRoot: string, rest: string): string {
-  const raw = `${basename(repoRoot)}-${rest}`;
-  const replaced = sanitizeLabelPart(raw);
-  if (replaced.length <= MAX_LABEL) return replaced;
-  const hash = createHash('sha256').update(raw).digest('hex');
-  return `${replaced.slice(0, MAX_LABEL - HASH_TAIL - 1)}-${hash.slice(
-    0,
-    HASH_TAIL
-  )}`;
-}
-
-/** `<repo basename>-<branch>` — e.g. `n10-feature-x`. */
-export function worktreeSessionLabel(repoRoot: string, branch: string): string {
-  return sessionLabel(repoRoot, branch);
-}
-
-/** `<directory basename>-shell` or `<directory basename>-agent`. */
-export function terminalSessionLabel(
-  directory: string,
-  kind: 'shell' | 'agent'
-): string {
-  return sessionLabel(directory, kind);
 }

@@ -17,6 +17,7 @@
 import type { SessionSpec } from '@n10/terminal';
 import {
   commandArgs,
+  createdPaneTags,
   optionCommands,
   sessionEnvFlags,
   type TmuxLaunchPlan,
@@ -80,7 +81,11 @@ async function createRemote(
   checkedRemote(result, `new-session -s ${name}`);
   try {
     const commands = [
-      ...optionCommands(name, plan.tags, plan.retainOnExit),
+      ...optionCommands(
+        name,
+        { ...createdPaneTags(plan, result), ...plan.tags },
+        plan.retainOnExit
+      ),
       await resolvedCommandArgs(executor, name, spec, true),
     ];
     const [first, ...following] = commands;

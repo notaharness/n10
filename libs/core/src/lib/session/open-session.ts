@@ -5,25 +5,15 @@ import {
   type TmuxLaunchPlan,
 } from '@n10/terminal-tmux';
 import type { SessionBackend, SessionSpec } from '@n10/terminal';
-import {
-  sessionNames,
-  spawnSession,
-  type NamedPtyEntry,
-} from '../pty-registry.js';
+import { spawnSession, type NamedPtyEntry } from '../pty-registry.js';
 import {
   LOCAL_MACHINE,
-  sessionIdentity,
   terminalSessionKey,
   worktreeSessionKey,
 } from '../session-key.js';
 import { pollerFor, requireMachine } from '../machine-registry.js';
-import {
-  ORCHESTRA_TAG,
-  sessionTags,
-  terminalSessionLabel,
-  worktreeSessionLabel,
-  type TaggedSession,
-} from '../session-identity.js';
+import { N10_EXT, type TaggedSession } from '../session-identity.js';
+import { attachPlan, launchPlan } from './launch-plan.js';
 import {
   listOurSessionsWith,
   resolveSessionByName,
@@ -33,7 +23,6 @@ import { readWorktreeHead } from '../discovery/worktree-origin.js';
 import type { LaunchSpec } from '../agents/registry.js';
 import type { SessionRequest } from './session-request.js';
 import { localSessionEnv } from './local-session-env.js';
-import { worktreeIdentity } from './worktree-identity.js';
 
 export interface OpenSessionParams {
   session: SessionRequest;
@@ -162,17 +151,6 @@ async function performOpen(params: OpenSessionParams): Promise<NamedPtyEntry> {
   return spawnSession(key, backend, cols, rows, launch.agent, createdFor);
 }
 
-function attachPlan(
-  existing: TaggedSession,
-  expected: TmuxSessionIncarnation | undefined
-): TmuxLaunchPlan {
-  return {
-    mode: 'attach',
-    target: existing.name,
-    ...(expected ? { expected, expectedTags: identityGuard(existing) } : {}),
-  };
-}
-
 /** The registry key the opened session answers to, and — for a
  *  worktree — the branch it was created for: its tag when it existed,
  *  else what the create just wrote. */
@@ -187,7 +165,7 @@ function registration(
   if (session.type !== 'worktree')
     return { key: terminalSessionKey(backend.name!, machineId) };
   const written =
-    plan.mode === 'create' ? plan.tags[ORCHESTRA_TAG.branch] : undefined;
+    plan.mode === 'create' ? plan.tags[N10_EXT.branch] : undefined;
   return {
     key: worktreeSessionKey(session.path, session.repo, machineId),
     createdFor: existing?.branch || written || undefined,
@@ -271,80 +249,6 @@ function sessionSpec(
   };
 }
 
-function launchPlan(
-  request: SessionRequest,
-  existing: TaggedSession | null,
-  agent: string | undefined,
-  fresh: boolean | undefined,
-  expected: TmuxSessionIncarnation | undefined,
-  cwd: string
-): TmuxLaunchPlan {
-  const worktree =
-    request.type === 'worktree' ? worktreeIdentity(request, cwd) : null;
-  const identity = worktree ?? {
-    type: (request as Extract<SessionRequest, { type: 'terminal' }>).kind,
-  };
-  const agentTags: Record<string, string> = agent
-    ? { [ORCHESTRA_TAG.agent]: agent }
-    : {};
-  const retainOnExit = request.type === 'worktree' || request.kind === 'agent';
-  if (existing) {
-    const tags = {
-      ...agentTags,
-      ...(fresh
-        ? {
-            [ORCHESTRA_TAG.orchestrator]: null,
-            [ORCHESTRA_TAG.orchestratorConfig]: null,
-            [ORCHESTRA_TAG.lastReport]: null,
-            [ORCHESTRA_TAG.target]: null,
-          }
-        : {}),
-    };
-    if (fresh && expected)
-      return {
-        mode: 'replace',
-        target: existing.name,
-        expected,
-        retainOnExit,
-        tags,
-        expectedTags: identityGuard(existing),
-      };
-    // Unconfirmed restarts never use -k. An external live winner is left alone.
-    return {
-      mode: 'restart',
-      target: existing.name,
-      tags,
-      retainOnExit,
-      ...(expected ? { expected, expectedTags: identityGuard(existing) } : {}),
-    };
-  }
-  return {
-    mode: 'create',
-    label:
-      request.type === 'worktree'
-        ? worktreeSessionLabel(request.repo, worktree!.branch)
-        : terminalSessionLabel(request.repo, request.kind),
-    tags: { ...sessionTags(request.repo, identity), ...agentTags },
-    retainOnExit,
-    excludedNames:
-      request.type === 'terminal'
-        ? sessionNames().flatMap((key) => {
-            const identity = sessionIdentity(key);
-            return identity?.kind === 'terminal' ? [identity.id] : [];
-          })
-        : undefined,
-  };
-}
-
 function shouldAttach(mode: string, session: TaggedSession | null): boolean {
   return session !== null && (mode === 'attach' || !session.paneDead);
-}
-
-function identityGuard(session: TaggedSession): Record<string, string> {
-  return {
-    [ORCHESTRA_TAG.repo]: session.repo,
-    [ORCHESTRA_TAG.sessionType]: session.type,
-    [ORCHESTRA_TAG.branch]: session.branch,
-    [ORCHESTRA_TAG.spawner]: session.spawner,
-  };
 }

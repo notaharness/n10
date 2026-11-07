@@ -24,7 +24,7 @@ export interface LiveWorktreeSession {
   /** The worktree directory the session belongs to, from its tags. */
   path: string;
   /** The main checkout the worktree belongs to — real path, as `git
-   *  rev-parse --show-toplevel` prints it, from `@orchestra-repo`. */
+   *  rev-parse --show-toplevel` prints it, from `@session-repo`. */
   repoRoot: string;
   /** The branch checked out in the worktree now — not necessarily the
    *  one the session was spawned under. */
@@ -42,7 +42,7 @@ export interface LiveWorktreeSession {
   /** Orchestra's tags, when the session carries them. The harness
    *  running in the pane. */
   agent?: string;
-  /** The player's reporting target (`ORCHESTRA_TAG.orchestrator`). */
+  /** The player's reporting target (`ORCHESTRA_EXT.orchestrator`). */
   orchestrator?: string;
   /** `<KIND> <ISO-8601 UTC>` of the last report the player delivered. */
   lastReport?: string;

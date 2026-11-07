@@ -16,6 +16,7 @@ import {
   tmuxListSessionsDetailed,
   tmuxListSessionsRead,
   tmuxNewSessionDetached,
+  createdPaneId,
   tmuxPaneState,
   tmuxSetOption,
   tmuxShowOption,
@@ -107,6 +108,9 @@ describe('tmuxNewSessionDetached', () => {
     expect(mockedExec.mock.calls[0]![1]).toEqual([
       'new-session',
       '-d',
+      '-P',
+      '-F',
+      '#{pane_id}',
       '-s',
       'repo-feat',
       '-c',
@@ -128,6 +132,15 @@ describe('tmuxNewSessionDetached', () => {
     mockedExec.mockReturnValueOnce('' as unknown as Buffer);
     tmuxNewSessionDetached('repo-shell', { cwd: '/repo', cols: 80, rows: 24 });
     expect(mockedExec.mock.calls[0]![1]?.slice(-2)).toEqual(['-y', '24']);
+  });
+
+  // A remote executor may add its own lines around tmux's output.
+  it('reads the new pane from the line that holds only a pane ID', () => {
+    const result = (stdout: string) => ({ stdout, stderr: '', exitCode: 0 });
+    expect(createdPaneId(result('%12\n'))).toBe('%12');
+    expect(createdPaneId(result('motd line\n%7\nbye\n'))).toBe('%7');
+    expect(createdPaneId(result('pane %7\n'))).toBeNull();
+    expect(createdPaneId(result(''))).toBeNull();
   });
 
   // The race a creator has to answer: the name was free a moment ago

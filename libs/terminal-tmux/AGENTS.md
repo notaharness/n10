@@ -10,6 +10,11 @@ explicit serializable `TmuxLaunchPlan` to async `createTmuxBackend`:
   then start the requested command. A temporary idle process keeps the session
   present while metadata is written. Failed creation cleans up only that newly
   allocated session.
+- A create plan's `paneOption` names a session option the library sets to the
+  new pane's ID, ahead of the plan's tags in the same queue; core decides what
+  it means. `respawn-pane` keeps the pane, so the ID survives every restart.
+  Sessions are single-pane: restart and replace respawn `=name:`, the active
+  pane, which is the recorded one only while nobody splits the window.
 - `attach`: connect to the exact target without rewriting tags or running a
   command. Retained exited panes can be attached for their output.
 - `restart`: require a dead pane and use native `respawn-pane` without `-k`, so a

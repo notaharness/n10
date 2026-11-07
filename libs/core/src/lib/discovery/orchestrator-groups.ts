@@ -4,10 +4,10 @@ import { listOurSessions } from '../session-resolver.js';
 /**
  * Which sessions are Orchestra orchestrators, and which report to each.
  *
- * A player's `@orchestra-orchestrator` is where its reports go:
+ * A player's `@session-x-orchestra-orchestrator` is where its reports go:
  * `tmux:<session>`, which names a session on its server, or
  * `claude:<id>` / `codex:<thread>`, which name a conversation. A
- * conversation's session is the one whose `@orchestra-target` carries
+ * conversation's session is the one whose `@session-x-orchestra-target` carries
  * that same string: Orchestra writes it on the session it runs in when
  * it spawns or adopts a player from inside tmux, and takes it off every
  * other session of that server, so one server has one per target.
@@ -28,9 +28,9 @@ export interface OrchestratorGroup {
 export interface OrchestraMember {
   /** Its registry key (`registryNameOf`). */
   key: string;
-  /** `@orchestra-repo`. */
+  /** `TaggedSession.repo`. */
   repo: string;
-  /** A worktree session's checkout (`@orchestra-worktree-path`); `''`
+  /** A worktree session's checkout (`@session-worktree`); `''`
    *  for a terminal. */
   worktree: string;
 }

@@ -20,6 +20,7 @@ import {
   shownTerminal,
   spareText,
 } from './setup/prewarm.js';
+import { orchestraTags } from '@n10/core/testing/session-tags';
 import { startSurvivingTerminal } from './setup/terminals.js';
 import {
   killFixtureSessions,
@@ -30,8 +31,8 @@ import {
 /**
  * An Orchestra orchestrator's tab: a terminal tab where `claude` was
  * run by hand and spawned players. Orchestra marks that session with
- * `@orchestra-target`, the target its players carry in
- * `@orchestra-orchestrator`; the strip groups the players' tabs under
+ * `@session-x-orchestra-target`, the target its players carry in
+ * `@session-x-orchestra-orchestrator`; the strip groups the players' tabs under
  * it. Everything here is plain tmux tags on the test's own server.
  */
 test.skip(!tmuxAvailable(), 'tmux is not installed');
@@ -100,12 +101,12 @@ test.describe('Orchestrator tab', () => {
         'sleep 300',
       ].join(''),
     });
-    tagTmuxSession(name, { '@orchestra-orchestrator': target }, homeDir);
+    tagTmuxSession(name, orchestraTags({ orchestrator: target }), homeDir);
     return branch;
   }
 
   function markOrchestrator(homeDir: string, target = CLAUDE): void {
-    tagTmuxSession(ORCHESTRATOR, { '@orchestra-target': target }, homeDir);
+    tagTmuxSession(ORCHESTRATOR, orchestraTags({ target }), homeDir);
   }
 
   test('groups its players under it, counted where the X was, listed on hover', async ({
@@ -175,7 +176,7 @@ test.describe('Orchestrator tab', () => {
     });
     tagTmuxSession(
       'transloco-dir',
-      { '@orchestra-orchestrator': CODEX },
+      orchestraTags({ orchestrator: CODEX }),
       homeDir
     );
     markOrchestrator(homeDir, CODEX);

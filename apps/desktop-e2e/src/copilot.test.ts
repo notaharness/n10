@@ -8,6 +8,7 @@ import {
   openAgentMenuFromCard,
   sessionMenu,
 } from './setup/app.js';
+import { orchestraTags } from '@n10/core/testing/session-tags';
 import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
 import {
   confirmNewTerminal,
@@ -48,10 +49,10 @@ test('Copilot worktree launch, activity and explicit fresh restart in Desktop', 
   const name = findN10SessionFor('copilot-life', homeDir)!;
   tagTmuxSession(
     name,
-    {
-      '@orchestra-orchestrator': 'tmux:fixture-orchestrator',
-      '@orchestra-last-report': 'PROGRESS 2026-09-09T14:32:00Z inbox',
-    },
+    orchestraTags({
+      orchestrator: 'tmux:fixture-orchestrator',
+      lastReport: 'PROGRESS 2026-09-09T14:32:00Z inbox',
+    }),
     homeDir
   );
   copilot.control(cwd, 'exit');
@@ -85,7 +86,7 @@ test('Copilot worktree launch, activity and explicit fresh restart in Desktop', 
         '-p',
         '-t',
         `=${name}:`,
-        '#{@orchestra-agent}\t#{@orchestra-orchestrator}\t#{@orchestra-last-report}',
+        '#{@session-agent}\t#{@session-x-orchestra-orchestrator}\t#{@session-x-orchestra-last-report}',
       ],
       { env: socketEnv(homeDir), encoding: 'utf8' }
     ).trim()

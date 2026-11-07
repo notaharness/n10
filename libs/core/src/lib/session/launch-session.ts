@@ -191,7 +191,7 @@ export function buildAgentLaunch(
 
 /**
  * Whether `agent` (the tag recorded on the session, e.g.
- * `@orchestra-agent`) can be restarted without asking the user to pick
+ * `@session-agent`) can be restarted without asking the user to pick
  * explicitly. `test` only counts when the config still carries the
  * `aiCommand` that agent runs verbatim — otherwise a continuation would
  * resume as `sh -c ''`, or silently redirect to whatever `aiCommand`

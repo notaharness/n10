@@ -15,7 +15,7 @@ import { killAll } from '../src/lib/pty-registry.js';
 
 const fixtures = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const archiveHash =
-  'afe847911e21a8c73866d4743fd1cd645973bc5a6011ab14729d946efb65ea83';
+  '0e6ce0640743b2287caba0af40e3d3c0439abefec7083e4d65e4e53b3ac16790';
 
 /** One plugin install, repository and tmux server per test. */
 export function orchestraFixture() {
@@ -112,6 +112,35 @@ export function orchestraFixture() {
         cwd: repo,
         encoding: 'utf8',
         timeout: 15_000,
+      });
+    },
+    /** Run a script as a process in `session`'s pane on the fixture's
+     *  server would: `$TMUX` and `$TMUX_PANE` name that pane, for the
+     *  child alone. */
+    scriptInside: (
+      session: string,
+      env: Record<string, string>,
+      name: string,
+      ...args: string[]
+    ) => {
+      assertIsolated();
+      const [socket, pid, id, pane] = tmux(
+        'display-message',
+        '-p',
+        '-t',
+        `=${session}:`,
+        '#{socket_path}\t#{pid}\t#{session_id}\t#{pane_id}'
+      ).split('\t');
+      return spawnSync('bash', [scriptPath(name), ...args], {
+        cwd: repo,
+        encoding: 'utf8',
+        timeout: 15_000,
+        env: {
+          ...process.env,
+          ...env,
+          TMUX: `${socket},${pid},${id!.slice(1)}`,
+          TMUX_PANE: pane,
+        },
       });
     },
     read: (name: string) => readFileSync(join(home, name), 'utf8'),

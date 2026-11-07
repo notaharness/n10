@@ -42,6 +42,9 @@ export * from './lib/plan/plan-types.js';
 // ── Session / PTY infrastructure (Node host side) ────────────────
 export * from './lib/session-backend.js';
 export * from './lib/session-identity.js';
+export * from './lib/session-identity-read.js';
+export * from './lib/session-identity-write.js';
+export * from './lib/session-label.js';
 export * from './lib/session-resolver.js';
 export * from './lib/session/session-request.js';
 export * from './lib/session/open-session.js';

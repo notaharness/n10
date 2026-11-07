@@ -400,6 +400,7 @@ function remoteWorktreeSession(
     type: 'worktree',
     branch,
     machine,
+    identityTags: {},
   };
 }
 

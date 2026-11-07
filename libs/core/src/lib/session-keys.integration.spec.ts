@@ -11,7 +11,7 @@ import { diffScans } from './discovery/discovery-model.js';
 import { getSession, isSessionAlive, killSession } from './pty-registry.js';
 import { canonicalWorktreePath, worktreeSessionKey } from './session-key.js';
 import { resetRepoRoot } from './session-backend.js';
-import { sessionTags } from './session-identity.js';
+import { sessionTags } from './session-identity-write.js';
 import { openSession } from './session/open-session.js';
 import { launchTerminalSession } from './terminal/launch-terminal.js';
 import { removeWorktreeSession } from './session/remove-worktree.js';
@@ -44,7 +44,10 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         cwd,
         cols: 80,
         rows: 24,
-        build: () => ({ spec: { cmd: '/bin/sh', args: ['-c', 'sleep 300'] } }),
+        build: () => ({
+          spec: { cmd: '/bin/sh', args: ['-c', 'sleep 300'] },
+          agent: 'test',
+        }),
       });
     }
     function terminal() {
@@ -136,11 +139,11 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
         {
           mode: 'create',
           label: 'external-player',
-          tags: sessionTags(fixture.repo, {
-            type: 'worktree',
-            branch,
-            worktreePath: path,
-          }),
+          tags: sessionTags(
+            fixture.repo,
+            { type: 'worktree', branch, worktreePath: path },
+            { agent: 'codex' }
+          ),
         }
       );
       const delta = diffScans(

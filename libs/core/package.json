@@ -41,6 +41,11 @@
       "types": "./src/testing/npm-update.ts",
       "import": "./src/testing/npm-update.ts",
       "default": "./src/testing/npm-update.ts"
+    },
+    "./testing/session-tags": {
+      "types": "./src/testing/session-tags.ts",
+      "import": "./src/testing/session-tags.ts",
+      "default": "./src/testing/session-tags.ts"
     }
   },
   "nx": {

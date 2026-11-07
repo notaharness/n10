@@ -99,6 +99,15 @@ const found: TaggedSession = {
   machine: 'local',
   created: 1,
   paneDead: false,
+  identityTags: {
+    '@session-version': '1',
+    '@session-launcher': 'orchestra',
+    '@session-worktree': '/repo/worktree',
+    '@session-repo': '/repo',
+    '@session-cwd': '/repo/worktree',
+    '@session-x-orchestra-branch': 'feature/x',
+    '@session-x-n10-dir': '',
+  },
 };
 beforeEach(() => {
   vi.clearAllMocks();
@@ -142,7 +151,13 @@ describe('session launch boundary', () => {
     expect(state.create.mock.calls[0][1]).toEqual({
       mode: 'restart',
       target: found.name,
-      tags: { '@orchestra-agent': 'codex' },
+      tags: {
+        '@session-agent': 'codex',
+        '@session-x-orchestra-agent-provisional': null,
+        '@session-status': null,
+        '@session-status-kind': null,
+        '@session-status-at': null,
+      },
       retainOnExit: true,
     });
   });
@@ -177,11 +192,15 @@ describe('session launch boundary', () => {
       target: found.name,
       retainOnExit: true,
       tags: {
-        '@orchestra-agent': 'codex',
-        '@orchestra-orchestrator': null,
-        '@orchestra-orchestrator-config': null,
-        '@orchestra-last-report': null,
-        '@orchestra-target': null,
+        '@session-agent': 'codex',
+        '@session-x-orchestra-agent-provisional': null,
+        '@session-status': null,
+        '@session-status-kind': null,
+        '@session-status-at': null,
+        '@session-x-orchestra-orchestrator': null,
+        '@session-x-orchestra-orchestrator-config': null,
+        '@session-x-orchestra-last-report': null,
+        '@session-x-orchestra-target': null,
       },
     });
     expect(state.create.mock.calls[0][0]).toMatchObject({
@@ -202,10 +221,10 @@ describe('session launch boundary', () => {
     expect(state.create.mock.calls[0][1]).toMatchObject({
       mode: 'create',
       tags: {
-        '@orchestra-repo': '/repo',
-        '@orchestra-branch': 'feature/x',
-        '@orchestra-worktree-path': '/repo/worktree',
-        '@orchestra-agent': 'codex',
+        '@session-repo': '/repo',
+        '@session-x-n10-branch': 'feature/x',
+        '@session-worktree': '/repo/worktree',
+        '@session-agent': 'codex',
       },
       retainOnExit: true,
     });

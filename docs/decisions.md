@@ -127,22 +127,58 @@ Windows shell, installer or Windows-side process.
 ## Session identity shared with Orchestra
 
 Names are labels; tags carry identity. n10 and the Orchestra skill's bash
-scripts create ordinary tmux sessions using the same user options:
+scripts create ordinary tmux sessions and tag them with the shared tmux
+agent-session convention (`@session-*`, schema `1`): a core record any tool
+can read, plus each tool's own `@session-x-<vendor>-*` extensions. All are
+session-scoped user options. The names live in `session-identity.ts`.
 
-| Session user option        | Meaning                                                  |
-| -------------------------- | -------------------------------------------------------- |
-| `@orchestra-spawner`       | Creator, such as `n10` or `orchestra`                    |
-| `@orchestra-repo`          | Canonical main checkout path                             |
-| `@orchestra-session-type`  | `worktree`, `shell`, `agent`; `dir` is read as `agent`   |
-| `@orchestra-worktree-path` | A worktree session's checkout: its identity              |
-| `@orchestra-branch`        | Branch a worktree session was created for (task context) |
-| `@orchestra-agent`         | Agent used for the most recent launch                    |
+| Session user option           | Written by n10 on                | Meaning                                                     |
+| ----------------------------- | -------------------------------- | ----------------------------------------------------------- |
+| `@session-launcher`           | worktree sessions and agent tabs | `n10` or `orchestra`: the tool that registered the session  |
+| `@session-agent`              | worktree sessions and agent tabs | Agent of the most recent launch (`claude`, `codex`, …)      |
+| `@session-pane`               | worktree sessions and agent tabs | The pane the agent runs in (`%N`), recorded at creation     |
+| `@session-cwd`                | worktree sessions and agent tabs | Canonical working directory; an agent tab's only when local |
+| `@session-worktree`           | worktree sessions                | The session's checkout: its identity                        |
+| `@session-repo`               | worktree sessions                | Canonical main checkout path                                |
+| `@session-x-n10-session-type` | every session                    | `worktree`, `shell` or `agent`                              |
+| `@session-x-n10-branch`       | worktree sessions                | Branch the session was created for (task context)           |
+| `@session-x-n10-dir`          | terminal tabs                    | The directory the tab was opened in: its scope              |
+| `@session-version`            | worktree sessions and agent tabs | `1`, written last, only on a complete record                |
 
-`dir` is Orchestra's name for an agent in a directory; n10 never writes it.
-The shared names live in `session-identity.ts`. Creator/reporting metadata
-survives attachment and restart; a successful new process updates its agent
-metadata. Tags contain data, never arbitrary commands to execute. They live
-only as long as the tmux session, and do not provide persistence after reboot.
+The `@session-x-n10-*` rows are n10's extension contract. Orchestra's
+`@session-x-orchestra-*` extensions are Orchestra's. n10 reads branch,
+orchestrator, last report and target, and for a fresh conversation clears
+orchestrator, orchestrator config, last report and target. While
+`@session-x-orchestra-agent-provisional` is `1`, `@session-agent` is only
+Orchestra's guess: n10 treats the agent as unknown and offers no Continue,
+as for any agent it cannot name, rather than resuming the guess. When n10
+records the agent it launched, it unsets the mark in the same queue. n10 does not publish
+`@session-status*`; replacing an agent clears them.
+
+A session is ours when it carries a version-1 record with a token agent,
+launcher `n10` or `orchestra` and absolute paths, or — a shell tab, which has
+no agent and so no record — `@session-x-n10-session-type shell` with a
+directory and no version. Anything else is foreign, including a session with
+only the `@orchestra-*` tags of releases before the convention: there is no
+migration between the formats, so users close running sessions before
+upgrading. One left running keeps its agent but is foreign to the new release:
+it is not listed or attached, Launch Agent starts a second agent in the same
+checkout, and removing the worktree cannot stop the old one. A record naming both `@session-worktree` and
+`@session-repo` is a worktree session; any other is an agent in a directory,
+scoped by `@session-x-n10-dir` when n10 launched it and by `@session-cwd`
+otherwise (Orchestra's `dir` players). Values are single-line UTF-8 within the
+convention's limits; one that fails is left out, never escaped or truncated.
+n10 refuses to create a session whose record would lack a required value,
+since it could not find that session again. Tags contain data,
+never commands. They live only as long as the tmux session, and do not
+provide persistence after reboot. Listing reads them as `#{@key}` format
+columns in one fork, which tmux also resolves from global options; the
+convention's local-scope read is not used.
+
+Creator and reporting metadata survives attachment and restart; a successful
+new process updates `@session-agent` and clears status, and a fresh
+conversation also clears Orchestra's routing. A replacement guards, in the
+same tmux command, the identity tags the session was read by.
 
 Worktree lookup matches canonical repository plus canonical checkout path —
 the physical path as resolved on the machine holding it (`pwd -P` there,
@@ -150,12 +186,10 @@ the physical path as resolved on the machine holding it (`pwd -P` there,
 a rename or a restart keeps the session its worktree's, and a second worktree
 on the original branch never claims it. A terminal lookup uses its actual
 allocated tmux target. `session-resolver.ts` obtains one listing and applies
-those rules for attach, discovery, liveness and cleanup. A session lacking a
-spawner or recognized type is foreign; worktree sessions also require repo
-and worktree-path tags, with no fallback to `#{session_path}` or the branch
-(sessions are closed before an upgrade, not migrated). A familiar name alone never authorizes attachment or
-termination. Duplicate worktree identities resolve to the oldest session;
-extras are listed, never silently killed.
+those rules for attach, discovery, liveness and cleanup, with no fallback to
+`#{session_path}` or the branch. A familiar name alone never authorizes
+attachment or termination. Duplicate worktree identities resolve to the
+oldest session; extras are listed, never silently killed.
 
 Labels are `<repo>-<branch>` for worktrees and `<directory>-shell` or
 `<directory>-agent` for standalone terminals. Worktree labels use the canonical
@@ -757,11 +791,11 @@ and when Settings → Keyboard opens; a read begun before a write is dropped.
 An Orchestra orchestrator's tab carries the Brain icon, and its players' tabs
 stand under it rather than beside it. Which session is an orchestrator, and
 whose players, comes from tags alone (core `discovery/orchestrator-groups.ts`).
-A player's `@orchestra-orchestrator` of `tmux:<session>` names its session.
+A player's `@session-x-orchestra-orchestrator` of `tmux:<session>` names its session.
 `claude:<id>` and `codex:<thread>` name a conversation, which the tmux server
 cannot tie to a session. Orchestra closes that gap explicitly: `spawn.sh` and
 `adopt.sh`, run inside tmux with the orchestrator's own identity as the
-target, write it as `@orchestra-target` on the session they run in, and take
+target, write it as `@session-x-orchestra-target` on the session they run in, and take
 it off every other session of that server. That is how a terminal tab where
 `claude` was run by hand becomes an orchestrator. n10 does not infer the link
 from process trees, Claude's session registry or transcripts. Repositories

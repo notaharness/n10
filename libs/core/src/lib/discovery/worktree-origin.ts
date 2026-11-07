@@ -5,8 +5,8 @@ import { basename, join, resolve } from 'node:path';
  * Where a worktree directory is, git-wise, read from its own files:
  * the branch checked out in it, or the directory's name on a detached
  * HEAD. No git is forked. The repository a worktree belongs to is not
- * asked here at all — a session carries it as `@orchestra-repo`, and a
- * session without that tag is foreign.
+ * asked here at all — a session carries it as `@session-repo`, and a
+ * worktree session without that tag is foreign.
  */
 
 /** What a checkout's HEAD says: the branch checked out, or the

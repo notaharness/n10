@@ -89,7 +89,7 @@ export interface TmuxObservation {
  * Every session is read through the resolver, so only tagged sessions
  * are seen at all: a session whose name n10 might have chosen but
  * that carries no tags is foreign and never listed. A worktree session
- * is this repository's when its `@orchestra-repo` is the open root;
+ * is this repository's when its `@session-repo` is the open root;
  * it is *persisted* when one of the worktrees handed in is the
  * checkout it belongs to (`TaggedSession.worktreePath`), whichever
  * branch that checkout is on now. Another checkout's sessions carry
@@ -142,7 +142,7 @@ export function observeTmuxSessions(
 }
 
 interface ClassifyContext {
-  /** The open repository's root — what `@orchestra-repo` must equal. */
+  /** The open repository's root — what `@session-repo` must equal. */
   root: string;
   /** Canonical checkout path → the registry name of that worktree. */
   byPath: Map<string, string>;

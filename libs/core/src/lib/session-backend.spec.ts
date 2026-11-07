@@ -2,6 +2,12 @@ import { worktreeSessionKey, terminalSessionKey } from './session-key.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { TmuxSessionInfo, TmuxStatus } from '@n10/terminal-tmux';
 import type { DiscoveredWorktree } from './discovery/discovery-model.js';
+import {
+  orchestraTags,
+  terminalSessionTags,
+  worktreeSessionTags,
+} from '../testing/session-tags.js';
+import { without } from '../../tests/session-tags.js';
 
 const {
   isTmuxAvailableMock,
@@ -91,13 +97,23 @@ function ours(
     created,
     paneDead: false,
     path,
-    options: {
-      '@orchestra-spawner': 'n10',
-      '@orchestra-repo': repo,
-      '@orchestra-session-type': type,
-      ...(branch === null ? {} : { '@orchestra-branch': branch }),
-      ...(type === 'worktree' ? { '@orchestra-worktree-path': path } : {}),
-    },
+    options:
+      type === 'worktree'
+        ? without(
+            worktreeSessionTags({
+              launcher: 'n10',
+              repo,
+              worktreePath: path,
+              branch: branch ?? '',
+              agent: 'claude',
+            }),
+            ...(branch === null ? ['@session-x-n10-branch'] : [])
+          )
+        : terminalSessionTags({
+            kind: type,
+            dir: repo,
+            ...(type === 'agent' ? { agent: 'claude' } : {}),
+          }),
   };
 }
 
@@ -458,6 +474,7 @@ describe('observeTmuxSessions', () => {
       {
         name: terminalSessionKey('repo-agent-2'),
         kind: 'agent',
+        agent: 'claude',
         running: true,
         path: '/repo',
       },
@@ -487,6 +504,7 @@ describe('observeTmuxSessions', () => {
       {
         name: terminalSessionKey('repo-stray'),
         kind: 'agent',
+        agent: 'claude',
         running: true,
         path: '/wt/gone',
       },
@@ -555,7 +573,7 @@ describe('observeTmuxSessions', () => {
   it('retains exited terminal metadata for restoration', () => {
     const session = ours('repo-agent', 'agent', '/repo', null, '/repo');
     session.paneDead = true;
-    session.options!['@orchestra-agent'] = 'codex';
+    session.options!['@session-agent'] = 'codex';
     tmuxListSessionsMock.mockReturnValue([session]);
     expect(observed('/repo', []).terminals).toEqual([
       {
@@ -607,8 +625,7 @@ const PEER = 'b'.repeat(32);
 /** A terminal session as Orchestra or another machine's n10 tags it. */
 function startedElsewhere(
   name: string,
-  type: string,
-  spawner: string,
+  kind: 'shell' | 'dir',
   path: string
 ): TmuxSessionInfo {
   return {
@@ -617,9 +634,8 @@ function startedElsewhere(
     paneDead: false,
     path,
     options: {
-      '@orchestra-spawner': spawner,
-      '@orchestra-session-type': type,
-      '@orchestra-orchestrator': `beam:${'c'.repeat(32)}/claude:abc`,
+      ...terminalSessionTags({ kind, dir: path, agent: 'claude' }),
+      ...orchestraTags({ orchestrator: `beam:${'c'.repeat(32)}/claude:abc` }),
     },
   };
 }
@@ -628,7 +644,7 @@ describe('another machine’s terminals', () => {
   it('lists every terminal session there by its tags, keyed with that machine', async () => {
     remoteListMock.mockResolvedValue([
       ours('notes', 'shell', '/home/far', null, '/home/far/notes'),
-      startedElsewhere('player', 'dir', 'orchestra', '/home/far/work'),
+      startedElsewhere('player', 'dir', '/home/far/work'),
       ours('wt', 'worktree', '/home/far/app', 'main', '/home/far/app/wt'),
       foreign('untagged', '/home/far'),
     ]);
@@ -642,6 +658,7 @@ describe('another machine’s terminals', () => {
       {
         name: terminalSessionKey('player', PEER),
         kind: 'agent',
+        agent: 'claude',
         path: '/home/far/work',
         running: true,
       },
@@ -674,8 +691,8 @@ describe('another machine’s terminals', () => {
 describe('terminals another machine started here', () => {
   it('are reported by their tags, not by who started them', () => {
     tmuxListSessionsMock.mockReturnValue([
-      startedElsewhere('far-shell', 'shell', 'n10', '/home/dev'),
-      startedElsewhere('far-player', 'dir', 'orchestra', '/home/dev/work'),
+      startedElsewhere('far-shell', 'shell', '/home/dev'),
+      startedElsewhere('far-player', 'dir', '/home/dev/work'),
     ]);
     expect(observed('/repo', []).terminals.map((t) => t.name)).toEqual([
       terminalSessionKey('far-shell'),
