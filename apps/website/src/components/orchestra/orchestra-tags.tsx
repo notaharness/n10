@@ -8,40 +8,41 @@ import Link from 'next/link';
  */
 const tags = [
   {
-    name: '@orchestra-spawner',
+    name: '@session-launcher',
     value: 'orchestra',
     note: 'or n10 — whichever program created the session',
   },
-  { name: '@orchestra-repo', value: '/code/shop', note: 'the main checkout' },
   {
-    name: '@orchestra-worktree-path',
-    value: '/code/shop/.claude/worktrees/feature-search',
-    note: 'the worktree’s directory, the session’s identity; required',
+    name: '@session-agent',
+    value: 'claude',
+    note: 'what is actually running in the pane',
   },
+  { name: '@session-pane', value: '%12', note: 'the pane the agent runs in' },
   {
-    name: '@orchestra-branch',
+    name: '@session-worktree',
+    value: '/code/shop/.claude/worktrees/feature-search',
+    note: 'the worktree’s directory, the session’s identity',
+  },
+  { name: '@session-repo', value: '/code/shop', note: 'the main checkout' },
+  {
+    name: '@session-x-orchestra-branch',
     value: 'feature/search',
     note: 'the branch when the player started',
   },
   {
-    name: '@orchestra-session-type',
-    value: 'worktree',
-    note: 'worktree or dir for players; n10’s terminal tabs are shell or agent',
-  },
-  {
-    name: '@orchestra-agent',
-    value: 'claude',
-    note: 'what is actually running in the pane',
-  },
-  {
-    name: '@orchestra-orchestrator',
+    name: '@session-x-orchestra-orchestrator',
     value: 'tmux:planning',
     note: 'where reports go; beam:<peer>/… when that is another machine',
   },
   {
-    name: '@orchestra-last-report',
+    name: '@session-x-orchestra-last-report',
     value: 'DONE 2026-09-21T14:02:07Z inbox',
     note: 'kind, time and outcome of the last report',
+  },
+  {
+    name: '@session-version',
+    value: '1',
+    note: 'written last; without it the session is not a player',
   },
 ];
 
@@ -71,7 +72,11 @@ export function OrchestraTags() {
           <p className="text-fd-muted-foreground mt-4 leading-relaxed text-pretty">
             Orchestra stores player state as user options on its tmux session.
             There are no state files or daemons, the tags end with the session,
-            and anything connected to the tmux server can read them.
+            and anything connected to the tmux server can read them. The{' '}
+            <code className="whitespace-nowrap">@session-*</code> keys follow a
+            shared convention for agent sessions;{' '}
+            <code className="whitespace-nowrap">@session-x-orchestra-*</code>{' '}
+            are Orchestra’s own.
           </p>
           <p className="text-fd-muted-foreground mt-4 leading-relaxed text-pretty">
             n10 reads the same tags, and Beam carries commands and reports
