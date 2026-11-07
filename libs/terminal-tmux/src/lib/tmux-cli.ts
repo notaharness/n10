@@ -163,8 +163,8 @@ export interface TmuxNewSessionOptions {
  *  will drive it attaches afterwards with {@link tmuxAttachArgs}. A
  *  non-zero exit is returned, not thrown — a caller racing another
  *  creator inspects {@link isDuplicateSession} and tries another name.
- *  On success stdout is the new pane's ID (`%N`); read it with
- *  {@link createdPaneId}. */
+ *  On success stdout carries the new pane's ID (`%N`) on a line of its
+ *  own; read it with {@link createdPaneId}. */
 /** Pure argv builder, shared with the remote executor path. */
 export function newSessionDetachedArgv(
   name: string,
@@ -192,8 +192,12 @@ export function newSessionDetachedArgv(
 /** The pane a successful `new-session` printed, or `null` when its
  *  output is not a native pane ID. */
 export function createdPaneId(result: TmuxRunResult): string | null {
-  const id = result.stdout.trim();
-  return /^%\d+$/.test(id) ? id : null;
+  return (
+    result.stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => /^%\d+$/.test(line)) ?? null
+  );
 }
 
 export function tmuxNewSessionDetached(

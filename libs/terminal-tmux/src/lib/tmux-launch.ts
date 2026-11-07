@@ -203,7 +203,10 @@ export function createdPaneTags(
 ): Record<string, string> {
   if (!plan.paneOption) return {};
   const paneId = createdPaneId(result);
-  if (!paneId) throw new Error('tmux new-session printed no pane ID');
+  if (!paneId)
+    throw new Error(
+      "Couldn't start the session: tmux didn't report its new pane. Try again."
+    );
   return { [plan.paneOption]: paneId };
 }
 
