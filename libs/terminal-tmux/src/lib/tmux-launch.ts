@@ -5,6 +5,7 @@ import {
 import type { SessionSpec } from '@n10/terminal';
 import { sanitizeTmuxSessionName } from './sanitize-tmux-session-name.js';
 import {
+  createdPaneId,
   isDuplicateSession,
   sessionNameCandidates,
   setOptionArgv,
@@ -18,12 +19,16 @@ import {
   type TmuxRunResult,
 } from './tmux-cli.js';
 
-/** The caller decides identity and intent; this library performs transport operations. */
+/** The caller decides identity and intent; this library performs transport operations.
+ *  A create plan's `paneOption` names a session user option the library
+ *  sets to the new pane's ID, ahead of `tags` in the same command
+ *  queue; the caller gives it meaning. */
 export type TmuxLaunchPlan =
   | {
       mode: 'create';
       label: string;
       tags: Record<string, string>;
+      paneOption?: string;
       retainOnExit?: boolean;
       excludedNames?: readonly string[];
     }
@@ -116,7 +121,8 @@ export function commandArgs(
   ];
 }
 
-/** Exported for the remote executor path — see {@link sessionEnvFlags}. */
+/** Exported for the remote executor path — see {@link sessionEnvFlags}.
+ *  Tags keep their order; retention and status follow them. */
 export function optionCommands(
   name: string,
   tags: Record<string, string | null> = {},
@@ -169,9 +175,14 @@ function create(
     try {
       // Publish complete metadata and launch in one native command queue, so
       // another client cannot discover a partly tagged placeholder.
+      // respawn-pane -k keeps the placeholder's pane, so its ID stands.
       runCommands(
         [
-          ...optionCommands(name, plan.tags, plan.retainOnExit),
+          ...optionCommands(
+            name,
+            { ...createdPaneTags(plan, result), ...plan.tags },
+            plan.retainOnExit
+          ),
           commandArgs(name, spec, true),
         ],
         env
@@ -183,6 +194,17 @@ function create(
     }
   }
   throw new Error(`no free tmux session name for ${label}`);
+}
+
+/** The pane option of a create plan, from what `new-session` printed. */
+export function createdPaneTags(
+  plan: Extract<TmuxLaunchPlan, { mode: 'create' }>,
+  result: TmuxRunResult
+): Record<string, string> {
+  if (!plan.paneOption) return {};
+  const paneId = createdPaneId(result);
+  if (!paneId) throw new Error('tmux new-session printed no pane ID');
+  return { [plan.paneOption]: paneId };
 }
 
 export function prepareTmuxSession(

@@ -82,6 +82,41 @@ describe('retained tmux process lifecycle', () => {
       observer.mockRestore();
     }
   });
+  it('records the new pane in the pane option, which a restart keeps', async () => {
+    const request = spec('exit 0');
+    const created = await createTmuxBackend(request, {
+      mode: 'create',
+      label: request.name,
+      tags: { '@test-agent': 'first' },
+      paneOption: '@test-pane',
+      retainOnExit: true,
+    });
+    backends.push(created);
+    const pane = execFileSync(
+      'tmux',
+      ['display-message', '-p', '-t', `=${created.name!}:`, '#{pane_id}'],
+      { encoding: 'utf8' }
+    ).trim();
+    expect(pane).toMatch(/^%\d+$/);
+    expect(tmuxShowOption(created.name!, '@test-pane')).toBe(pane);
+    await vi.waitFor(() =>
+      expect(tmuxPaneState(created.name!)?.paneDead).toBe(true)
+    );
+    created.dispose();
+    const restarted = await createTmuxBackend(spec('sleep 30'), {
+      mode: 'restart',
+      target: created.name!,
+      retainOnExit: true,
+    });
+    backends.push(restarted);
+    expect(
+      execFileSync(
+        'tmux',
+        ['display-message', '-p', '-t', `=${created.name!}:`, '#{pane_id}'],
+        { encoding: 'utf8' }
+      ).trim()
+    ).toBe(pane);
+  });
   it('keeps semicolons and multiline launch arguments literal in native command queues', async () => {
     const request = spec('');
     const literal = [';', 'trailing;', 'backslash\\;', 'quoted "value"\nnext;'];

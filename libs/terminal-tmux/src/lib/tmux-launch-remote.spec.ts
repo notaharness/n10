@@ -12,7 +12,11 @@ const spec: SessionSpec = {
   rows: 24,
 };
 
-interface ExecResult { stdout: string; stderr: string; code: number }
+interface ExecResult {
+  stdout: string;
+  stderr: string;
+  code: number;
+}
 
 interface FakeOptions {
   hasSession?: (name: string) => boolean;
@@ -51,6 +55,7 @@ function tmuxReply(opts: FakeOptions, argv: string[]): ExecResult {
     return ok(`${opts.defaultShell ?? ''}\n`);
   if (tmuxArgs.includes('display-message'))
     return paneStateReply(opts, tmuxArgs);
+  if (tmuxArgs[0] === 'new-session' && !opts.fail) return ok('%5\n');
   if (opts.fail && argv.join(' ').includes(opts.fail))
     return { stdout: '', stderr: 'boom', code: 1 };
   return ok();
@@ -90,10 +95,23 @@ describe('prepareRemoteTmuxSession (D5: the same plan, executed remotely)', () =
     // executor doing the running differ from a local invocation.
     expect(calls[0]).toBe('tmux has-session -t =test:');
     expect(calls[1]).toMatch(
-      /^tmux new-session -d -s test -c \/tmp -x 80 -y 24( -e \S+=\S+)* -- \/bin\/sh -c exec sleep 86400$/
+      /^tmux new-session -d -P -F #\{pane_id\} -s test -c \/tmp -x 80 -y 24( -e \S+=\S+)* -- \/bin\/sh -c exec sleep 86400$/
     );
     expect(calls[2]).toMatch(
       /^tmux set-option -t =test: @agent example ; set-option -t =test: remain-on-exit on ; set-option -t =test: status off ; respawn-pane -k -t =test: -c \/tmp( -e \S+=\S+)* -- \/bin\/sh -c agent$/
+    );
+  });
+
+  it('writes the pane option first, with the pane new-session printed', async () => {
+    const { executor, calls } = fakeExecutor({ hasSession: () => false });
+    await prepareRemoteTmuxSession(executor, spec, {
+      mode: 'create',
+      label: 'test',
+      tags: { '@agent': 'example' },
+      paneOption: '@pane',
+    });
+    expect(calls[2]).toMatch(
+      /^tmux set-option -t =test: @pane %5 ; set-option -t =test: @agent example ; /
     );
   });
 

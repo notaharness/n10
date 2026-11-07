@@ -107,6 +107,9 @@ describe('tmuxNewSessionDetached', () => {
     expect(mockedExec.mock.calls[0]![1]).toEqual([
       'new-session',
       '-d',
+      '-P',
+      '-F',
+      '#{pane_id}',
       '-s',
       'repo-feat',
       '-c',
