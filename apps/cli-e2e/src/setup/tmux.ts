@@ -104,12 +104,45 @@ const LISTING = [
   '#{session_name}',
   '#{@session-launcher}',
   '#{@session-x-n10-session-type}',
+  '#{@session-version}',
   '#{@session-repo}#{@session-x-n10-dir}',
   '#{@session-x-n10-branch}',
   '#{pane_dead}',
   '#{pane_pid}',
   '#{pane_start_command}',
 ].join('\t');
+
+function isOurs(launcher: string, n10Type: string, version: string): boolean {
+  return n10Type === 'shell' ? !version : version === '1' && !!launcher;
+}
+
+/** One listing row. A shell tab has only n10's extensions and no
+ *  version; any other session of ours has version 1 — without it the
+ *  row reads as untagged. */
+function taggedRow(line: string): TaggedTmuxSession {
+  const [
+    name = '',
+    launcher = '',
+    n10Type = '',
+    version = '',
+    repo = '',
+    branch = '',
+    dead,
+    pid,
+    startCommand = '',
+  ] = line.split('\t');
+  const ours = isOurs(launcher, n10Type, version);
+  return {
+    name,
+    spawner: ours ? launcher || 'n10' : '',
+    type: ours ? n10Type : '',
+    repo,
+    branch,
+    paneDead: dead === '1',
+    panePid: Number(pid),
+    paneStartCommand: startCommand,
+  };
+}
 
 /** Every session on the test's tmux server, tags included. Empty when
  *  no server is running — tmux exits non-zero for that, which is not an
@@ -129,28 +162,7 @@ export function listTaggedSessions(tmuxTmpdir: string): TaggedTmuxSession[] {
     })
       .split('\n')
       .filter((line) => line.trim())
-      .map((line) => {
-        const [
-          name = '',
-          spawner = '',
-          type = '',
-          repo = '',
-          branch = '',
-          dead,
-          pid,
-          startCommand = '',
-        ] = line.split('\t');
-        return {
-          name,
-          spawner: spawner || (type ? 'n10' : ''),
-          type,
-          repo,
-          branch,
-          paneDead: dead === '1',
-          panePid: Number(pid),
-          paneStartCommand: startCommand,
-        };
-      });
+      .map(taggedRow);
   } catch {
     return [];
   }
