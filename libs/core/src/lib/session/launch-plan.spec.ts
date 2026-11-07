@@ -107,6 +107,7 @@ describe('launchPlan', () => {
       retainOnExit: true,
       tags: {
         '@session-agent': 'codex',
+        '@session-x-orchestra-agent-provisional': null,
         '@session-status': null,
         '@session-status-kind': null,
         '@session-status-at': null,

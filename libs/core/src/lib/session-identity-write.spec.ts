@@ -116,6 +116,7 @@ describe('relaunchTags', () => {
   it('records the launched agent and clears status', () => {
     expect(relaunchTags(read(orchestraWorktree()), 'claude', false)).toEqual({
       '@session-agent': 'claude',
+      '@session-x-orchestra-agent-provisional': null,
       '@session-status': null,
       '@session-status-kind': null,
       '@session-status-at': null,
@@ -130,6 +131,23 @@ describe('relaunchTags', () => {
       '@session-x-orchestra-orchestrator-config': null,
       '@session-x-orchestra-last-report': null,
       '@session-x-orchestra-target': null,
+    });
+  });
+
+  // The agent n10 launched is the one that ran: Orchestra's guess is
+  // gone, in the same queue.
+  it("clears Orchestra's provisional mark with the agent it records", () => {
+    const writes = relaunchTags(
+      read({
+        ...orchestraWorktree(),
+        '@session-x-orchestra-agent-provisional': '1',
+      }),
+      'codex',
+      false
+    );
+    expect(writes).toMatchObject({
+      '@session-agent': 'codex',
+      '@session-x-orchestra-agent-provisional': null,
     });
   });
 

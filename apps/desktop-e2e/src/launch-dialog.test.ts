@@ -230,6 +230,12 @@ test('Review sends its selected agent and instructions to the same guarded workt
   await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible();
   const name = findN10SessionFor(BRANCH, homeDir)!;
   await retagAsOrchestraPlayer(name, homeDir);
+  // Orchestra had only guessed the agent; the review records the real one.
+  tagTmuxSession(
+    name,
+    { '@session-x-orchestra-agent-provisional': '1' },
+    homeDir
+  );
   const menu = await openMenu(page, app);
   await menu.getByRole('radio', { name: 'Review', exact: true }).click();
   const picker = menu.getByRole('combobox', { name: 'Agent' });
@@ -249,8 +255,9 @@ test('Review sends its selected agent and instructions to the same guarded workt
     .fill(
       'Check module boundaries. Preserve "quotes", $HOME and `code`.\nSecond line.'
     );
+  // A guessed agent is not named.
   await expect(menu.getByRole('note')).toContainText(
-    'stops the running Custom session'
+    'stops the running agent session'
   );
   await menu
     .getByRole('button', { name: 'Stop and start review', exact: true })
@@ -267,6 +274,9 @@ test('Review sends its selected agent and instructions to the same guarded workt
   expect(args).not.toContain('resume');
   expect(findN10SessionFor(BRANCH, homeDir)).toBe(name);
   expect(await pane(homeDir, name, '#{@session-agent}')).toBe('codex');
+  expect(
+    await pane(homeDir, name, '#{@session-x-orchestra-agent-provisional}')
+  ).toBe('');
   expect(await pane(homeDir, name, '#{@session-launcher}')).toBe('orchestra');
   // The checkout and the branch Orchestra recorded stay as they were.
   expect(await pane(homeDir, name, '#{@session-x-orchestra-branch}')).toBe(

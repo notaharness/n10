@@ -139,9 +139,10 @@ const FRESH_CLEARS: TagWrites = {
 
 /**
  * The tags a restart or replacement writes after its new process
- * starts: the agent it launched, cleared status and, for a fresh
- * conversation, cleared Orchestra routing. A shell has no agent to
- * record. An agent the convention cannot name is left as it was.
+ * starts: the agent it launched, which is no longer Orchestra's guess,
+ * cleared status and, for a fresh conversation, cleared Orchestra
+ * routing. A shell has no agent to record. An agent the convention
+ * cannot name is left as it was.
  */
 export function relaunchTags(
   session: TaggedSession,
@@ -150,7 +151,7 @@ export function relaunchTags(
 ): TagWrites {
   return {
     ...(session.type !== 'shell' && isTagToken(agent)
-      ? { [SESSION_KEY.agent]: agent }
+      ? { [SESSION_KEY.agent]: agent, [ORCHESTRA_EXT.agentProvisional]: null }
       : {}),
     ...STATUS_CLEARS,
     ...(fresh ? FRESH_CLEARS : {}),

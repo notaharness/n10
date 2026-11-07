@@ -151,7 +151,8 @@ orchestrator, last report and target, and for a fresh conversation clears
 orchestrator, orchestrator config, last report and target. While
 `@session-x-orchestra-agent-provisional` is `1`, `@session-agent` is only
 Orchestra's guess: n10 treats the agent as unknown and offers no Continue,
-as for any agent it cannot name, rather than resuming the guess. n10 does not publish
+as for any agent it cannot name, rather than resuming the guess. When n10
+records the agent it launched, it unsets the mark in the same queue. n10 does not publish
 `@session-status*`; replacing an agent clears them.
 
 A session is ours when it carries a version-1 record with a token agent,
