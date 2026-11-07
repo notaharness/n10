@@ -9,8 +9,16 @@ import {
 } from './setup/app.js';
 import { armContextMenuChoice } from './setup/menu.js';
 import type { ElectronApplication } from '@playwright/test';
-import { orchestraTags } from '@n10/core/testing/session-tags';
-import { findN10SessionFor, socketEnv, tagTmuxSession } from './setup/tmux.js';
+import {
+  orchestraTags,
+  worktreeSessionTags,
+} from '@n10/core/testing/session-tags';
+import {
+  findN10SessionFor,
+  socketEnv,
+  tagTmuxSession,
+  untagTmuxSession,
+} from './setup/tmux.js';
 import { fakeCli } from './setup/fake-cli.js';
 
 const codex = fakeCli('codex');
@@ -35,6 +43,42 @@ async function pane(homeDir: string, name: string, format: string) {
     ['display-message', '-p', '-t', `=${name}:`, format],
     { env: socketEnv(homeDir), encoding: 'utf8' }
   ).trim();
+}
+
+/** Make the session n10 just created look as Orchestra 2.0 records a
+ *  player it spawned, adopted by the `planning` orchestrator: Orchestra's
+ *  record and extensions on the same checkout, none of n10's. */
+async function retagAsOrchestraPlayer(name: string, homeDir: string) {
+  const [repo, worktreePath, agent, paneId] = (
+    await pane(
+      homeDir,
+      name,
+      '#{@session-repo}\t#{@session-worktree}\t#{@session-agent}\t#{@session-pane}'
+    )
+  ).split('\t');
+  untagTmuxSession(
+    name,
+    ['@session-x-n10-session-type', '@session-x-n10-branch'],
+    homeDir
+  );
+  tagTmuxSession(
+    name,
+    {
+      ...worktreeSessionTags({
+        launcher: 'orchestra',
+        repo: repo!,
+        worktreePath: worktreePath!,
+        branch: BRANCH,
+        agent: agent!,
+        pane: paneId!,
+      }),
+      ...orchestraTags({
+        orchestrator: 'planning',
+        lastReport: `DONE ${REPORT_TIME} inbox`,
+      }),
+    },
+    homeDir
+  );
 }
 
 async function openMenu(
@@ -115,17 +159,7 @@ test('Orchestra context shows real report metadata only for Continue and preserv
   await startSessionFromMenu(page);
   await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible();
   const name = findN10SessionFor(BRANCH, homeDir)!;
-  tagTmuxSession(
-    name,
-    {
-      '@session-launcher': 'orchestra',
-      ...orchestraTags({
-        orchestrator: 'planning',
-        lastReport: `DONE ${REPORT_TIME} inbox`,
-      }),
-    },
-    homeDir
-  );
+  await retagAsOrchestraPlayer(name, homeDir);
   const menu = await openMenu(page, app);
   await expect(
     menu.getByRole('region', { name: 'Orchestra context' })
@@ -181,17 +215,7 @@ test('Review sends its selected agent and instructions to the same guarded workt
   await startSessionFromMenu(page);
   await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible();
   const name = findN10SessionFor(BRANCH, homeDir)!;
-  tagTmuxSession(
-    name,
-    {
-      '@session-launcher': 'orchestra',
-      ...orchestraTags({
-        orchestrator: 'planning',
-        lastReport: `DONE ${REPORT_TIME} inbox`,
-      }),
-    },
-    homeDir
-  );
+  await retagAsOrchestraPlayer(name, homeDir);
   const menu = await openMenu(page, app);
   await menu.getByRole('radio', { name: 'Review', exact: true }).click();
   const picker = menu.getByRole('combobox', { name: 'Agent' });
@@ -230,6 +254,12 @@ test('Review sends its selected agent and instructions to the same guarded workt
   expect(findN10SessionFor(BRANCH, homeDir)).toBe(name);
   expect(await pane(homeDir, name, '#{@session-agent}')).toBe('codex');
   expect(await pane(homeDir, name, '#{@session-launcher}')).toBe('orchestra');
+  // The checkout and the branch Orchestra recorded stay as they were.
+  expect(await pane(homeDir, name, '#{@session-x-orchestra-branch}')).toBe(
+    BRANCH
+  );
+  expect(await pane(homeDir, name, '#{@session-x-n10-branch}')).toBe('');
+  expect(await pane(homeDir, name, '#{@session-version}')).toBe('1');
   expect(
     await pane(homeDir, name, '#{@session-x-orchestra-orchestrator}')
   ).toBe('');

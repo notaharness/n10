@@ -91,6 +91,7 @@ export interface TaggedTmuxSession {
 }
 
 const TAGS = [
+  '@session-version',
   '@session-launcher',
   '@session-x-n10-session-type',
   '@session-worktree',
@@ -107,18 +108,23 @@ const LISTING = ['#{session_name}', ...TAGS.map((tag) => `#{${tag}}`)].join(
 /** The first of `values` that is set. */
 const first = (...values: string[]): string => values.find(Boolean) ?? '';
 
-/** One listing row. A shell tab has only n10's extensions; a record
- *  naming both checkouts is a worktree session, any other an agent. */
+/** One listing row. A shell tab has only n10's extensions and no
+ *  version; any other session of ours has version 1 — without it the
+ *  row reads as untagged. A record naming both checkouts is a worktree
+ *  session, any other an agent. */
 function taggedRow(line: string): TaggedTmuxSession {
   const [name = '', ...values] = line.split('\t');
   const tag = (key: (typeof TAGS)[number]) => values[TAGS.indexOf(key)] ?? '';
   const worktree = !!tag('@session-worktree') && !!tag('@session-repo');
-  const launcher = tag('@session-launcher');
   const shell = tag('@session-x-n10-session-type') === 'shell';
+  const launcher = tag('@session-launcher');
+  const ours = shell
+    ? !tag('@session-version')
+    : tag('@session-version') === '1' && !!launcher;
   return {
     name,
-    spawner: shell ? 'n10' : launcher,
-    type: shell ? 'shell' : worktree ? 'worktree' : launcher ? 'agent' : '',
+    spawner: !ours ? '' : shell ? 'n10' : launcher,
+    type: !ours ? '' : shell ? 'shell' : worktree ? 'worktree' : 'agent',
     repo: worktree
       ? tag('@session-repo')
       : first(tag('@session-x-n10-dir'), tag('@session-cwd')),
@@ -191,6 +197,21 @@ export function tagTmuxSession(
   const env = socketEnv(tmuxTmpdir);
   for (const [key, value] of Object.entries(tags)) {
     execFileSync('tmux', ['set-option', '-t', `=${name}:`, key, value], {
+      stdio: 'ignore',
+      env,
+    });
+  }
+}
+
+/** Unset tags on a session, one `set-option -u` each. */
+export function untagTmuxSession(
+  name: string,
+  keys: readonly string[],
+  tmuxTmpdir: string
+): void {
+  const env = socketEnv(tmuxTmpdir);
+  for (const key of keys) {
+    execFileSync('tmux', ['set-option', '-u', '-t', `=${name}:`, key], {
       stdio: 'ignore',
       env,
     });
