@@ -72,7 +72,7 @@ bash apps/desktop/scripts/test-macos-package.sh \
   /tmp/n10-installed.png
 ```
 
-CI runs this on `macos-14` (arm64) and `macos-15-intel` (x64), uploading the
+CI runs this on `macos-15` (arm64) and `macos-15-intel` (x64), uploading the
 screenshots as artifacts.
 
 `src/fixtures/desktop.ts` creates a repo and isolated HOME, seeds optional Git
