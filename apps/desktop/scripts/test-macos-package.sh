@@ -52,7 +52,7 @@ for theme in light dark; do
   N10_QA_STEPS=$(node -e '
     const fs = require("node:fs");
     const js = fs.readFileSync(process.argv[1], "utf8").replaceAll("/tmp/qa-repo", process.argv[2]);
-    process.stdout.write(JSON.stringify([{ js, waitMs: 200, shot: process.argv[3], contentSize: [1600, 900] }]));
+    process.stdout.write(JSON.stringify([{ js, waitMs: 200, shot: process.argv[3], contentSize: [1280, 640] }]));
   ' "$script_dir/installer-qa.js" "$work/repo" "$theme_shot")
   log="$work/app-$theme.log"
   if ! python3 - "$app_binary" "$work/repo" "$log" <<'PY'
@@ -76,7 +76,7 @@ PY
     exit 1
   fi
   dimensions=$(sips -g pixelWidth -g pixelHeight "$theme_shot")
-  if [[ "$dimensions" != *'pixelWidth: 1600'* || "$dimensions" != *'pixelHeight: 900'* ]]; then
+  if [[ "$dimensions" != *'pixelWidth: 1280'* || "$dimensions" != *'pixelHeight: 640'* ]]; then
     echo "unexpected screenshot dimensions: $dimensions" >&2
     exit 1
   fi
