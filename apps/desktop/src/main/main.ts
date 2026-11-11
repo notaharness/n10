@@ -8,6 +8,7 @@ import {
   Menu,
   nativeTheme,
   webContents,
+  type MenuItemConstructorOptions,
 } from 'electron';
 import {
   holdMenuShortcuts,
@@ -93,25 +94,39 @@ function installAppMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+/** A context menu's items as Electron's template, `choose` hearing the
+ *  id of the one picked; a submenu nests its own. */
+function contextTemplate(
+  items: ContextMenuItem[],
+  choose: (id: string) => void
+): MenuItemConstructorOptions[] {
+  return items.map((item) => {
+    if ('type' in item) return { type: 'separator' as const };
+    const common = {
+      label: item.label,
+      enabled: item.enabled ?? true,
+      ...(item.toolTip ? { toolTip: item.toolTip } : {}),
+    };
+    if (item.submenu) {
+      return { ...common, submenu: contextTemplate(item.submenu, choose) };
+    }
+    return {
+      ...common,
+      ...(item.checked === undefined
+        ? {}
+        : { type: 'radio' as const, checked: item.checked }),
+      click: () => choose(item.id),
+    };
+  });
+}
+
 function popupContextMenu(items: ContextMenuItem[]): Promise<string | null> {
   return new Promise((resolve) => {
     let chosen: string | null = null;
     const menu = Menu.buildFromTemplate(
-      items.map((item) =>
-        'type' in item
-          ? { type: 'separator' as const }
-          : {
-              label: item.label,
-              enabled: item.enabled ?? true,
-              ...(item.toolTip ? { toolTip: item.toolTip } : {}),
-              ...(item.checked === undefined
-                ? {}
-                : { type: 'radio' as const, checked: item.checked }),
-              click: () => {
-                chosen = item.id;
-              },
-            }
-      )
+      contextTemplate(items, (id) => {
+        chosen = id;
+      })
     );
     const win = BrowserWindow.getFocusedWindow() ?? undefined;
     menu.popup({

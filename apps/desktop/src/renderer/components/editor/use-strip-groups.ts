@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
   SessionActivitySnapshot,
   SidebarItem,
@@ -56,22 +56,15 @@ export interface StripGroups {
 }
 
 /**
- * The strip's groups and every tab's face, from the open repository's
- * items, the host's session listings and the tabs. Notes the presented
- * order for positional switching, and expands a collapsed group when one
- * of its tabs becomes active from anywhere (the palette, Ctrl+Tab, a
- * roster row).
+ * What the strip needs of a tab to group it: the session it shows or
+ * works beside, and its affiliation. Also how the workspace places a
+ * tab a sync opens (`groupOf`), so it shares one answer with the strip.
  */
-export function useStripGroups(items: SidebarItem[]): StripGroups {
+export function useTabFacts(items: SidebarItem[]) {
   const { repo } = useRepo();
-  const tabs = useTabs();
-  const activity = useSessionActivity(repo.cwd);
   const terminals = useTerminals();
   const foreign = useForeignSessions();
   const sessions = useSessions(repo.cwd);
-  const machines = useMachines();
-  const repoColors = useRepoColors();
-  const showMachines = hasPeerMachines(machines.data ?? []);
   const index = useMemo(() => indexItems(repo.cwd, items), [repo.cwd, items]);
 
   const sessionRows = useMemo(
@@ -90,6 +83,43 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
   );
 
   const { sessionOf, ownSession } = tabSessions(items, index);
+
+  const factsOf = (tab: Tab) => tabFacts(tab, sessionOf(tab), affiliations);
+  return { index, sessionOf, ownSession, factsOf };
+}
+
+/** The group a tab belongs to as the strip reads it (`useTabFacts`), by
+ *  a function that keeps its identity and reads the latest facts: a sync
+ *  places the tabs it opens with it without re-running on every render. */
+export function useGroupOf(items: SidebarItem[]) {
+  const { factsOf } = useTabFacts(items);
+  const latest = useRef(factsOf);
+  useEffect(() => {
+    latest.current = factsOf;
+  });
+  return useCallback(
+    (tab: Tab) => latest.current(tab).affiliation?.key ?? null,
+    []
+  );
+}
+
+/**
+ * The strip's groups and every tab's face, from the open repository's
+ * items, the host's session listings and the tabs. Notes the presented
+ * order for positional switching, and expands a collapsed group when one
+ * of its tabs becomes active from anywhere (the palette, Ctrl+Tab, a
+ * roster row).
+ */
+export function useStripGroups(items: SidebarItem[]): StripGroups {
+  const { repo } = useRepo();
+  const tabs = useTabs();
+  const activity = useSessionActivity(repo.cwd);
+  const terminals = useTerminals();
+  const sessions = useSessions(repo.cwd);
+  const machines = useMachines();
+  const repoColors = useRepoColors();
+  const showMachines = hasPeerMachines(machines.data ?? []);
+  const { index, sessionOf, ownSession, factsOf } = useTabFacts(items);
 
   const machineLabelFor = (tab: Tab): string | null => {
     if (!showMachines) return null;
@@ -123,11 +153,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     };
   };
 
-  const groups = present(
-    tabs.tabs,
-    (tab) => tabFacts(tab, sessionOf(tab), affiliations),
-    tabs.pinned
-  );
+  const groups = present(tabs.tabs, factsOf, tabs.pinned);
   const colorOf = (group: TabGroup): string | null => {
     if (group.head) return colorOfTab(group.head);
     // A terminal in a subdirectory names no repository of its own: it
@@ -139,10 +165,12 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
 
   // Positional keyboard switching walks the order the strip presents,
   // collapsed members included.
+  // Only the focused pane's: the shortcuts walk the pane they act in.
   const presented = presentedIds(groups).join('\n');
+  const focused = tabs.focused;
   useEffect(() => {
-    notePresentedOrder(presented ? presented.split('\n') : []);
-  }, [presented]);
+    if (focused) notePresentedOrder(presented ? presented.split('\n') : []);
+  }, [presented, focused]);
 
   // A tab activated from anywhere shows: its group expands. So does a
   // collapsed group the active tab joins behind its chip (its

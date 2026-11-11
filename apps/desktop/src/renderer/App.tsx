@@ -3,7 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import type { N10HostApi, RepoInfo } from '../host/contract.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
-import { TabDragProvider } from './components/editor/TabStrip.js';
+import { TabDragProvider } from './components/editor/TabDragProvider.js';
 import { EnrolmentDialog } from './components/fleet/EnrolmentDialog.js';
 import { RevokeMachineDialog } from './components/machines/RevokeMachineDialog.js';
 import { Toaster } from './components/ui/sonner.js';

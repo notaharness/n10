@@ -17,7 +17,7 @@ import type {
 import { useThreads } from '../../../lib/data/queries.js';
 import { totalCommentCount } from '../../../lib/diff/thread-model.js';
 import { useRepo } from '../../../lib/repo-context.js';
-import { usePaneShown } from '../../../lib/tabs/pane-shown.js';
+import { usePaneTakesKeys } from '../../../lib/tabs/pane-shown.js';
 import { cn } from '../../../lib/utils.js';
 import {
   SEVERITIES,
@@ -95,7 +95,7 @@ export function StepCard({
     threads.data ? totalCommentCount(threads.data) : null
   );
 
-  const shown = usePaneShown();
+  const shown = usePaneTakesKeys();
   const startEditing = () => {
     setBody(draft.body);
     setSeverity(draft.severity);

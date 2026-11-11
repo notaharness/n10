@@ -21,6 +21,7 @@ import { pressWithoutFocus } from './tab-keyboard.js';
 import { TabEnd } from './TabButton.js';
 import { TabIcon } from './TabIcon.js';
 import { runGroupMenu, runTabMenu, type GroupMenu } from './tab-menu.js';
+import { usePaneMenus } from './use-pane-menus.js';
 import { TabLabel } from './TabLabel.js';
 import type { useSortableTab } from './TabStrip.js';
 import type { useRosterOpen } from './use-roster-open.js';
@@ -68,6 +69,7 @@ function HomeBody({
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
 }) {
   const tabs = useTabs();
+  const { tabMenu } = usePaneMenus();
   const { tabOverflow } = useDesktopPrefs();
   const { tab } = face;
   const active = tab.id === tabs.activeId;
@@ -106,9 +108,15 @@ function HomeBody({
       onDoubleClick={() => tabs.keep(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
-        runTabMenu(tab, tabs, closer, tabOverflow, menu).catch((err: unknown) =>
-          toast.error(errorMessage(err))
-        );
+        runTabMenu(
+          tab,
+          tabs,
+          closer,
+          tabOverflow,
+          menu,
+          undefined,
+          tabMenu
+        ).catch((err: unknown) => toast.error(errorMessage(err)));
       }}
       title={label}
       className={cn(BODY, 'cursor-default')}

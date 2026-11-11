@@ -8,7 +8,7 @@ import {
   openTerminal,
   type DesktopTerminal,
 } from '../../lib/terminals/xterm.js';
-import { usePaneShown } from '../../lib/tabs/pane-shown.js';
+import { usePaneFocused, usePaneShown } from '../../lib/tabs/pane-shown.js';
 import { demoMayFocus } from '../../lib/demo-focus.js';
 import { getResolvedTheme, useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
@@ -67,6 +67,8 @@ export function SessionTerminal({
   const [xterm, setXterm] = useState<DesktopTerminal | null>(null);
   const { resolved } = useTheme();
   const shown = usePaneShown();
+  // Shown in another pane than the focused one: on screen, not typed in.
+  const focusedPane = usePaneFocused();
 
   // Terminal responses and user input can race a session ending. Keep
   // the host's refusal visible without throwing an unhandled rejection
@@ -217,7 +219,7 @@ export function SessionTerminal({
   // row's takes it).
   useEffect(() => {
     if (!xterm) return undefined;
-    if (!blocked && shown && demoMayFocus()) {
+    if (!blocked && shown && focusedPane && demoMayFocus()) {
       const raf = requestAnimationFrame(() => xterm.term.focus());
       return () => cancelAnimationFrame(raf);
     }
@@ -225,7 +227,7 @@ export function SessionTerminal({
     if (focused instanceof HTMLElement && wrapRef.current?.contains(focused))
       focused.blur();
     return undefined;
-  }, [xterm, blocked, shown]);
+  }, [xterm, blocked, shown, focusedPane]);
 
   // Fit the terminal grid to its pane whenever the pane's box changes.
   //

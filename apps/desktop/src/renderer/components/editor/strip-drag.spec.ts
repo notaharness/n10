@@ -77,6 +77,16 @@ describe('strip drag', () => {
       ])
     ).toBeNull();
   });
+  it('moves a block onto another pane’s block beside it there', () => {
+    const left = { ...block(['a', 'b'], 0), pane: 'pane-1' };
+    const right = { ...block(['c', 'd'], 2), pane: 'pane-2' };
+    expect(dropMove('block:g', left, 'block:h', right, [['a', 'b']])).toEqual({
+      kind: 'move',
+      ids: ['a', 'b'],
+      targetId: 'd',
+      side: 'after',
+    });
+  });
   it('makes no move onto itself or another group’s member', () => {
     expect(dropMove('a', member('g', 0), 'a', member('g', 0), [])).toBeNull();
     expect(dropMove('a', member('g', 0), 'x', member('h', 0), [])).toBeNull();

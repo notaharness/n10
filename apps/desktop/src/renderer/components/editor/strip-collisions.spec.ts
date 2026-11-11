@@ -1,6 +1,10 @@
 import type { ClientRect, DroppableContainer } from '@dnd-kit/core';
 import { describe, expect, it } from 'vitest';
-import { collisionsEndingAt, END_ID, groupEndId } from './strip-collisions.js';
+import {
+  collisionsEndingAt,
+  groupEndId,
+  stripEndId,
+} from './strip-collisions.js';
 import type { StripDragData } from './strip-drag.js';
 
 const rect = (left: number, width = 50): ClientRect => ({
@@ -61,7 +65,7 @@ describe('collisionsEndingAt', () => {
     const containers = [
       container('b1', 50, block(1)),
       container('b2', 100, block(2)),
-      container(END_ID, 150, undefined, 500),
+      container(stripEndId(''), 150, undefined, 500),
       container('b0', 0, block(0)),
     ];
     const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
@@ -87,7 +91,7 @@ describe('collisionsEndingAt', () => {
       container('m0', 0, member(0), 200),
       container('m1', 200, member(1), 200),
       container('m2', 0, member(2), 100),
-      container(groupEndId('g'), 100, undefined, 300),
+      container(groupEndId('', 'g'), 100, undefined, 300),
     ];
     containers[2]!.rect.current = { ...rect(0, 100), top: 30, bottom: 60 };
     containers[3]!.rect.current = { ...rect(100, 300), top: 30, bottom: 60 };
@@ -100,5 +104,35 @@ describe('collisionsEndingAt', () => {
       pointerCoordinates: { x: 350, y: 45 },
     });
     expect(collisions.map((c) => c.id)).toEqual(['m2']);
+  });
+
+  it('takes a pane’s end room for that pane’s last place, not another pane’s', () => {
+    const inPane = (pane: string, index: number): StripDragData => ({
+      kind: 'block',
+      label: '',
+      ids: [`${pane}-${index}`],
+      index,
+      pane,
+    });
+    // Pane 2 sits below pane 1, and its blocks index further.
+    const containers = [
+      container('a0', 0, inPane('pane-1', 0)),
+      container('a1', 50, inPane('pane-1', 1)),
+      container(stripEndId('pane-1'), 100, undefined, 500),
+      container('b0', 0, inPane('pane-2', 0)),
+      container('b1', 50, inPane('pane-2', 1)),
+      container('b2', 100, inPane('pane-2', 2)),
+    ];
+    for (const c of containers.slice(3))
+      c.rect.current = { ...c.rect.current!, top: 300, bottom: 330 };
+    const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
+    const collisions = collisionsEndingAt({
+      active: { id: 'a0' } as never,
+      collisionRect: rect(400, 10),
+      droppableRects: rects,
+      droppableContainers: containers,
+      pointerCoordinates: { x: 405, y: 15 },
+    });
+    expect(collisions.map((c) => c.id)).toEqual(['a1']);
   });
 });

@@ -13,6 +13,7 @@ import { pressWithoutFocus } from './tab-keyboard.js';
 import { blockId } from './strip-blocks.js';
 import type { StripDragData, StripPlace } from './strip-drag.js';
 import { runTabMenu, type GroupMenu } from './tab-menu.js';
+import { usePaneMenus } from './use-pane-menus.js';
 import type { TabFace } from './use-strip-groups.js';
 import { FACE_ICON, TabIcon } from './TabIcon.js';
 import {
@@ -134,6 +135,7 @@ export function TabButton({
 }) {
   const { tab, item, snapshot, foreignRepo, machineLabel, repoColor } = face;
   const tabs = useTabs();
+  const { tabMenu } = usePaneMenus();
   const { tabOverflow } = useDesktopPrefs();
   const { label, face: kind } = tabPresentation(tab, item, machineLabel);
   // Resting on a tab renders its pane ahead of the press, another
@@ -178,7 +180,7 @@ export function TabButton({
       onDoubleClick={() => tabs.keep(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
-        runTabMenu(tab, tabs, closer, tabOverflow, menu, rename).catch(
+        runTabMenu(tab, tabs, closer, tabOverflow, menu, rename, tabMenu).catch(
           (err: unknown) => toast.error(errorMessage(err))
         );
       }}

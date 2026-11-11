@@ -181,6 +181,20 @@ describe('keyboard tab switching', () => {
     expect(strip.active).toBe('b');
   });
 
+  it('Ctrl+1…8 choose that tab in the presented order, Ctrl+9 the last', () => {
+    strip.ids = ['a', 'o', 'b', 'p', 'q'];
+    notePresentedOrder(['a', 'o', 'p', 'q', 'b']);
+    const e = press('3', { ctrl: true });
+    expect(strip.active).toBe('p');
+    expect(e.defaultPrevented).toBe(true);
+    press('9', { ctrl: true });
+    expect(strip.active).toBe('b');
+    // No sixth tab: nothing moves, and the chord is still the app's.
+    const none = press('6', { ctrl: true });
+    expect(strip.active).toBe('b');
+    expect(none.defaultPrevented).toBe(true);
+  });
+
   it('Ctrl+Tab walks by recent use while Ctrl is held, commits on release', () => {
     press('Tab', { ctrl: true });
     press('Tab', { ctrl: true });

@@ -37,7 +37,18 @@ export function showContextMenu(
     menu.className = MENU;
     menu.setAttribute('role', 'menu');
     const buttons: HTMLButtonElement[] = [];
-    for (const item of items) {
+    // A submenu's items show inline under its label, which the page's
+    // menu does not nest.
+    const flat = items.flatMap((item): ContextMenuItem[] =>
+      'type' in item || !item.submenu
+        ? [item]
+        : item.submenu.map((sub) =>
+            'type' in sub
+              ? sub
+              : { ...sub, label: `${item.label}: ${sub.label}` }
+          )
+    );
+    for (const item of flat) {
       if ('type' in item) {
         const rule = document.createElement('div');
         rule.className = '-mx-1 my-1 h-px bg-border';

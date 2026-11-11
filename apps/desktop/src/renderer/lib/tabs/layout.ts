@@ -352,3 +352,21 @@ export function closeNeighbour(layout: LayoutNode, id: PaneId): PaneId | null {
   rest.sort(([, p], [, q]) => distance(a, p) - distance(a, q));
   return rest[0]?.[0] ?? null;
 }
+
+/** The smallest a pane may be, strip included, and a separator's room. */
+export const MIN_PANE = { width: 240, height: 180 } as const;
+export const SEPARATOR_PX = 4;
+
+/**
+ * The least room `node` needs along `axis`, in pixels: a pane its
+ * minimum; a split along that axis its children's sum and separators,
+ * across it its largest child's.
+ */
+export function minExtent(node: LayoutNode, axis: 'width' | 'height'): number {
+  if (node.kind === 'pane') return MIN_PANE[axis];
+  const along = (node.direction === 'row') === (axis === 'width');
+  const each = node.children.map((c) => minExtent(c, axis));
+  return along
+    ? each.reduce((a, b) => a + b, 0) + SEPARATOR_PX * (each.length - 1)
+    : Math.max(...each);
+}

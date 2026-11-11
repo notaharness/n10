@@ -142,7 +142,7 @@ export function withStrip(
   );
   for (const tab of list) tabs[tab.id] = tab;
   const order = list.map((t) => t.id);
-  const pinned = rest.pinned.filter((id) => id in tabs);
+  const pinned = rest.pinned.filter((id) => Object.hasOwn(tabs, id));
   return {
     ...ws,
     ...rest,

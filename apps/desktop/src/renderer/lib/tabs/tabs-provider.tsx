@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useReducer, type ReactNode } from 'react';
-import { TabsContext, tabsActions } from './tabs.js';
+import { WorkspaceContext } from './tabs.js';
 import { reduce } from './tabs-model.js';
-import { focusedPaneOf, stripOf } from './workspace.js';
 import {
   type Restored,
   useRestoredWorkspace,
@@ -49,13 +48,10 @@ function RestoredTabs({
     []
   );
 
-  const actions = useMemo(() => tabsActions(dispatch), []);
-  const api = useMemo(
-    () => ({
-      ...stripOf(workspace, focusedPaneOf(workspace).id),
-      ...actions,
-    }),
-    [workspace, actions]
+  const store = useMemo(() => ({ workspace, dispatch }), [workspace]);
+  return (
+    <WorkspaceContext.Provider value={store}>
+      {children}
+    </WorkspaceContext.Provider>
   );
-  return <TabsContext.Provider value={api}>{children}</TabsContext.Provider>;
 }

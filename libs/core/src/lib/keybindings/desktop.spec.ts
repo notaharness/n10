@@ -33,6 +33,19 @@ describe('desktop default bindings', () => {
     ['A', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.attention'],
     ['J', { ctrlKey: true, shiftKey: true }, 'desktop.groups.collapse-others'],
     ['p', { ctrlKey: true, altKey: true }, 'desktop.tabs.toggle-pin'],
+    ['3', { ctrlKey: true }, 'desktop.tabs.select-3'],
+    ['9', { ctrlKey: true }, 'desktop.tabs.select-9'],
+    ['\\', { ctrlKey: true }, 'desktop.panes.split-right'],
+    // Shift+\ is | as the key event reports it.
+    ['|', { ctrlKey: true, shiftKey: true }, 'desktop.panes.split-down'],
+    ['ArrowLeft', { ctrlKey: true, altKey: true }, 'desktop.panes.focus-left'],
+    ['ArrowDown', { ctrlKey: true, altKey: true }, 'desktop.panes.focus-down'],
+    [
+      'ArrowRight',
+      { ctrlKey: true, altKey: true, shiftKey: true },
+      'desktop.panes.move-right',
+    ],
+    ['w', { ctrlKey: true, altKey: true }, 'desktop.panes.close'],
   ] as const)('%s with %o fires %s', (key, mods, action) => {
     expect(resolveDesktopAction(press(key, mods), defaults)).toBe(action);
   });
@@ -60,6 +73,18 @@ describe('desktop default bindings', () => {
       'Ctrl+Shift+a',
       'Ctrl+Shift+j',
       'Ctrl+Alt+p',
+      ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Ctrl+${n}`),
+      'Ctrl+\\',
+      'Ctrl+Shift+|',
+      'Ctrl+Alt+←',
+      'Ctrl+Alt+→',
+      'Ctrl+Alt+↑',
+      'Ctrl+Alt+↓',
+      'Ctrl+Shift+Alt+←',
+      'Ctrl+Shift+Alt+→',
+      'Ctrl+Shift+Alt+↑',
+      'Ctrl+Shift+Alt+↓',
+      'Ctrl+Alt+w',
     ]);
   });
 
@@ -85,6 +110,16 @@ describe('desktop overrides', () => {
         bindings
       )
     ).toBe('desktop.tabs.next');
+  });
+  it('leaves a pane default unassigned when a user override owns its chord', () => {
+    const bindings = desktopBindings({
+      'desktop.tabs.attention': [{ ctrl: true, input: '\\' }],
+    });
+    expect(bindings['desktop.panes.split-right']).toEqual([]);
+    expect(bindings['desktop.panes.split-down']).toHaveLength(1);
+    expect(resolveDesktopAction(press('\\', { ctrlKey: true }), bindings)).toBe(
+      'desktop.tabs.attention'
+    );
   });
   it('replace the default for their action only', () => {
     const bindings = desktopBindings({

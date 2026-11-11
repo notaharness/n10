@@ -10,7 +10,7 @@
  * where it showed whatever order the tabs are stored in.
  */
 
-export type StripDragData =
+export type StripDragData = (
   | {
       kind: 'member';
       label: string;
@@ -30,12 +30,24 @@ export type StripDragData =
       /** A pinned tab: it moves only among the pinned ones, and nothing
        *  else lands among them. */
       pinned?: true;
-    };
+    }
+) & {
+  /** The pane whose strip it is on. */
+  pane?: string;
+};
 
 /** A place as its caller describes it; the strip adds the label. */
 export type StripPlace =
-  | Omit<Extract<StripDragData, { kind: 'member' }>, 'label'>
-  | Omit<Extract<StripDragData, { kind: 'block' }>, 'label'>;
+  | Omit<Extract<StripDragData, { kind: 'member' }>, 'label' | 'pane'>
+  | Omit<Extract<StripDragData, { kind: 'block' }>, 'label' | 'pane'>;
+
+/** The tabs a drag carries: a member its own, a block its ids. */
+export function draggedIds(
+  activeId: string,
+  dragged: StripDragData
+): readonly string[] {
+  return dragged.kind === 'member' ? [activeId] : dragged.ids;
+}
 
 export function isStripDragData(data: unknown): data is StripDragData {
   const kind = (data as { kind?: unknown } | undefined)?.kind;
@@ -68,8 +80,19 @@ export type StripDrop =
     }
   | { kind: 'arrange'; ids: string[] };
 
+/** A block dropped on another pane's block: its tabs go beside that
+ *  block there (the reducer moves them across, `workspace-reduce.ts`). */
+type BlockData = Extract<StripDragData, { kind: 'block' }>;
+
+function beside(dragged: BlockData, over: BlockData): StripDrop | null {
+  const side = dragged.index < over.index ? 'after' : 'before';
+  const targetId = side === 'after' ? over.ids.at(-1) : over.ids[0];
+  return targetId ? { kind: 'move', ids: dragged.ids, targetId, side } : null;
+}
+
 /** The move a drop makes. `null` for a drop on itself, nowhere legal, or
- *  from a strip that has changed under the drag. */
+ *  from a strip that has changed under the drag. `blocks` are the
+ *  dragged block's pane's, as presented. */
 export function dropMove(
   activeId: string,
   dragged: StripDragData,
@@ -85,6 +108,7 @@ export function dropMove(
     return { kind: 'move', ids: [activeId], targetId: overId, side };
   }
   if (over.kind !== 'block') return null;
+  if ((dragged.pane ?? '') !== (over.pane ?? '')) return beside(dragged, over);
   const from = dragged.index;
   const to = over.index;
   if (from === to || !sameIds(blocks[from], dragged.ids) || !blocks[to])

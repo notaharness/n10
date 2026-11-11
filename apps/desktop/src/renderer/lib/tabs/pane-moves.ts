@@ -85,18 +85,19 @@ function shownAfterMove(
   moving: readonly string[],
   activate: string | undefined
 ): string {
-  if (activate !== undefined && moving.includes(activate)) return activate;
   const carried = panes.find(
     (p) => p.id !== dest && p.activeId !== null && moving.includes(p.activeId)
   )?.activeId;
-  return carried ?? moving[0]!;
+  if (carried) return carried;
+  if (activate !== undefined && moving.includes(activate)) return activate;
+  return moving[0]!;
 }
 
 /**
  * Move `ids` (in their present order, from wherever they are) into pane
  * `dest`, beside `anchor` or at its end. The destination takes focus and
- * shows `activate`, else the active tab of a pane that lost it to this
- * move, else the first tab moved. A pane left empty goes.
+ * shows the active tab of a pane that lost it to this move, else
+ * `activate`, else the first tab moved. A pane left empty goes.
  */
 export function moveToPane(
   ws: Workspace,
@@ -143,7 +144,7 @@ export function splitPane(
   activate?: string
 ): Workspace {
   const pane = panesOf(ws.layout).find((p) => p.id === target);
-  const asked = new Set(ids.filter((id) => id in ws.tabs));
+  const asked = new Set(ids.filter((id) => Object.hasOwn(ws.tabs, id)));
   if (!pane || asked.size === 0) return ws;
   if (pane.order.every((id) => asked.has(id))) return ws;
   const added: PaneNode = {

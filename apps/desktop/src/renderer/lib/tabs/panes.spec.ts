@@ -85,6 +85,14 @@ describe('splitting', () => {
     ]);
   });
 
+  it('shows the active tab a group carries, else the one asked for', () => {
+    const carried = then(
+      threeTabs(),
+      split([id('branch:b'), id('branch:c')], 'pane-1', 'right', id('branch:b'))
+    );
+    expect(shape(carried)[1]!.active).toBe('branch:c');
+  });
+
   it('shows the tab asked for when a group moves', () => {
     const ws = then(
       threeTabs(),
@@ -207,6 +215,7 @@ describe('closing a pane', () => {
   it('moves its tabs, order and active tab to its neighbour and closes nothing', () => {
     const ws = then(
       threeTabs(),
+      { type: 'activate', id: id('branch:b') },
       split(
         [id('branch:b'), id('branch:c')],
         'pane-1',

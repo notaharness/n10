@@ -96,7 +96,7 @@ function crossPaneMove(
 ): Workspace | null {
   const dest = paneOf(ws, action.targetId);
   const elsewhere = action.ids.some(
-    (id) => id in ws.tabs && !dest?.order.includes(id)
+    (id) => Object.hasOwn(ws.tabs, id) && !dest?.order.includes(id)
   );
   if (!dest || !elsewhere) return null;
   return moveToPane(ws, action.ids, dest.id, {
@@ -111,9 +111,10 @@ function namedTab(
   ws: Workspace,
   action: TabsAction
 ): { id: string | undefined; focus: boolean } | null {
+  if ('id' in action)
+    return { id: action.id, focus: action.type === 'activate' };
+  if ('ids' in action) return { id: action.ids[0], focus: false };
   switch (action.type) {
-    case 'activate':
-      return { id: action.id, focus: true };
     case 'open-settings':
       return { id: 'settings', focus: true };
     case 'open-terminal':
@@ -125,15 +126,8 @@ function namedTab(
       );
       return { id: tab?.id, focus: true };
     }
-    case 'close':
-    case 'close-others':
-    case 'keep':
-      return { id: action.id, focus: false };
     case 'terminal-ended':
       return { id: terminalTabId(action.name), focus: false };
-    case 'set-pinned':
-    case 'move':
-      return { id: action.ids[0], focus: false };
     default:
       return null;
   }
@@ -267,7 +261,7 @@ function distribute(
   }
   const tabs = Object.fromEntries(list.map((t) => [t.id, t]));
   // A pin goes with its tab, as `withStrip` has it.
-  const pinned = rest.pinned.filter((id) => id in tabs);
+  const pinned = rest.pinned.filter((id) => Object.hasOwn(tabs, id));
   return {
     ...ws,
     ...rest,

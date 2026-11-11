@@ -15,6 +15,11 @@ import {
   isStripCommand,
   runStripCommand,
 } from './strip-commands.js';
+import {
+  hasPaneCommands,
+  isPaneCommand,
+  runPaneCommand,
+} from './pane-commands.js';
 
 /**
  * The keyboard tab switcher, apart from React: one MRU order for the
@@ -138,12 +143,60 @@ function commit(): void {
   mru = commitMru(mru);
 }
 
-function runAuxiliaryAction(e: KeyEvent, action: DesktopActionId): boolean {
-  if (!isStripCommand(action)) return false;
-  if (!hasStripCommands()) return true;
+/**
+ * The tab `n` (1-based) of the focused pane's presented order, pinned
+ * tabs first and collapsed members included; 9 is the last. `null` for
+ * a position the pane does not have.
+ */
+export function presentedAt(
+  order: readonly string[],
+  tabIds: readonly string[],
+  n: number
+): string | null {
+  const open = new Set(tabIds);
+  const shown = new Set(order);
+  const walk = [
+    ...order.filter((id) => open.has(id)),
+    ...tabIds.filter((id) => !shown.has(id)),
+  ];
+  return (n === 9 ? walk.at(-1) : walk[n - 1]) ?? null;
+}
+
+const SELECT = /^desktop\.tabs\.select-(\d)$/;
+
+/** The strip's or the panes' handler for `action`: whether one is
+ *  mounted, and running it. `null` for any other action. */
+function commandFor(action: DesktopActionId) {
+  if (isStripCommand(action))
+    return { mounted: hasStripCommands, run: () => runStripCommand(action) };
+  if (isPaneCommand(action))
+    return { mounted: hasPaneCommands, run: () => runPaneCommand(action) };
+  return null;
+}
+
+/** A shortcut that is no step along the strip: the strip's commands,
+ *  the panes', and choosing a tab by position. Handled here, or false.
+ *  With nothing mounted to run it the key goes on; otherwise it is
+ *  consumed, repeats too, and runs once. */
+function runAuxiliaryAction(
+  e: KeyEvent,
+  action: DesktopActionId,
+  deps: TabSwitchingDeps
+): boolean {
+  const ordinal = SELECT.exec(action)?.[1];
+  if (ordinal !== undefined) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const id = presentedAt(presented, deps.tabIds(), Number(ordinal));
+    if (id && !e.repeat) deps.activate(id);
+    return true;
+  }
+  const command = commandFor(action);
+  if (!command) return false;
+  if (!command.mounted()) return true;
   e.preventDefault();
   e.stopImmediatePropagation();
-  if (!e.repeat) runStripCommand(action);
+  if (!e.repeat) command.run();
   return true;
 }
 
@@ -160,7 +213,7 @@ function canHandleKey(e: KeyEvent, deps: TabSwitchingDeps): boolean {
 function onKeyDown(e: KeyEvent, deps: TabSwitchingDeps): void {
   if (!canHandleKey(e, deps)) return;
   const action = resolveDesktopAction(e, deps.bindings());
-  if (!action || runAuxiliaryAction(e, action)) return;
+  if (!action || runAuxiliaryAction(e, action, deps)) return;
   e.preventDefault();
   e.stopImmediatePropagation();
   const delta = STEP[action]!;
