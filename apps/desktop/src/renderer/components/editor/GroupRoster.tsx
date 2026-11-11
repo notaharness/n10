@@ -115,7 +115,7 @@ export function GroupRoster({
         escaped.current =
           roster.mode !== 'hover' ||
           !!document.activeElement?.closest('[data-group-roster]');
-        roster.escaped();
+        roster.close();
       }}
       onCloseAutoFocus={(e) => {
         e.preventDefault();

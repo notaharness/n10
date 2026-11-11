@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, focusTerminal, stripTab, tab } from './setup/app.js';
+import {
+  createWorktree,
+  focusTerminal,
+  openRoster,
+  stripTab,
+  tab,
+} from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -56,12 +62,7 @@ const roster = (page: Page) => page.locator('[data-group-roster]');
 const activeLabel = (page: Page, key: string) =>
   chipOf(page, key).locator('[data-group-active-label]');
 const rosterRows = (page: Page) => roster(page).locator('[data-roster-row]');
-/** Open a chip's roster from the keyboard: a press shows its first tab. */
-async function openRoster(page: Page, chip: Locator) {
-  await chip.focus();
-  await page.keyboard.press('Alt+ArrowDown');
-  await expect(roster(page)).toBeVisible();
-}
+
 const ready = (branch: string) => `player-${branch}-ready`;
 
 /** Press `from`, carry it in pointer steps to `x, y`, and let go. */

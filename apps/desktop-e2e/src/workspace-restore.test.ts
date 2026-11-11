@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, stripTab, tab, visibleText } from './setup/app.js';
+import {
+  createWorktree,
+  openRoster,
+  stripTab,
+  tab,
+  visibleText,
+} from './setup/app.js';
 import { tmuxAvailable } from './setup/external.js';
 import { shownTerminal } from './setup/prewarm.js';
 import { LIFT, motion, tabNames } from './setup/tab-row.js';
@@ -105,7 +111,7 @@ test.describe('Workspace restore', () => {
 
     // Pin gamma, chosen from the chip's roster: it moves to the strip's
     // start, out of its group.
-    await placeChip(page).click();
+    await openRoster(page, placeChip(page));
     await rosterRows(page).filter({ hasText: 'gamma' }).click();
     await page.keyboard.press('Control+Alt+p');
     await expect(stripTab(page, /gamma/)).toHaveAttribute(
@@ -142,7 +148,7 @@ test.describe('Workspace restore', () => {
       'true'
     );
     await expect.poll(() => tabNames(next)).toEqual([gamma, repo, shellName]);
-    await placeChip(next).click();
+    await openRoster(next, placeChip(next));
     await expect(rosterRows(next)).toHaveText([/^alpha/, /^beta/]);
     await next.keyboard.press('Escape');
 

@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
   createWorktree,
+  openRoster,
   showChanges,
   sidebarRow,
   visibleText,
@@ -311,7 +312,7 @@ test.describe('Reaching the plan from elsewhere', () => {
     const chip = page.locator('[data-group-chip^="place:"]');
     await expect(chip).toHaveAttribute('aria-selected', 'true');
     await expect(chip.getByLabel('1 comment in the plan')).toBeVisible();
-    await chip.click();
+    await openRoster(page, chip);
     await expect(
       page
         .locator('[data-group-roster]')

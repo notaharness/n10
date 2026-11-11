@@ -27,8 +27,6 @@ const rowOf = (active: Active | null | undefined): string | undefined => {
 export function useRosterOpen(group?: string) {
   const [mode, setMode] = useState<RosterMode | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Escape keeps hover from opening it again until the pointer leaves.
-  const suppressed = useRef(false);
   const dragging = useDndContext().active !== null;
 
   const clear = () => {
@@ -60,16 +58,17 @@ export function useRosterOpen(group?: string) {
   return {
     mode,
     open: mode !== null,
-    /** The pointer came onto the chip or the roster. */
+    /** The pointer came onto the chip or the roster. Only coming onto
+     *  it opens it: a pointer still resting where Escape closed it does
+     *  not open it again. */
     enter() {
       clear();
-      if (mode !== null || dragging || suppressed.current) return;
+      if (mode !== null || dragging) return;
       timer.current = setTimeout(() => setMode('hover'), HOVER_OPEN_MS);
     },
     /** The pointer left the chip or the roster. */
     leave() {
       clear();
-      suppressed.current = false;
       if (mode === 'hover') timer.current = setTimeout(close, HOVER_CLOSE_MS);
     },
     /** A press anywhere on the chip: the pointer is not resting, so a
@@ -86,10 +85,6 @@ export function useRosterOpen(group?: string) {
     openByKeyboard() {
       clear();
       setMode('keyboard');
-    },
-    escaped() {
-      suppressed.current = true;
-      close();
     },
     close,
   };

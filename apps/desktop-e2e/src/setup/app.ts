@@ -56,13 +56,27 @@ export function stripTab(
   return tab(page, name, exact).and(page.locator('[data-tab-id]'));
 }
 
+/** Open `chip`'s roster by resting the pointer on it: a press shows
+ *  its group's first tab instead, and focusing a chip in another pane
+ *  hands that pane's terminal the keys. */
+export async function openRoster(page: Page, chip: Locator): Promise<void> {
+  const roster = page.locator('[data-group-roster]');
+  // Come onto it from elsewhere: a pointer already resting on the chip
+  // comes to rest on it no more, nor on a chip a sync drew again under
+  // it. Again, if a redraw dropped the rest.
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await chip.hover();
+    await expect(roster).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+}
+
 /** Open the roster of the chip `name`'s tab stands behind, and give
  *  its row there; the roster stays open. */
 async function rosterRowFor(page: Page, name: RegExp): Promise<Locator> {
   const roster = page.locator('[data-group-roster]');
   for (const chip of await page.locator('[data-group-chip]').all()) {
-    await chip.click();
-    await roster.waitFor({ state: 'visible' });
+    await openRoster(page, chip);
     const row = roster.getByRole('button', { name });
     if ((await row.count()) > 0) return row.first();
     await page.keyboard.press('Escape');

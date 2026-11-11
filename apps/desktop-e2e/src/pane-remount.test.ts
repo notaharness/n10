@@ -2,7 +2,12 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, focusTerminal, visibleText } from './setup/app.js';
+import {
+  createWorktree,
+  focusTerminal,
+  openRoster,
+  visibleText,
+} from './setup/app.js';
 import { tmuxAvailable } from './setup/external.js';
 import { armContextMenuChoice } from './setup/menu.js';
 import {
@@ -67,7 +72,7 @@ test('a pane keeps its terminal mounted, with focus, as it is split off and coll
   // The first split: alpha goes right from its tab's menu, on its row
   // in the repository chip's roster, and the terminal's pane, the sole
   // one until now, becomes the left half.
-  await page.locator('[data-group-chip^="place:"]').click();
+  await openRoster(page, page.locator('[data-group-chip^="place:"]'));
   await armContextMenuChoice(app, 'Split right');
   await page
     .locator('[data-group-roster]')

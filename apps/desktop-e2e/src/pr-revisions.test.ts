@@ -5,6 +5,7 @@ import { test, expect } from './fixtures/desktop.js';
 import {
   chooseFromTabMenu,
   keepOpen,
+  openRoster,
   showChanges,
   showTab,
   sidebarRow,
@@ -571,7 +572,7 @@ test.describe('a pull request opened behind another tab', () => {
     await expect(chip.locator('[data-group-count]')).toHaveText('2', {
       timeout: 30_000,
     });
-    await chip.click();
+    await openRoster(page, chip);
     await expect(
       page
         .locator('[data-group-roster]')

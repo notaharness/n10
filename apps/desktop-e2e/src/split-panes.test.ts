@@ -350,14 +350,16 @@ test.describe('Split panes', () => {
 
     // Ctrl+9 opens the pane's last tab, out of view below: the strip
     // scrolls it in.
-    // The shells open in no set order: the last is whichever ends the row.
-    const lastName = (await topLeft.getByRole('tab').last().innerText())
-      .split('\n')[0]!
-      .trim();
+    // The shells open in no set order: the last is whichever ends the
+    // row. By id: a label cut to fit may show either end of its name.
+    const lastId = await topLeft
+      .getByRole('tab')
+      .last()
+      .getAttribute('data-tab-id');
     await stripTab(page, /^feature-tab-strip-wrap/).click();
     await page.keyboard.press('Control+9');
     const last = topLeft.getByRole('tab', { selected: true });
-    await expect(last).toHaveText(new RegExp(`^${lastName}`));
+    await expect(last).toHaveAttribute('data-tab-id', lastId!);
     await expect
       .poll(async () => {
         const [a, b] = await Promise.all([

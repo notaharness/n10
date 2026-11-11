@@ -3,6 +3,7 @@ import { test, expect } from './fixtures/desktop.js';
 import {
   createWorktree,
   dismissSessionMenu,
+  openRoster,
   sessionMenu,
   sidebarRow,
   tab,
@@ -23,7 +24,7 @@ async function closeAllTabs(
   const chip = page.locator('[data-group-chip]').first();
   await armContextMenuChoice(app, 'Close All');
   if ((await chip.count()) > 0) {
-    await chip.click();
+    await openRoster(page, chip);
     await rosterRows(page).first().click({ button: 'right' });
   } else {
     await tabs(page).first().click({ button: 'right' });
@@ -74,7 +75,7 @@ test.describe('Editor tabs', () => {
     await sidebarRow(page, /beta/).click();
     const chip = page.locator('[data-group-chip^="place:"]');
     await expect(chip.locator('[data-group-count]')).toHaveText('2');
-    await chip.click();
+    await openRoster(page, chip);
     await expect(rosterRows(page)).toHaveCount(2);
     await expect(rosterRows(page).filter({ hasText: 'alpha' })).toHaveCount(1);
     await expect(rosterRows(page).filter({ hasText: 'beta' })).toHaveCount(1);

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab } from './setup/app.js';
+import { createWorktree, openRoster, tab } from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -48,7 +48,7 @@ test.describe('Tabs for work created outside the app', () => {
     await createWorktree(page, 'beta');
     await expect(activeLabel(page)).toHaveText(/beta/);
     await expect(chip(page)).toHaveAttribute('aria-selected', 'true');
-    await chip(page).click();
+    await openRoster(page, chip(page));
     await expect(row(page, /beta/)).toHaveAttribute('aria-current', 'true');
     await expect(row(page, /beta/)).not.toHaveAccessibleName(/Not yet opened/);
     await expect(row(page, /alpha/)).not.toHaveAttribute('aria-current');
@@ -78,14 +78,14 @@ test.describe('Tabs for work created outside the app', () => {
       timeout: 30_000,
     });
     await expect(activeLabel(page)).toHaveText(/alpha/);
-    await chip(page).click();
+    await openRoster(page, chip(page));
     const background = row(page, new RegExp(branch));
     await expect(background).toHaveAccessibleName(/Not yet opened/);
     await expect(background).not.toHaveAttribute('aria-current');
 
     await background.click();
     await expect(activeLabel(page)).toHaveText(new RegExp(branch));
-    await chip(page).click();
+    await openRoster(page, chip(page));
     await expect(background).toHaveAttribute('aria-current', 'true');
     await expect(background).not.toHaveAccessibleName(/Not yet opened/);
   });
