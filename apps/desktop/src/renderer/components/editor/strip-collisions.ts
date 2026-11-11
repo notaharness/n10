@@ -18,6 +18,20 @@ export function groupEndId(key: string): string {
 const isEnd = (id: unknown) =>
   id === END_ID || String(id).startsWith(`${END_ID}:`);
 
+/** Keyboard coordinates name a row first. A far-left tab on the next
+ * row must beat a horizontally nearby tab on the old row. */
+function keyboardRow(
+  args: Parameters<CollisionDetection>[0],
+  places: typeof args.droppableContainers
+) {
+  const distance = (id: (typeof places)[number]['id']) => {
+    const rect = args.droppableRects.get(id);
+    return rect ? Math.abs(rect.top - args.collisionRect.top) : Infinity;
+  };
+  const nearest = Math.min(...places.map((place) => distance(place.id)));
+  return places.filter((place) => distance(place.id) <= nearest + 1);
+}
+
 /** A place's index on the strip, as its data says (`StripDragData`). */
 function indexOf(container: { data: { current?: unknown } }): number {
   const data = container.data.current;
@@ -27,7 +41,9 @@ function indexOf(container: { data: { current?: unknown } }): number {
 /**
  * What the pointer is over, or, where it is over no legal place (a
  * keyboard drag, a border, another group), the legal place nearest the
- * dragged one: a member dragged out of its group opens the slot at that
+ * dragged one. Keyboard drags choose the nearest row before a place in
+ * it, so a row ending far left cannot lose to a tab on the old row.
+ * A member dragged out of its group opens the slot at that
  * end of its group. Only legal places are enabled droppables
  * (`strip-drag.ts`), so nothing else is ever a candidate. The room after
  * the last tab, the strip's or a wrapped group's, counts as the last
@@ -45,5 +61,9 @@ export const collisionsEndingAt: CollisionDetection = (args) => {
     return last ? [{ id: last.id }] : [];
   }
   if (within.length > 0) return within;
-  return closestCenter({ ...args, droppableContainers: places });
+  return closestCenter({
+    ...args,
+    droppableContainers:
+      args.pointerCoordinates === null ? keyboardRow(args, places) : places,
+  });
 };

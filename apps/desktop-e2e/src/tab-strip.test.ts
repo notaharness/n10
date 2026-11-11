@@ -171,17 +171,29 @@ test.describe('Tab strip overflow', () => {
     const t = tab(page, new RegExp(name));
     await t.focus();
     await page.keyboard.press(LIFT);
-    // The sensor hears arrows a task after the lift.
+    // The keyboard sensor starts a task after the lift. Retry only if
+    // the preceding key left the tab in place, so a slow render does
+    // not turn one intended step into two.
+    await expect
+      .poll(async () => (await motion(t)).transform)
+      .toBe('translate3d(0px, 0px, 0px)');
+    const down = /^translate3d\(-?[\d.]+px, [1-9]/;
     await expect(async () => {
+      if (down.test((await motion(t)).transform)) return;
       await page.keyboard.press('ArrowDown');
-      expect((await motion(t)).transform).toMatch(
-        /^translate3d\(-?[\d.]+px, [1-9]/
-      );
+      await expect
+        .poll(async () => (await motion(t)).transform, { timeout: 400 })
+        .toMatch(down);
     }).toPass();
-    // Dropped once the strip has taken it to another tab's place.
-    await expect(
-      page.getByText(new RegExp(`^Position (?!${end + 1} )\\d+ of \\d+\\.$`))
-    ).toBeAttached();
+    // The announced slot must be in the next row before the drop.
+    await expect
+      .poll(async () => {
+        const message = await page
+          .getByText(/^Position \d+ of \d+\.$/)
+          .textContent();
+        return Number(message?.match(/\d+/)?.[0]);
+      })
+      .toBeGreaterThan(end + 1);
     await page.keyboard.press('Space');
     await expect
       .poll(async () => (await tabNames(page)).indexOf(name))

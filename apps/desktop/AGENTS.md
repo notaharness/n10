@@ -219,7 +219,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   row's remaining room. Either way the
   dragged tab stays inside the strip (`restrictToParentElement`): past its
   end it would widen a scrolling box that auto-scroll then chases.
-  Collisions go by pointer first, then nearest centre; the strip's end
+  Collisions go by pointer first, then nearest centre within the
+  keyboard drag's row; the strip's end
   resolves to the last tab and is disabled for keyboard drags. The
   strip's `DndContext` (`TabDragProvider`) sits above the repository
   gate. A label that does not
