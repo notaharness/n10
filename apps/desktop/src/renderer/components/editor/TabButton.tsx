@@ -61,7 +61,8 @@ function tabClassName({
 }
 
 /** What follows the label: the plan count, the removed and unseen
- *  marks, and the close button. */
+ *  marks, and the close button (none on a group's home, whose chip is
+ *  no tab to close). */
 export function TabEnd({
   item,
   unseen,
@@ -69,7 +70,7 @@ export function TabEnd({
 }: {
   item: SidebarItem | undefined;
   unseen: boolean;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
   // A plan is built inside a tab and then navigated away from, so the
   // count has to be visible from wherever the user ends up.
@@ -79,12 +80,14 @@ export function TabEnd({
       <PlanCountBadge count={planCount} />
       <RemovedMark item={item} />
       {unseen && <UnseenDot />}
-      <TabCloseButton
-        onClose={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-      />
+      {onClose && (
+        <TabCloseButton
+          onClose={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+        />
+      )}
     </>
   );
 }

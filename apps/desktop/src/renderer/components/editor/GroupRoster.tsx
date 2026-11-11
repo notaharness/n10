@@ -100,7 +100,10 @@ function RosterRow({
     face.machineLabel
   );
   const Icon = FACE_ICON[kind];
-  const status = rowStatus(face.status);
+  const status = rowStatus(face.status, {
+    exited: face.snapshot?.exited ?? false,
+    unseen: face.unseen,
+  });
   const where = secondary(face);
   return (
     <li className="relative">

@@ -50,7 +50,15 @@ export function groupSummary(statuses: readonly TabStatus[]): string {
     : tabCount(statuses.length);
 }
 
-/** A roster row's status: its state, or nothing for an idle tab. */
-export function rowStatus(status: TabStatus): string {
-  return status === 'idle' ? '' : ROW_WORDS[status];
+/** A roster row's status: its state, else what the tab's activity says
+ *  short of a state (an agent that ended, a tab not yet looked at), else
+ *  nothing for an idle tab. */
+export function rowStatus(
+  status: TabStatus,
+  facts: { exited: boolean; unseen: boolean }
+): string {
+  if (status !== 'idle') return ROW_WORDS[status];
+  if (facts.exited) return 'Ended';
+  if (facts.unseen) return 'Not yet opened';
+  return ROW_WORDS.idle;
 }

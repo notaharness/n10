@@ -4,6 +4,8 @@ import { useRepo } from '../../lib/repo-context.js';
 import {
   groupOf,
   isCollapsed,
+  presentedIds,
+  tabStopOf,
   type TabGroup,
 } from '../../lib/tabs/tab-groups.js';
 import { indexItems } from '../../lib/tabs/tab-item.js';
@@ -73,11 +75,11 @@ export function EditorArea({
   const { groups, faceOf, colorOf } = useStripGroups(items);
   const [announced, announce] = useState('');
 
-  // The row's one Tab stop: the active tab when it shows, else the
-  // first tab showing.
-  const shown = shownTabIds(groups, tabs.collapsed);
-  const tabStopId =
-    tabs.activeId && shown.includes(tabs.activeId) ? tabs.activeId : shown[0];
+  const tabStopId = tabStopOf(
+    presentedIds(groups),
+    shownTabIds(groups, tabs.collapsed),
+    tabs.activeId
+  );
 
   const activeGroup = groupOf(groups, tabs.activeId);
   const others = groups.filter((g) => g.chipped && g !== activeGroup);

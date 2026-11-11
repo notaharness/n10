@@ -9,6 +9,7 @@ import {
   presentedIds,
   statusCounts,
   statusFromActivity,
+  tabStopOf,
   type TabFacts,
 } from './tab-groups.js';
 import { terminalTabId, type Tab } from './tab-identity.js';
@@ -180,6 +181,20 @@ describe('collapse', () => {
     expect(isCollapsed(group!, { 'place:/a': true })).toBe(true);
     const [single] = strip([['notes', place('/notes')]]);
     expect(isCollapsed(single!, { 'place:/notes': true })).toBe(false);
+  });
+});
+
+describe('tabStopOf', () => {
+  const presented = ['a', 'h', 'p1', 'p2', 'p3', 'z'];
+  it('is the active tab when it shows', () => {
+    expect(tabStopOf(presented, presented, 'p2')).toBe('p2');
+  });
+  it('is the shown tab nearest an active one behind a collapsed chip', () => {
+    expect(tabStopOf(presented, ['a', 'h', 'z'], 'p1')).toBe('h');
+    expect(tabStopOf(presented, ['a', 'z'], 'p3')).toBe('z');
+  });
+  it('is the first shown with no active tab', () => {
+    expect(tabStopOf(presented, ['h', 'z'], null)).toBe('h');
   });
 });
 

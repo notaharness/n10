@@ -165,6 +165,26 @@ export function presentedIds(groups: readonly TabGroup[]): string[] {
   return groups.flatMap((g) => g.tabs.map((t) => t.id));
 }
 
+/** The row's one Tab stop: the active tab when it shows, else the
+ *  shown tab nearest it in strip order (behind a collapsed chip, its
+ *  home or a neighbour), else the first. */
+export function tabStopOf(
+  presented: readonly string[],
+  shown: readonly string[],
+  activeId: string | null
+): string | undefined {
+  const at = activeId === null ? -1 : presented.indexOf(activeId);
+  if (at < 0) return shown[0];
+  const visible = new Set(shown);
+  for (let d = 0; d < presented.length; d++) {
+    const near = [presented[at - d], presented[at + d]].find(
+      (id) => id !== undefined && visible.has(id)
+    );
+    if (near) return near;
+  }
+  return shown[0];
+}
+
 /** The group `tabId` stands in, if any. */
 export function groupOf(
   groups: readonly TabGroup[],

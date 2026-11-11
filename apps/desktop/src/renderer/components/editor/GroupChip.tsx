@@ -15,7 +15,11 @@ import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { cn, errorMessage } from '../../lib/utils.js';
 import { PopoverAnchor } from '../ui/popover.js';
 import { StatusClusters } from './StatusClusters.js';
-import { RepoBand, UnseenDot } from './tab-marks.js';
+import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
+import { RepoBand } from './tab-marks.js';
+import { pressWithoutFocus } from './tab-keyboard.js';
+import { TabEnd } from './TabButton.js';
+import { FACE_ICON, TabIcon } from './TabIcon.js';
 import { runGroupMenu, runTabMenu, type GroupMenu } from './tab-menu.js';
 import { TabLabel } from './TabLabel.js';
 import type { useSortableTab } from './TabStrip.js';
@@ -84,6 +88,7 @@ function HomeBody({
         if (!e.defaultPrevented) onKeyDown(e);
       }}
       onMouseDown={(e) => {
+        pressWithoutFocus(e);
         if (e.button !== 1) return;
         e.preventDefault();
         closer.close(tab.id);
@@ -94,6 +99,7 @@ function HomeBody({
         menu.setCollapsed(false);
         tabs.activate(tab.id);
       }}
+      onDoubleClick={() => tabs.pin(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
         runTabMenu(tab, tabs, closer, tabOverflow, menu).catch((err: unknown) =>
@@ -103,6 +109,12 @@ function HomeBody({
       title={label}
       className={cn(BODY, 'cursor-default')}
     >
+      <TabIcon
+        Icon={FACE_ICON[kind]}
+        running={face.item ? itemRunning(face.item) : face.running}
+        snapshot={face.snapshot}
+        active={active}
+      />
       <span className="flex max-w-40 min-w-16">
         <TabLabel
           label={label}
@@ -111,7 +123,7 @@ function HomeBody({
           cut={cutSide(kind)}
         />
       </span>
-      {face.unseen && <UnseenDot />}
+      <TabEnd item={face.item} unseen={face.unseen} />
       <Grip />
     </div>
   );
@@ -121,6 +133,7 @@ function HomeBody({
  *  It opens the roster, and drags the group. */
 function LabelBody({
   label,
+  containsActive,
   setHandle,
   handle,
   menu,
@@ -129,6 +142,7 @@ function LabelBody({
   justDropped,
 }: {
   label: string;
+  containsActive: boolean;
   onPress: () => void;
   justDropped: () => boolean;
   setHandle: Sortable['setHandle'];
@@ -141,6 +155,7 @@ function LabelBody({
       ref={setHandle}
       {...handle}
       aria-label={`Show tabs in ${label}`}
+      aria-description={containsActive ? 'Contains active tab' : undefined}
       aria-haspopup="dialog"
       data-group-label
       onKeyDown={(e) => {
@@ -250,7 +265,12 @@ export function GroupChip({
             {...body}
           />
         ) : (
-          <LabelBody label={label} onPress={roster.press} {...body} />
+          <LabelBody
+            label={label}
+            containsActive={containsActive}
+            onPress={roster.press}
+            {...body}
+          />
         )}
         <button
           ref={rosterButton}

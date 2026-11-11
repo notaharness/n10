@@ -25,9 +25,19 @@ describe('group status text', () => {
     expect(rosterSummary(['working', 'idle'])).toBe('1 working · 1 idle');
     expect(rosterSummary(['idle', 'idle'])).toBe('');
   });
-  it('says nothing for an idle tab, never Done', () => {
-    expect(rowStatus('idle')).toBe('');
-    expect(rowStatus('new-output')).toBe('New output');
-    expect(rowStatus('working')).toBe('Working');
+  it('says nothing for an idle tab but an ended or unopened one, never Done', () => {
+    const none = { exited: false, unseen: false };
+    expect(rowStatus('idle', none)).toBe('');
+    expect(rowStatus('new-output', none)).toBe('New output');
+    expect(rowStatus('working', none)).toBe('Working');
+    // Not idle, though no state says so: an agent that ended, a tab
+    // nobody has looked at.
+    expect(rowStatus('idle', { exited: true, unseen: true })).toBe('Ended');
+    expect(rowStatus('idle', { exited: false, unseen: true })).toBe(
+      'Not yet opened'
+    );
+    expect(rowStatus('working', { exited: false, unseen: true })).toBe(
+      'Working'
+    );
   });
 });
