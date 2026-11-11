@@ -321,6 +321,36 @@ describe('reconciling across panes', () => {
     expect(ws.layout.kind).toBe('pane');
     expect(Object.keys(ws.tabs)).toHaveLength(2);
   });
+
+  it('never hands the focused pane another repository’s tab on a background close', () => {
+    const OTHER = '/repos/beta';
+    const ws = then(
+      run(open('branch:a1'), open('branch:a2'), {
+        type: 'open-item',
+        repo: OTHER,
+        itemKey: 'branch:b1',
+        preview: false,
+      }),
+      split([id('branch:a2')], 'pane-1', 'right'),
+      { type: 'activate', id: id('branch:a1') },
+      {
+        type: 'sync-items',
+        repo: REPO,
+        entries: [
+          { itemKey: 'branch:a1', branch: 'a1', worktree: '/wt/a1' },
+          { itemKey: 'branch:a2', branch: 'a2' },
+        ],
+      },
+      { type: 'worktrees-removed', repo: REPO, worktrees: ['/wt/a1'] }
+    );
+    // pane-1 keeps beta's tab, unshown: showing it would switch the
+    // window to beta because a worktree went away.
+    expect(ws.focusedPane).toBe('pane-1');
+    const [left, right] = panesOf(ws.layout);
+    expect(left!.order).toEqual([itemTabId(OTHER, 'branch:b1')]);
+    expect(left!.activeId).toBeNull();
+    expect(right!.activeId).toBe(id('branch:a2'));
+  });
 });
 
 // A property-test counterexample: a listing closing a pinned tab takes

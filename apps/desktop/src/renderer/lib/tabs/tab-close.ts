@@ -84,7 +84,7 @@ export function closeRemovedWorktrees(
  * view has nothing left, nothing is active: that is its empty state,
  * with the other repositories' tabs still on the strip.
  */
-function nextActive(
+export function nextActive(
   tabs: readonly Tab[],
   idx: number,
   repo: string | undefined

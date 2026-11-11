@@ -410,7 +410,44 @@ const replay = (actions: TabsAction[]): { state: Strip; inView: string } => {
 
 const run = (actions: TabsAction[]): Strip => replay(actions).state;
 
-const sequence = fc.array(action, { maxLength: 25 });
+/**
+ * Most sequences start from a workspace worth splitting: tabs open in
+ * both repositories, then a few splits of one tab each. Left to chance,
+ * a strip rarely holds the two tabs a split needs, and the layout
+ * properties would see a multi-pane tree in one sequence in twenty.
+ */
+const openIn = (repo: string) => (itemKey: string) =>
+  ({ type: 'open-item', repo, itemKey, preview: false } as const);
+const seed: fc.Arbitrary<TabsAction[]> = fc
+  .tuple(
+    fc.shuffledSubarray([...KEYS], { minLength: 3, maxLength: 4 }),
+    fc.shuffledSubarray([...KEYS], { minLength: 2, maxLength: 4 }),
+    fc.array(
+      fc.record({
+        type: fc.constant('split' as const),
+        ids: pick.map((p) => [p]),
+        target: pick,
+        edge: fc.constantFrom(...EDGES),
+      }),
+      { minLength: 2, maxLength: 4 }
+    )
+  )
+  .map(([here, there, splits]) => [
+    ...here.map(openIn(REPOS[0])),
+    { type: 'repo-opened', repo: REPOS[1] } as const,
+    ...there.map(openIn(REPOS[1])),
+    ...splits,
+  ]);
+
+const sequence = fc.oneof(
+  {
+    arbitrary: fc
+      .tuple(seed, fc.array(action, { maxLength: 20 }))
+      .map(([start, rest]) => [...start, ...rest]),
+    weight: 3,
+  },
+  { arbitrary: fc.array(action, { maxLength: 25 }), weight: 1 }
+);
 
 describe('tab reducer invariants', () => {
   it('never holds two tabs for the same item', () => {
@@ -635,9 +672,12 @@ describe('closing never hands focus to another repository', () => {
     id: string,
     repo: string
   ): Strip | null => {
-    const before = run(actions);
-    const after = reduce(before, { type: 'close', id, repo });
-    return after.activeId === before.activeId ? null : after;
+    const { ws } = replayWorkspace(actions);
+    const after = reduceWorkspace(ws, { type: 'close', id, repo });
+    // A pane its last tab left goes, and focus with it: that is the
+    // neighbour's own tab, not a choice the close made.
+    if (after.focusedPane !== ws.focusedPane) return null;
+    return view(after).activeId === view(ws).activeId ? null : view(after);
   };
 
   it('never moves focus onto a tab outside the repo the close named', () => {
@@ -678,6 +718,36 @@ describe('closing never hands focus to another repository', () => {
           expect(own).toEqual([]);
         }
       ),
+      { numRuns: 500 }
+    );
+  });
+});
+
+describe('a reconciliation never hands focus to another repository', () => {
+  it('leaves the focused pane on its repository, or on nothing', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const { ws, inView } = replayWorkspace(actions);
+        const after = reduceWorkspace(ws, {
+          type: 'sync-items',
+          repo: inView,
+          entries: [],
+          terminals: [],
+          scanned: ['local', 'peer'],
+        });
+        // A pane its last tab left goes, and focus with it.
+        if (after.focusedPane !== ws.focusedPane) return;
+        const before = view(ws).activeId;
+        const now = view(after);
+        if (before === null || now.activeId === before) return;
+        if (now.tabs.some((t) => t.id === before)) return;
+        const active = now.tabs.find((t) => t.id === now.activeId);
+        if (active === undefined || active.kind === 'settings') return;
+        if (active.kind === 'terminal' && active.repo === null) return;
+        // Its active tab closed in the background: what replaces it is
+        // of the repository in view, or the pane shows nothing.
+        expect(active.repo).toBe(inView);
+      }),
       { numRuns: 500 }
     );
   });
@@ -960,12 +1030,17 @@ describe('agents alive in other repositories', () => {
 describe('the workspace', () => {
   const sequenceWs = (actions: TabsAction[]) => replayWorkspace(actions).ws;
 
-  /** Every split well formed, at any depth: two or more children, and
-   *  sizes that sum to one, one per child. */
+  /** Every split well formed, at any depth: two or more children, none
+   *  a split running its way, and positive sizes that sum to one, one
+   *  per child. */
   const wellFormed = (node: LayoutNode): boolean =>
     node.kind === 'pane' ||
     (node.children.length >= 2 &&
+      node.children.every(
+        (c) => c.kind === 'pane' || c.direction !== node.direction
+      ) &&
       node.sizes.length === node.children.length &&
+      node.sizes.every((size) => size > 0) &&
       Math.abs(node.sizes.reduce((a, b) => a + b, 0) - 1) < 1e-9 &&
       node.children.every(wellFormed));
 
@@ -987,6 +1062,7 @@ describe('the workspace', () => {
         const ws = sequenceWs(actions);
         const panes = panesOf(ws.layout);
         expect(wellFormed(ws.layout)).toBe(true);
+        expect(new Set(panes.map((p) => p.id)).size).toBe(panes.length);
         expect(panes.some((p) => p.id === ws.focusedPane)).toBe(true);
         const empties = panes.filter((p) => p.order.length === 0);
         expect(empties.length === 0 || panes.length === 1).toBe(true);

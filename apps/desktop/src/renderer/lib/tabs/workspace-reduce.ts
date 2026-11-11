@@ -1,3 +1,4 @@
+import { nextActive } from './tab-close.js';
 import { standsFor, tabHome, terminalTabId, type Tab } from './tab-identity.js';
 import { panesOf, replacePane, resizeSplit } from './layout.js';
 import {
@@ -207,23 +208,25 @@ function across(
   const after = reduceStrip(before, action);
   if (after === before) return ws;
   const groupOf = action.type === 'sync-items' ? action.groupOf : undefined;
-  return distribute(ws, after, placeFor(ws, groupOf));
+  const repo = 'repo' in action ? action.repo : undefined;
+  return distribute(ws, after, placeFor(ws, groupOf), repo);
 }
 
-/** The pane's active tab once its order is `order`: the one it had,
- *  else the tab that slid into its place, else the one before. */
-function keptActive(pane: PaneNode, order: readonly string[]): string | null {
-  if (pane.activeId === null || order.includes(pane.activeId)) {
-    return pane.activeId;
-  }
-  const at = pane.order.indexOf(pane.activeId);
-  const live = new Set(order);
-  const after = pane.order.slice(at + 1).find((id) => live.has(id));
-  const before = pane.order
-    .slice(0, at)
-    .reverse()
-    .find((id) => live.has(id));
-  return after ?? before ?? null;
+/** The pane's active tab once its tabs are `order`: the one it had,
+ *  else the one a close in the pane hands it to (`nextActive`), never
+ *  one of another repository than `repo`. */
+function keptActive(
+  pane: PaneNode,
+  order: readonly Tab[],
+  repo: string | undefined
+): string | null {
+  const was = pane.activeId;
+  if (was === null || order.some((t) => t.id === was)) return was;
+  const live = new Set(order.map((t) => t.id));
+  const at = pane.order
+    .slice(0, pane.order.indexOf(was))
+    .filter((id) => live.has(id)).length;
+  return nextActive(order, at, repo);
 }
 
 /**
@@ -236,7 +239,8 @@ function keptActive(pane: PaneNode, order: readonly string[]): string | null {
 function distribute(
   ws: Workspace,
   after: Strip,
-  place: (tab: Tab) => PaneId
+  place: (tab: Tab) => PaneId,
+  repo: string | undefined
 ): Workspace {
   const home = new Map<string, PaneId>();
   for (const p of panesOf(ws.layout)) {
@@ -250,9 +254,11 @@ function distribute(
   const landedIn = landed ? paneFor(landed) : null;
   let layout = ws.layout;
   for (const pane of panesOf(ws.layout)) {
-    const order = list.filter((t) => paneFor(t) === pane.id).map((t) => t.id);
-    const kept = keptActive(pane, order);
+    const mine = list.filter((t) => paneFor(t) === pane.id);
+    const order = mine.map((t) => t.id);
     const focused = pane.id === ws.focusedPane;
+    // Only the focused pane's choice moves the workspace's repository.
+    const kept = keptActive(pane, mine, focused ? repo : undefined);
     const takes =
       (focused && activeId === null) ||
       (landedIn === pane.id && (focused || kept === null));
