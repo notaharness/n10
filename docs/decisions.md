@@ -1028,7 +1028,7 @@ carries an unknown version, is renamed aside and never overwritten, and the
 workspace starts empty. Only a missing file means there is none: one that
 cannot be read, or set aside, makes the run read-only — the host refuses
 every save, and the renderer sends none, nor after a load that failed. The renderer saves everything
-but `unseen` (`lib/tabs/workspace-file.ts`), and a terminal tab only once a
+but `unseen` and `follows` (`lib/tabs/workspace-file.ts`), and a terminal tab only once a
 listing has dated it; it checks every field on restore and drops what does
 not hold (ids must be own keys and match their session or repository).
 `TabsProvider` shows the connecting state until the restore has answered, so
@@ -1050,6 +1050,25 @@ under the new path when it opens, and a tab for the old path could only fail
 to open beside it. A repository on an unmounted drive loses its restored
 tabs for that launch; they come back by the usual auto-open when it is
 opened. Remote and offline machines' tabs are unchanged.
+
+Two supervising layouts sit on the panes (`lib/tabs/supervise.ts`), plain
+layout actions that never open, close or copy a tab. Tile group moves a
+parent group's unpinned players out of the pane holding its home into a new
+pane on its right, else below; Follow group moves the group's unpinned
+members, less the home and what the focused pane shows, into a pane that
+switches to whichever got new output last. A tab is in one pane, so a follow
+pane owns what it shows rather than mirroring another pane's terminal: one
+session, one attach, one size. It never takes focus, and never switches
+while the user is in it (focus, or a drag from it): what arrives waits, and
+500 ms after the user leaves the latest still-new output shows. Switches
+coalesce for 250 ms and come at most every 2 s (`follow-scheduler.ts`), so
+a busy group does not flicker. Only a change to new output counts, the
+activity snapshot's `flashing`: the strip infers no blocked or done. A
+follow registration lives in `Workspace.follows` and is not saved, so
+following ends with the run rather than replacing views during a restore.
+A tab a sync opens goes to the pane following its group, else to the pane
+holding its players — not its home — so new players of a tiled group join
+them.
 
 ## Plans and auto-fixing
 
