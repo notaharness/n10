@@ -19,7 +19,7 @@ import {
 } from '../../lib/tabs/tab-groups.js';
 import { indexItems } from '../../lib/tabs/tab-item.js';
 import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
-import { useTabs, useWorkspace } from '../../lib/tabs/tabs.js';
+import { useTabs } from '../../lib/tabs/tabs.js';
 import { useRequestAgentView } from '../../lib/tabs/tab-views.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { EditorPane } from './EditorPane.js';
@@ -37,7 +37,6 @@ import { usePaneMenus } from './use-pane-menus.js';
 import { derivedLabel, useGroupRename } from './use-group-rename.js';
 import { useStripGroups } from './use-strip-groups.js';
 import { FollowController } from './FollowController.js';
-import { useFollowEnded } from './use-follow-pane.js';
 import { useSupervise } from './use-supervise.js';
 
 /**
@@ -85,8 +84,6 @@ export function EditorArea({
     faceOf
   );
   const supervise = useSupervise({ groups, faceOf, factsOf, labelOf });
-  const following = useWorkspace().workspace.follows[tabs.paneId];
-  useFollowEnded(supervise.nameOf);
   const pins = groups.filter((g) => g.pinned).length;
   const { stripMenu } = usePaneMenus();
 
@@ -270,15 +267,12 @@ export function EditorArea({
               )),
         ])}
       </TabStrip>
-      {following && (
-        <FollowController
-          following={following}
-          name={supervise.nameOf(following.key)}
-          groups={groups}
-          faceOf={faceOf}
-          activitySource={activitySource}
-        />
-      )}
+      <FollowController
+        nameOf={supervise.nameOf}
+        groups={groups}
+        faceOf={faceOf}
+        activitySource={activitySource}
+      />
       <div aria-live="polite" className="sr-only">
         {announced}
       </div>
