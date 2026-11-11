@@ -1,202 +1,40 @@
-import { BrainIcon, CheckIcon } from 'lucide-react';
-import { useEffect, useRef, type RefObject } from 'react';
+import {
+  useContext,
+  useEffect,
+  useRef,
+  type ComponentProps,
+  type RefObject,
+} from 'react';
 import {
   groupSummary,
-  rowStatus,
   rosterSummary,
   tabCount,
 } from '../../lib/tabs/group-status.js';
-import { cutSide } from '../../lib/tabs/tab-presentation.js';
 import type { Tab } from '../../lib/tabs/tabs.js';
-import { cn } from '../../lib/utils.js';
 import { PopoverContent } from '../ui/popover.js';
 import { ScrollArea } from '../ui/scroll-area.js';
-import { usePlanCount } from '../../lib/plan/plan.js';
-import { PlanCountBadge, UnseenDot } from './tab-marks.js';
-import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
-import type { TabStatus } from '../../lib/tabs/tab-groups.js';
-import { FACE_ICON, TabIcon } from './TabIcon.js';
-import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
 import type { useRosterOpen } from './use-roster-open.js';
 import { walkRows } from './roster-keys.js';
 import { rosterEntries } from './roster-order.js';
-import { rosterSecondary } from './roster-text.js';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { PaneScopeContext } from '../../lib/tabs/tabs.js';
+import { RosterRow, rosterRowId, useRosterRowDrag } from './RosterRow.js';
 
-/** Each state's colour token in a row's words; idle has none. */
-const STATUS_TONE: Partial<Record<TabStatus, string>> = {
-  blocked: 'text-warning',
-  error: 'text-destructive',
-  'done-unseen': 'text-success',
-  'new-output': 'text-info',
-};
-
-/** The row's state, at its end, in words: active first, then the
- *  state. The row itself blinks and spins as its tab would. */
-function RowStatus({
-  face,
-  active,
-  status,
-}: {
-  face: TabFace;
-  active: boolean;
-  status: string;
+/** A row that drags: its place among `group`'s rows. */
+function SortableRow({
+  group,
+  index,
+  ...row
+}: Omit<ComponentProps<typeof RosterRow>, 'drag'> & {
+  group: string;
+  index: number;
 }) {
-  return (
-    <span
-      className={cn(
-        'flex w-[100px] shrink-0 items-center justify-end gap-1 truncate text-[11px] leading-4',
-        STATUS_TONE[face.status] ?? 'text-muted-foreground'
-      )}
-    >
-      {active && <CheckIcon aria-hidden className="size-3 shrink-0" />}
-      <span className="truncate">
-        {[active ? 'Active' : '', status].filter(Boolean).join(' · ')}
-      </span>
-    </span>
-  );
-}
-
-/** The row's icon, an orchestrator's brain for the home, spinning
- *  while its tab works, as the tab's own would. */
-function RowIcon({
-  face,
-  home,
-  active,
-}: {
-  face: TabFace;
-  home: boolean;
-  active: boolean;
-}) {
-  return (
-    <span className="flex shrink-0 text-muted-foreground">
-      <TabIcon
-        Icon={home ? BrainIcon : FACE_ICON[face.labelKind]}
-        running={face.item ? itemRunning(face.item) : face.running}
-        snapshot={face.snapshot}
-        active={active}
-      />
-    </span>
-  );
-}
-
-/** The row's repository colour, down its leading edge. */
-function RowBand({ color }: { color: string | null }) {
-  if (!color) return null;
-  return (
-    <span
-      aria-hidden
-      className="absolute inset-y-0 left-0 w-0.5"
-      style={{ backgroundColor: color }}
-    />
-  );
-}
-
-function rowName(
-  label: string,
-  where: string,
-  active: boolean,
-  status: string
-) {
-  return [label, where, active ? 'Active' : '', status]
-    .filter(Boolean)
-    .join(', ');
-}
-
-/** The row's two lines: its label with its marks, and where it is. */
-function RowText({
-  face,
-  label,
-  home,
-  where,
-}: {
-  face: TabFace;
-  label: string;
-  home: boolean;
-  where: string;
-}) {
-  const planned = usePlanCount(face.item?.pr?.id);
-  return (
-    <span className="flex min-w-0 flex-1 flex-col">
-      <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-5">
-        <TabLabel
-          label={label}
-          parts={home ? undefined : face.labelParts}
-          machineLabel={face.machineLabel}
-          preview={face.tab.preview}
-          cut={face.labelSource === 'task' ? 'end' : cutSide(face.labelKind)}
-        />
-        <PlanCountBadge count={planned} />
-        {face.unseen && <UnseenDot />}
-      </span>
-      {where && (
-        <span className="truncate text-[11px] leading-4 text-muted-foreground">
-          {where}
-        </span>
-      )}
-    </span>
-  );
-}
-
-/** How far in a row of `depth` starts: a step per level. */
-const indent = (depth: number) => `${0.5 + depth}rem`;
-
-export function RosterRow({
-  face,
-  active,
-  onJump,
-  onMenu,
-  home,
-  depth = 0,
-}: {
-  face: TabFace;
-  active: boolean;
-  onJump: (tab: Tab) => void;
-  /** The tab's native menu, from its row. */
-  onMenu?: (tab: Tab) => void;
-  home: boolean;
-  /** Under the home (1), or under a player too (2). */
-  depth?: number;
-}) {
-  const label = home
-    ? ['Orchestrator', face.taskTitle].filter(Boolean).join(' · ')
-    : face.label;
-  const flashing = !active && (face.snapshot?.flashing ?? false);
-  const status = rowStatus(face.status, {
-    exited: face.snapshot?.exited ?? false,
-    unseen: face.unseen,
-  });
-  const where = rosterSecondary(face);
-  return (
-    <li className="relative">
-      <button
-        type="button"
-        data-roster-row={face.tab.id}
-        aria-current={active || undefined}
-        data-roster-depth={depth}
-        style={{ paddingInlineStart: indent(depth) }}
-        aria-label={rowName(label, where, active, status)}
-        onClick={() => onJump(face.tab)}
-        onContextMenu={
-          onMenu &&
-          ((e) => {
-            e.preventDefault();
-            onMenu(face.tab);
-          })
-        }
-        className={cn(
-          'flex h-11 w-full items-center gap-2 px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-          active ? 'bg-tab-active' : 'bg-tab hover:bg-tab-hover',
-          flashing && 'tab-attention'
-        )}
-      >
-        <RowIcon face={face} home={home} active={active} />
-        <RowText face={face} label={label} home={home} where={where} />
-        <RowStatus face={face} active={active} status={status} />
-      </button>
-      <RowBand color={face.repoColor} />
-    </li>
-  );
+  const drag = useRosterRowDrag(group, row.face, index);
+  return <RosterRow {...row} drag={drag} />;
 }
 
 /**
@@ -253,6 +91,9 @@ export function GroupRoster({
     onJump(tab);
   };
   const statuses = faces.map((f) => f.status);
+  const pane = useContext(PaneScopeContext) ?? '';
+  const entries = rosterEntries(faces, homeId, players);
+  const rowId = (face: TabFace) => rosterRowId(pane, face.tab.id);
   const summary = rosterSummary(statuses);
   return (
     <PopoverContent
@@ -318,19 +159,31 @@ export function GroupRoster({
         className="min-h-0 flex-1"
         viewportClassName="max-h-[inherit]"
       >
-        <ul ref={list} onKeyDown={walkRows} className="flex flex-col">
-          {rosterEntries(faces, homeId, players).map(({ face, depth }) => (
-            <RosterRow
-              key={face.tab.id}
-              face={face}
-              active={face.tab.id === activeId}
-              onJump={jump}
-              onMenu={onMenu}
-              home={face.tab.id === homeId}
-              depth={depth}
-            />
-          ))}
-        </ul>
+        <SortableContext
+          items={entries.map(({ face }) => rowId(face))}
+          strategy={verticalListSortingStrategy}
+        >
+          <ul
+            ref={list}
+            data-roster-list
+            onKeyDown={walkRows}
+            className="flex flex-col"
+          >
+            {entries.map(({ face, depth }, index) => (
+              <SortableRow
+                key={face.tab.id}
+                group={groupKey}
+                index={index}
+                face={face}
+                active={face.tab.id === activeId}
+                onJump={jump}
+                onMenu={onMenu}
+                home={face.tab.id === homeId}
+                depth={depth}
+              />
+            ))}
+          </ul>
+        </SortableContext>
       </ScrollArea>
     </PopoverContent>
   );

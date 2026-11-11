@@ -127,11 +127,16 @@ export function TabStrip({
 function StripEnd() {
   const { active, activatorEvent } = useDndContext();
   const pane = useContext(PaneScopeContext) ?? '';
+  const data = active?.data.current;
+  // A row lands on its own pane's strip nowhere.
+  const ownRow =
+    isStripDragData(data) && data.row !== undefined && data.pane === pane;
   const { setNodeRef } = useDroppable({
     id: stripEndId(pane),
     disabled:
       activatorEvent instanceof KeyboardEvent ||
-      !isStripDragData(active?.data.current),
+      !isStripDragData(data) ||
+      ownRow,
   });
   return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
 }

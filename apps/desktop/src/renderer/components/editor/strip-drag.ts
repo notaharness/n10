@@ -2,8 +2,10 @@
  * What the strip drags, and where it may land: a block (a group dragged
  * by its chip, or a tab standing alone) moves between other blocks, a
  * pinned tab only among the pinned and anything else only outside them.
- * A group's members are never on the strip; they move through their
- * roster rows' menus. Illegal places
+ * A group's members are never on the strip: a roster row moves its tab
+ * among the group's other rows, or out to another pane's strip or a
+ * pane's side, never onto its own pane's strip, where its group would
+ * gather it back. Illegal places
  * are not drop targets at all (`useSortable`'s `disabled.droppable`), so
  * the pointer and the keyboard both meet only legal slots, and the slot
  * the strip opens is the one the drop takes: a block's drop arranges the
@@ -24,6 +26,8 @@ export interface StripDragData {
   pinned?: true;
   /** The pane whose strip it is on. */
   pane?: string;
+  /** A roster row: the key of the group whose roster lists it. */
+  row?: string;
 }
 
 /** A place as its caller describes it; the strip adds the label. */
@@ -43,7 +47,13 @@ export function acceptsDrop(
   target: StripDragData,
   dragged: StripDragData | undefined
 ): boolean {
-  return !dragged || !target.pinned === !dragged.pinned;
+  if (!dragged) return true;
+  if (dragged.row !== undefined)
+    return target.row === undefined
+      ? !samePane(dragged, target) && !target.pinned
+      : target.row === dragged.row && samePane(dragged, target);
+  if (target.row !== undefined) return false;
+  return !target.pinned === !dragged.pinned;
 }
 
 /** The strip's blocks as presented, each one's tabs. */
@@ -89,6 +99,7 @@ export function dropMove(
 ): StripDrop | null {
   if (activeId === overId || !acceptsDrop(over, dragged)) return null;
   if (!samePane(dragged, over)) return beside(dragged, over, pointerSide);
+  if (dragged.row !== undefined) return rowMove(dragged, over, blocks);
   const from = dragged.index;
   const to = over.index;
   if (from === to || !sameIds(blocks[from], dragged.ids) || !blocks[to])
@@ -104,4 +115,23 @@ function sameIds(
   b: readonly string[]
 ): boolean {
   return a?.length === b.length && a.every((id, i) => id === b[i]);
+}
+
+/** A roster row dropped on another of its group's rows: its tab goes
+ *  beside that row's, after it when it came from above, before when
+ *  from below, in the strip as presented (`blocks`). */
+function rowMove(
+  dragged: StripDragData,
+  over: StripDragData,
+  blocks: StripBlocks
+): StripDrop | null {
+  const [id] = dragged.ids;
+  const [target] = over.ids;
+  const order = blocks.flat();
+  if (!id || !target || !order.includes(id) || !order.includes(target))
+    return null;
+  const rest = order.filter((t) => t !== id);
+  const at = rest.indexOf(target) + (dragged.index < over.index ? 1 : 0);
+  rest.splice(at, 0, id);
+  return { kind: 'arrange', ids: rest };
 }

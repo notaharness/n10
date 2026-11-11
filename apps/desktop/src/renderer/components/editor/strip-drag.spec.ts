@@ -74,3 +74,46 @@ describe('strip drag', () => {
     ).toBeNull();
   });
 });
+
+describe('a roster row', () => {
+  const row = (id: string, index: number, pane = 'p1', group = 'g') =>
+    ({
+      ...block([id], index),
+      pane,
+      row: group,
+    } as StripDragData);
+  const onStrip = (ids: string[], index: number, pane: string) =>
+    ({ ...block(ids, index), pane } as StripDragData);
+
+  it('lands among its own group’s rows, or on another pane’s strip, never its own strip', () => {
+    expect(acceptsDrop(row('b', 1), row('a', 0))).toBe(true);
+    expect(acceptsDrop(row('b', 1, 'p1', 'h'), row('a', 0))).toBe(false);
+    expect(acceptsDrop(onStrip(['x'], 0, 'p2'), row('a', 0))).toBe(true);
+    expect(acceptsDrop(onStrip(['x'], 0, 'p1'), row('a', 0))).toBe(false);
+    // Nor does a strip's block land on a row.
+    expect(acceptsDrop(row('a', 0), onStrip(['x'], 0, 'p1'))).toBe(false);
+  });
+
+  it('moves its tab beside the row it is dropped on, in the strip as presented', () => {
+    const blocks = [['x'], ['a', 'b', 'c'], ['y']];
+    expect(
+      dropMove('row:a', row('a', 0), 'row:c', row('c', 2), blocks)
+    ).toEqual({ kind: 'arrange', ids: ['x', 'b', 'c', 'a', 'y'] });
+    expect(
+      dropMove('row:c', row('c', 2), 'row:a', row('a', 0), blocks)
+    ).toEqual({ kind: 'arrange', ids: ['x', 'c', 'a', 'b', 'y'] });
+  });
+
+  it('goes beside a block on another pane’s strip', () => {
+    expect(
+      dropMove(
+        'row:a',
+        row('a', 0),
+        'block:x',
+        onStrip(['x'], 0, 'p2'),
+        [],
+        'after'
+      )
+    ).toEqual({ kind: 'move', ids: ['a'], targetId: 'x', side: 'after' });
+  });
+});

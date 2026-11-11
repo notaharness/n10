@@ -73,7 +73,7 @@ export function GroupBlock({
   const tabs = useTabs();
   const { tabMenu } = usePaneMenus();
   const { tabOverflow } = useDesktopPrefs();
-  const roster = useRosterOpen();
+  const roster = useRosterOpen(group.key);
   const chip = useRef<HTMLDivElement>(null);
   const faces = group.tabs.map(faceOf);
   const head = group.head;

@@ -124,7 +124,7 @@ function PaneDropFollower({
     const strip =
       activatorEvent instanceof KeyboardEvent
         ? null
-        : activeNode?.closest('[role="tablist"]');
+        : activeNode?.closest('[role="tablist"], [data-roster-list]');
     follow(active ? { active, over } : null, strip ? stripBox(strip) : null);
   });
   return null;

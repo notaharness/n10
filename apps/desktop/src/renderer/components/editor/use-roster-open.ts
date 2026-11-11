@@ -1,4 +1,5 @@
-import { useDndContext, useDndMonitor } from '@dnd-kit/core';
+import { useDndContext, useDndMonitor, type Active } from '@dnd-kit/core';
+import { isStripDragData } from './strip-drag.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Resting on a chip this long opens its roster. */
@@ -15,8 +16,15 @@ export const HOVER_CLOSE_MS = 180;
  */
 export type RosterMode = 'hover' | 'pinned' | 'keyboard';
 
-/** A roster's open state, for `Popover`'s controlled `open`. */
-export function useRosterOpen() {
+/** The roster a drag's row is in, if it drags a row. */
+const rowOf = (active: Active | null | undefined): string | undefined => {
+  const data = active?.data.current;
+  return isStripDragData(data) ? data.row : undefined;
+};
+
+/** A roster's open state, for `Popover`'s controlled `open`. `group`:
+ *  the group it lists, whose rows' drags hold it open. */
+export function useRosterOpen(group?: string) {
   const [mode, setMode] = useState<RosterMode | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Escape keeps hover from opening it again until the pointer leaves.
@@ -34,11 +42,18 @@ export function useRosterOpen() {
     setMode(null);
   }, []);
   // A drag is no rest: a pending open is dropped, and a hover-open
-  // roster closes.
+  // roster closes, unless the drag is one of its own rows, which holds
+  // it open until the row is dropped back in it or carried away.
   useDndMonitor({
-    onDragStart() {
+    onDragStart({ active }) {
       clear();
-      setMode((now) => (now === 'hover' ? null : now));
+      const own = group !== undefined && rowOf(active) === group;
+      setMode((now) => (own ? 'pinned' : now === 'hover' ? null : now));
+    },
+    onDragEnd({ active, over }) {
+      if (group === undefined || rowOf(active) !== group) return;
+      const data = over?.data.current;
+      if (!isStripDragData(data) || data.row !== group) close();
     },
   });
 

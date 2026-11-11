@@ -1,10 +1,10 @@
-import { BellIcon, ListIcon } from 'lucide-react';
+import { ListIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { TabGroup } from '../../lib/tabs/tab-groups.js';
 import type { Tab } from '../../lib/tabs/tabs.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { ScrollArea } from '../ui/scroll-area.js';
-import { RosterRow } from './GroupRoster.js';
+import { RosterRow } from './RosterRow.js';
 import { walkRows } from './roster-keys.js';
 import type { TabFace } from './use-strip-groups.js';
 
@@ -65,20 +65,13 @@ export function AllTabs({
         <button
           type="button"
           data-all-tabs
+          // No badge: the tabs themselves blink. A screen reader still
+          // hears how many want a look.
           aria-label={count ? `All tabs, ${count} need attention` : 'All tabs'}
           aria-haspopup="dialog"
           className="relative flex h-9 w-12 shrink-0 items-center justify-center border-l border-border text-muted-foreground outline-none hover:bg-tab-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           <ListIcon aria-hidden className="size-4" />
-          {count > 0 && (
-            <span
-              className="absolute top-1 right-1 flex items-center gap-0.5 rounded bg-info px-0.5 text-[10px] leading-4 text-background tabular-nums"
-              aria-hidden
-            >
-              <BellIcon className="size-2.5" />
-              {count}
-            </span>
-          )}
         </button>
       </PopoverTrigger>
       <PopoverContent

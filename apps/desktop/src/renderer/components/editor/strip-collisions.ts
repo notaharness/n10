@@ -75,6 +75,10 @@ export const collisionsEndingAt: CollisionDetection = (args) => {
       );
     return last ? [{ id: last.id }] : [];
   }
+  // A roster lies over a pane's content: a row under the pointer comes
+  // before the pane beneath it.
+  const placesWithin = within.filter((c) => !isPaneZone(c.id));
+  if (placesWithin.length > 0) return placesWithin;
   if (within.length > 0) return within;
   if (leftStripRow(args.active.data.current, args.pointerCoordinates))
     return [];

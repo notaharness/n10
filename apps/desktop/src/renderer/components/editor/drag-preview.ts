@@ -3,6 +3,7 @@ import type { ClientRect, DragEndEvent, Modifier } from '@dnd-kit/core';
 import {
   restrictToHorizontalAxis,
   restrictToParentElement,
+  restrictToVerticalAxis,
 } from '@dnd-kit/modifiers';
 import { getEventCoordinates } from '@dnd-kit/utilities';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
@@ -167,10 +168,12 @@ export const holdInStrip =
     const { active, activatorEvent, transform } = args;
     const start = activatorEvent ? getEventCoordinates(activatorEvent) : null;
     const at = start && { x: start.x + transform.x, y: start.y + transform.y };
-    if (carriedOut(active?.data.current, at)) return transform;
-    const held = wrap
-      ? args
-      : { ...args, transform: restrictToHorizontalAxis(args) };
+    const data = active?.data.current;
+    if (carriedOut(data, at)) return transform;
+    // A roster's rows stand in a column; a wrapped strip's tabs in rows.
+    const row = isStripDragData(data) && data.row !== undefined;
+    const axis = row ? restrictToVerticalAxis : restrictToHorizontalAxis;
+    const held = wrap && !row ? args : { ...args, transform: axis(args) };
     return restrictToParentElement(held);
   };
 
