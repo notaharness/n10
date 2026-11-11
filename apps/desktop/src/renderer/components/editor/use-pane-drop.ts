@@ -1,9 +1,5 @@
-import {
-  useDndContext,
-  useDroppable,
-  type DragEndEvent,
-  type DragMoveEvent,
-} from '@dnd-kit/core';
+import { useEffect } from 'react';
+import { useDndContext, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import {
   setPaneDropTarget,
   type PaneDropTarget,
@@ -28,7 +24,40 @@ import { draggedIds, isStripDragData } from './strip-drag.js';
 
 const PREFIX = 'pane-zone:';
 
-export const isPaneZone = (id: unknown) => String(id).startsWith(PREFIX);
+export function isPaneZone(id: unknown): boolean {
+  return String(id).startsWith(PREFIX);
+}
+
+/** What a drag is over, as the drag context last said. */
+type Drag = Pick<DragEndEvent, 'active' | 'over'>;
+
+/**
+ * Where the pointer is, and the drag it carries. The strip's modifiers
+ * keep a dragged tab inside its strip, so neither the drag's `delta`
+ * nor its move events follow the pointer out over a pane: the pointer's
+ * own events do, and each one re-reads the zone under it.
+ */
+let pointer: { x: number; y: number } | null = null;
+let following: { drag: Drag; ws: Workspace } | null = null;
+
+function followPointer(e: PointerEvent) {
+  pointer = { x: e.clientX, y: e.clientY };
+  if (following) show(dropAt(following.drag, following.ws));
+}
+
+type DropAt = (PaneDropTarget & { ids: readonly string[] }) | null;
+
+function show(at: DropAt) {
+  setPaneDropTarget(
+    at && {
+      pane: at.pane,
+      zone: at.zone,
+      allowed: at.allowed,
+      ...(at.hint ? { hint: at.hint } : {}),
+    }
+  );
+  document.body.style.cursor = at && !at.allowed ? 'no-drop' : '';
+}
 
 /** The pane frame on screen, strip included, by its `data-pane-id`. */
 function frameOf(pane: PaneId): DOMRect | null {
@@ -43,20 +72,12 @@ function frameOf(pane: PaneId): DOMRect | null {
  *  dropping there would do anything: the middle of the pane it came
  *  from would not, nor a side where the pane has no room for two, nor a
  *  split of a pane by every tab it holds. */
-function dropAt(
-  event: DragMoveEvent | DragEndEvent,
-  ws: Workspace
-): (PaneDropTarget & { ids: readonly string[] }) | null {
-  const { over, active, activatorEvent, delta } = event;
+function dropAt({ over, active }: Drag, ws: Workspace): DropAt {
   const dragged = active.data.current;
   if (!over || !isPaneZone(over.id) || !isStripDragData(dragged)) return null;
-  if (!(activatorEvent instanceof MouseEvent)) return null;
+  if (!pointer) return null;
   const pane = String(over.id).slice(PREFIX.length);
-  const zone = zoneAt(
-    over.rect,
-    activatorEvent.clientX + delta.x,
-    activatorEvent.clientY + delta.y
-  );
+  const zone = zoneAt(over.rect, pointer.x, pointer.y);
   const ids = draggedIds(String(active.id), dragged);
   const from = dragged.pane;
   if (zone === 'centre') return { pane, zone, ids, allowed: from !== pane };
@@ -70,26 +91,25 @@ function dropAt(
     : { pane, zone, ids, allowed: false, hint: 'Not enough room to split' };
 }
 
-/** The drag provider's side of pane drops: following the pointer, and
- *  the drop. */
+/** The drag provider's side of pane drops: following the drag and the
+ *  pointer, and the drop. */
 export function usePaneDrop() {
   const { workspace } = useWorkspace();
   const panes = usePanes();
-  const show = (target: PaneDropTarget | null) => {
-    setPaneDropTarget(target);
-    document.body.style.cursor = target && !target.allowed ? 'no-drop' : '';
-  };
+  useEffect(() => {
+    const opts = { capture: true, passive: true };
+    window.addEventListener('pointermove', followPointer, opts);
+    window.addEventListener('pointerdown', followPointer, opts);
+    return () => {
+      window.removeEventListener('pointermove', followPointer, opts);
+      window.removeEventListener('pointerdown', followPointer, opts);
+    };
+  }, []);
   return {
-    move(event: DragMoveEvent) {
-      const at = dropAt(event, workspace);
-      show(
-        at && {
-          pane: at.pane,
-          zone: at.zone,
-          allowed: at.allowed,
-          ...(at.hint ? { hint: at.hint } : {}),
-        }
-      );
+    /** The drag context changed: what is dragged, and over what. */
+    follow(drag: Drag | null) {
+      following = drag && { drag, ws: workspace };
+      show(drag && dropAt(drag, workspace));
     },
     /** Whether the drop was onto a pane's content: then it is the
      *  pane's, done or refused, and no strip move. */
@@ -103,6 +123,7 @@ export function usePaneDrop() {
       return true;
     },
     clear() {
+      following = null;
       show(null);
     },
   };

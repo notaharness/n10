@@ -1,17 +1,17 @@
 import {
   DndContext,
   PointerSensor,
+  useDndContext,
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragMoveEvent,
 } from '@dnd-kit/core';
 import {
   restrictToHorizontalAxis,
   restrictToParentElement,
 } from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { useCallback, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { setStripDragging } from '../../lib/tabs/tab-switching.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
@@ -98,7 +98,6 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
         screenReaderInstructions,
       }}
       onDragStart={() => setStripDragging(true)}
-      onDragMove={(event: DragMoveEvent) => paneDrop.move(event)}
       onDragCancel={() => {
         setStripDragging(false);
         paneDrop.clear();
@@ -109,9 +108,24 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
         paneDrop.clear();
       }}
     >
+      <PaneDropFollower follow={paneDrop.follow} />
       <StripBlocksReport.Provider value={reportBlocks}>
         {children}
       </StripBlocksReport.Provider>
     </DndContext>
   );
+}
+
+/** Hands the drag context's every change to the pane drop: what is
+ *  dragged, and what it is over. */
+function PaneDropFollower({
+  follow,
+}: {
+  follow: ReturnType<typeof usePaneDrop>['follow'];
+}) {
+  const { active, over } = useDndContext();
+  useEffect(() => {
+    follow(active ? { active, over } : null);
+  });
+  return null;
 }
