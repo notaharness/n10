@@ -4,6 +4,7 @@ import type { SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
 import {
   nextAttention,
+  noteActivation,
   type AttentionRound,
 } from '../../lib/tabs/attention-round.js';
 import { rowStatus } from '../../lib/tabs/group-status.js';
@@ -18,6 +19,7 @@ import {
 import { indexItems } from '../../lib/tabs/tab-item.js';
 import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
+import { useRequestAgentView } from '../../lib/tabs/tab-views.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { EditorPane } from './EditorPane.js';
 import { AllTabs } from './AllTabs.js';
@@ -82,6 +84,7 @@ export function EditorArea({
 }) {
   const { repo } = useRepo();
   const tabs = useTabs();
+  const requestAgentView = useRequestAgentView();
   const closer = useCloseTabs(items);
   const index = indexItems(repo.cwd, items);
   const { groups, faceOf, colorOf } = useStripGroups(items);
@@ -89,9 +92,9 @@ export function EditorArea({
   const round = useRef<AttentionRound | null>(null);
   const attentionActivation = useRef<string | null>(null);
   useEffect(() => {
-    if (attentionActivation.current === tabs.activeId)
-      attentionActivation.current = null;
-    else round.current = null;
+    const byAttention = attentionActivation.current === tabs.activeId;
+    round.current = noteActivation(round.current, byAttention);
+    if (byAttention) attentionActivation.current = null;
   }, [tabs.activeId]);
 
   const tabStopId = tabStopOf(
@@ -120,16 +123,14 @@ export function EditorArea({
   const revealTab = (id: string) => {
     requestAnimationFrame(() => {
       const key = CSS.escape(id);
-      document
-        .querySelector<HTMLElement>(
-          `[data-home-tab="${key}"], [data-tab-id="${key}"]`
-        )
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      document
-        .querySelector<HTMLElement>(
-          '[data-editor-panes] > :not([data-spare-pane]) .xterm-helper-textarea'
-        )
-        ?.focus();
+      const target = document.querySelector<HTMLElement>(
+        `[data-home-tab="${key}"], [data-tab-id="${key}"]`
+      );
+      target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const terminal = document.querySelector<HTMLElement>(
+        '[data-editor-panes] > :not([data-spare-pane]) .xterm-helper-textarea'
+      );
+      (terminal ?? target)?.focus();
     });
   };
   const attention = () => {
@@ -153,6 +154,8 @@ export function EditorArea({
       return;
     }
     const target = faces.find((face) => face.tab.id === step.target)!;
+    if (target.tab.kind === 'item' && target.status === 'new-output')
+      requestAgentView(target.tab.id);
     attentionActivation.current = target.tab.id;
     tabs.activate(target.tab.id);
     const label = tabPresentation(
@@ -231,6 +234,9 @@ export function EditorArea({
             labelOf={(group) => groupLabel(group, faceOf)}
             activeId={tabs.activeId}
             onJump={(tab) => {
+              const face = faceOf(tab);
+              if (tab.kind === 'item' && face.status === 'new-output')
+                requestAgentView(tab.id);
               const group = groupOf(groups, tab.id);
               if (group?.chipped) tabs.setCollapsed([group.key], false);
               tabs.activate(tab.id);

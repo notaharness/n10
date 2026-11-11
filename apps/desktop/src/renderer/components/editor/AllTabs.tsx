@@ -86,9 +86,11 @@ export function AllTabs({
           <div ref={list} onKeyDown={walkRows} className="max-h-[400px]">
             {groups.map((group) => (
               <section key={group.key} aria-label={labelOf(group)}>
-                <h3 className="sticky top-0 z-10 border-b border-border bg-popover px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                  {labelOf(group)}
-                </h3>
+                {(group.chipped || group.tabs.length > 1) && (
+                  <h3 className="sticky top-0 z-10 border-b border-border bg-popover px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                    {labelOf(group)}
+                  </h3>
+                )}
                 <ul>
                   {group.tabs.map((tab) => (
                     <RosterRow

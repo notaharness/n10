@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   nextAttention,
+  noteActivation,
   type AttentionRound,
   type AttentionTab,
 } from './attention-round.js';
@@ -44,6 +45,7 @@ describe('attention traversal', () => {
     changed.push({ id: 'later', status: 'blocked' });
     const next = nextAttention(first.round, changed, first.target);
     expect(next.target).toBe('error-a');
+    expect(next.index).toBe(3);
     let round = next.round;
     for (let i = 0; i < 3; i++)
       round = nextAttention(round, changed, 'active').round;
@@ -52,6 +54,16 @@ describe('attention traversal', () => {
     expect(nextAttention(fresh.round, changed, 'blocked-a').target).toBe(
       'later'
     );
+  });
+
+  it('keeps the round for its own jump and resets after a manual choice', () => {
+    const first = nextAttention(null, tabs, 'active');
+    expect(noteActivation(first.round, true)).toBe(first.round);
+    expect(nextAttention(first.round, tabs, first.target).target).toBe(
+      'blocked-b'
+    );
+    expect(noteActivation(first.round, false)).toBeNull();
+    expect(nextAttention(null, tabs, 'new-a').target).toBe('blocked-a');
   });
 
   it('distinguishes no pending tabs from only the current tab', () => {

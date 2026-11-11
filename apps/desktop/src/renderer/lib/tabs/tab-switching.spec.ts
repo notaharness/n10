@@ -6,6 +6,7 @@ import {
   notePresentedOrder,
   noteStrip,
   resetTabMru,
+  setStripDragging,
   type TabSwitchingDeps,
 } from './tab-switching.js';
 import { setStripCommands } from './strip-commands.js';
@@ -96,6 +97,7 @@ beforeEach(() => {
 afterEach(() => {
   stop();
   setStripCommands(null);
+  setStripDragging(false);
 });
 
 describe('keyboard tab switching', () => {
@@ -124,6 +126,26 @@ describe('keyboard tab switching', () => {
       expect(delivered).toBe(0);
     }
   );
+
+  it('leaves auxiliary chords untouched without a mounted strip', () => {
+    const event = press('A', { ctrl: true, shift: true });
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('stands aside while composing or dragging the strip', () => {
+    let runs = 0;
+    setStripCommands({ attention: () => runs++, collapseOthers: () => runs++ });
+    const composing = Object.assign(
+      keyEvent('keydown', 'A', { ctrl: true, shift: true }),
+      { isComposing: true }
+    );
+    target.dispatchEvent(composing);
+    expect(composing.defaultPrevented).toBe(false);
+    setStripDragging(true);
+    const dragging = press('A', { ctrl: true, shift: true });
+    expect(dragging.defaultPrevented).toBe(false);
+    expect(runs).toBe(0);
+  });
 
   it('Ctrl+PgDn/PgUp go along the strip and stop the event', () => {
     strip.visit('a');

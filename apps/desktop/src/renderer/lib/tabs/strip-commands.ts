@@ -7,6 +7,10 @@ export interface StripCommands {
 
 let commands: StripCommands | null = null;
 
+export function hasStripCommands(): boolean {
+  return commands !== null;
+}
+
 export function setStripCommands(next: StripCommands | null): void {
   commands = next;
 }

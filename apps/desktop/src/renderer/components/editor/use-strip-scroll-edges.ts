@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useEdgeAutoScroll } from './use-edge-auto-scroll.js';
 
 /** Scroll position and overflow of the strip's one-row track. */
 export function useStripScrollEdges(blockKey: string, wrap: boolean) {
@@ -12,11 +11,18 @@ export function useStripScrollEdges(blockKey: string, wrap: boolean) {
   const update = useCallback(() => {
     const el = track.current;
     if (!el) return;
-    setEdges({
+    const next = {
       overflow: el.scrollWidth > el.clientWidth + 1,
       left: el.scrollLeft > 1,
       right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
-    });
+    };
+    setEdges((previous) =>
+      previous.overflow === next.overflow &&
+      previous.left === next.left &&
+      previous.right === next.right
+        ? previous
+        : next
+    );
   }, []);
   useEffect(() => {
     const el = track.current;
@@ -27,6 +33,5 @@ export function useStripScrollEdges(blockKey: string, wrap: boolean) {
     update();
     return () => observer.disconnect();
   }, [blockKey, wrap, update]);
-  useEdgeAutoScroll(track, !wrap);
   return { track, edges, update };
 }

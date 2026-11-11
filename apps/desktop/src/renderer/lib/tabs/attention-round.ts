@@ -23,6 +23,14 @@ export interface AttentionStep {
   feedback: 'empty' | 'current' | null;
 }
 
+/** A manual tab choice starts a fresh round; the round's own jump keeps it. */
+export function noteActivation(
+  round: AttentionRound | null,
+  byAttention: boolean
+): AttentionRound | null {
+  return byAttention ? round : null;
+}
+
 /** One stable traversal. New activity waits until the next round. */
 export function nextAttention(
   current: AttentionRound | null,
@@ -63,7 +71,7 @@ export function nextAttention(
   return {
     round,
     target,
-    index: round.visited.length,
+    index: round.ids.indexOf(target) + 1,
     total: round.ids.length,
     feedback: null,
   };

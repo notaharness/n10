@@ -7,7 +7,7 @@ import {
   type SetStateAction,
 } from 'react';
 import { focusAfter } from '../focus.js';
-import { useTabView } from '../tabs/tab-views.js';
+import { useAgentViewRequest, useTabView } from '../tabs/tab-views.js';
 import type { PullRequestInfo } from '@n10/vcs-core/types';
 import {
   adoptPullRequest,
@@ -70,6 +70,7 @@ export function useReviewMode({
       chosen: true,
     }));
   }, []);
+  useAgentViewRequest(() => setMode('agent'));
   useAgentFocus(agent, () => setMode('agent'));
   return [pane.mode, setMode];
 }
