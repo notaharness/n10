@@ -7,6 +7,7 @@ import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { cn } from '../../lib/utils.js';
 import { Popover } from '../ui/popover.js';
 import { GroupChip } from './GroupChip.js';
+import { GroupDragHint } from './GroupDragHint.js';
 import { GroupRoster } from './GroupRoster.js';
 import { blockId } from './strip-blocks.js';
 import { GroupEnd, GroupMembers, useSortableTab } from './TabStrip.js';
@@ -76,6 +77,7 @@ export function GroupBlock({
   const wrap = useDesktopPrefs().tabOverflow === 'wrap';
   const roster = useRosterOpen();
   const rosterButton = useRef<HTMLButtonElement>(null);
+  const node = useRef<HTMLDivElement | null>(null);
   const faces = group.tabs.map(faceOf);
   const head = group.head;
   const members = head ? group.tabs.slice(1) : group.tabs;
@@ -122,7 +124,10 @@ export function GroupBlock({
 
   return (
     <div
-      ref={setNode}
+      ref={(el) => {
+        setNode(el);
+        node.current = el;
+      }}
       role="presentation"
       data-tab-group={group.key}
       data-collapsed={collapsed || undefined}
@@ -178,6 +183,7 @@ export function GroupBlock({
           ))}
         </GroupMembers>
       )}
+      <GroupDragHint group={group.key} node={node} />
       {followers}
       {/* Its last row's room, as the strip's end takes the strip's. */}
       {wrap && ids !== null && <GroupEnd group={group.key} />}

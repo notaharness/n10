@@ -17,10 +17,11 @@ export interface TerminalRecord {
 export function terminalFacts(
   name: string,
   record: TerminalRecord,
-  affiliation?: Affiliation
+  affiliationOf?: (machine: string) => Affiliation | undefined
 ) {
   const session = getSession(name);
   const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
+  const affiliation = affiliationOf?.(machine);
   return {
     name,
     ...record,

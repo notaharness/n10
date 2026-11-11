@@ -48,6 +48,13 @@ vi.mock('@n10/vcs-core', () => ({
 
 vi.mock('@n10/core', () => ({
   isGitRepo: (cwd: string) => state.repoRoots.has(cwd),
+  // A terminal no listing names yet is placed by its directory.
+  mainCheckoutOf: () => null,
+  placeAffiliation: (path: string) => ({
+    kind: 'place',
+    key: `place:${path}`,
+    label: path,
+  }),
   // The remote machine has every directory asked for (the engine's spec
   // covers resolving it there).
   requireMachine: (id: string) => ({ id, executor: {} }),

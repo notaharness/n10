@@ -4,6 +4,7 @@ import {
   checkoutKey,
   LOCAL_MACHINE,
   mainCheckoutOf,
+  placeAffiliation,
   type Affiliation,
   type Affiliations,
   type PlaceOf,
@@ -57,6 +58,19 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
     return place;
   };
   const placeOf = options.placeOf ?? defaultPlaceOf;
+  /** A terminal's launch directory's place, asked on every listing of
+   *  terminals; kept apart from the listings' memo, which forgets what
+   *  no pane shows. Terminals are few. */
+  const launched = new Map<string, string>();
+  const launchPlaceOf: PlaceOf = (dir, machine) => {
+    const key = `${machine}\0${dir}`;
+    let place = launched.get(key);
+    if (place === undefined) {
+      place = placeOf(dir, machine);
+      launched.set(key, place);
+    }
+    return place;
+  };
 
   function forgetUnlisted(): void {
     const listed = new Set(listings.get(LOCAL_MACHINE)?.map((s) => s.path));
@@ -117,6 +131,14 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
     /** A session's, by registry key, once a listing has named it. */
     of(key: string): Affiliation | undefined {
       return snapshot.sessions.get(key);
+    },
+    /** A session's affiliation, else, before any listing names it, the
+     *  place of the directory it runs in, by the rule listings use. */
+    ofOrPlace(key: string, dir: string, machine = LOCAL_MACHINE): Affiliation {
+      return (
+        snapshot.sessions.get(key) ??
+        placeAffiliation(launchPlaceOf(dir, machine), machine)
+      );
     },
     /** The parent group of the agent working in a checkout, if any. */
     ofCheckout(path: string, machine = LOCAL_MACHINE): Affiliation | undefined {

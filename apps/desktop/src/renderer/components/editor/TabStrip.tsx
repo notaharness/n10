@@ -61,17 +61,25 @@ function spoken(target: Active | Over): string {
   return isStripDragData(data) ? data.label : String(target.id);
 }
 
+/** Where a place stands among those the drag may land on: its
+ *  sortable list's, a group's members or the strip's blocks. */
+function position(over: Over): string | undefined {
+  const sortable = (
+    over.data.current as
+      | { sortable?: { index: number; items: unknown[] } }
+      | undefined
+  )?.sortable;
+  return sortable
+    ? `Position ${sortable.index + 1} of ${sortable.items.length}.`
+    : undefined;
+}
+
 const announcements: Announcements = {
-  onDragStart: ({ active }) => `Picked up ${spoken(active)}.`,
-  onDragOver: ({ active, over }) =>
-    over
-      ? `${spoken(active)} is over ${spoken(over)}.`
-      : `${spoken(active)} is not over a tab.`,
+  onDragStart: ({ active }) => `Moving ${spoken(active)}.`,
+  onDragOver: ({ over }) => (over ? position(over) : undefined),
   onDragEnd: ({ active, over }) =>
-    over
-      ? `${spoken(active)} was dropped over ${spoken(over)}.`
-      : `${spoken(active)} was dropped.`,
-  onDragCancel: ({ active }) => `Moving ${spoken(active)} was cancelled.`,
+    over ? `Moved ${spoken(active)}.` : 'Move cancelled.',
+  onDragCancel: () => 'Move cancelled.',
 };
 
 /** Where the strip tells the drag what its blocks are, as presented. */

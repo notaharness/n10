@@ -51,7 +51,7 @@ export interface StripGroups {
   groups: TabGroup[];
   faceOf(tab: Tab): TabFace;
   /** The repository colour a group's chip carries: its home's, else the
-   *  one repository every member shares, else none. */
+   *  one repository every member naming one shares, else none. */
   colorOf(group: TabGroup): string | null;
 }
 
@@ -128,7 +128,9 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
   );
   const colorOf = (group: TabGroup): string | null => {
     if (group.head) return colorOfTab(group.head);
-    const colors = new Set(group.tabs.map(colorOfTab));
+    // A terminal in a subdirectory names no repository of its own: it
+    // takes no part.
+    const colors = new Set(group.tabs.map(colorOfTab).filter(Boolean));
     const [only] = colors;
     return colors.size === 1 ? only ?? null : null;
   };

@@ -816,9 +816,10 @@ or chosen.
 - **Inheritance.** A terminal in a player's checkout takes the player's
   parent; so does any tab whose session, or checkout, is the player's.
 - **Place.** Everything else: a worktree session's main checkout, a
-  directory's repository main checkout, else the directory. A tab no listing
-  describes (a pull request with no agent, a terminal not listed yet) takes
-  its repository, else its directory. Settings belongs to nothing.
+  directory's repository main checkout, else the directory. A terminal no
+  listing names yet is placed by that same rule from where it was launched,
+  so it starts in the group it stays in. A tab no session describes (a pull
+  request with no agent) takes its repository. Settings belongs to nothing.
 
 Core `discovery/affiliations.ts` derives them over a listing, pure. The
 engine's affiliation service holds each machine's last discovery listing
@@ -853,7 +854,8 @@ rule by affiliation kind (`initiallyCollapsed`: a parent group starts
 collapsed, its players behind the chip, and a place group expanded),
 kept for the run. A collapsed group shows its chip alone; activating a tab in
 it from anywhere expands it, while collapsing the group the active tab is in
-leaves the active content as it is. Collapse others is on the native menus.
+leaves the active content as it is. A collapsed group the active tab joins
+behind its chip, when a later scan gives it its parent, expands too. Collapse others is on the native menus.
 Positional keyboard switching walks the presented order, collapsed members
 included (`tab-switching.ts`). Close Others closes every other tab.
 
@@ -861,8 +863,15 @@ Drag (`strip-drag.ts`): a member moves only among its group's members, and a
 group, dragged by its chip body, or a lone tab moves only between blocks.
 Illegal places are disabled droppables (`useSortable`'s `disabled.droppable`),
 so pointer and keyboard drags meet only legal slots and the slot the strip
-opens is the one the drop takes. A home's tab selects on click, not on press,
-so dragging its group does not activate it.
+opens is the one the drop takes. A block's drop arranges the whole strip in
+its presented order with the block moved, since the stored order may
+interleave groups; a group shown behind the one it follows moves with it as
+one block. The room after the last tab, the strip's or a wrapped group's, is
+the last legal place by index, not by dnd-kit's mount order. A member
+carried outside its group is told "Tabs stay in their group", and drags
+announce "Moving", "Position n of m", "Moved" and "Move cancelled". A home's
+tab selects on click, not on press, so dragging its group does not activate
+it.
 
 ## Plans and auto-fixing
 

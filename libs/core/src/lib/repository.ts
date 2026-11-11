@@ -37,23 +37,30 @@ export function resolveRepositoryRoot(path: string): string {
   }
 }
 
+/** `git rev-parse` in `dir`, trimmed; throws outside a repository. */
+function revParse(dir: string, ...args: string[]): string {
+  return execFileSync('git', ['rev-parse', ...args], {
+    cwd: dir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+}
+
 /**
  * The main checkout of the repository `dir` is in — the directory
  * itself, a subdirectory or a linked worktree of it — or `null` outside
  * one. Git's common directory is the main checkout's `.git`; a bare
- * repository's is the repository itself.
+ * repository's is the repository itself. A submodule's lives in its
+ * superproject's `.git/modules`, so its checkout is its top level.
  */
 export function mainCheckoutOf(dir: string): string | null {
   try {
-    const common = execFileSync(
-      'git',
-      ['rev-parse', '--path-format=absolute', '--git-common-dir'],
-      { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
-    ).trim();
+    const common = revParse(dir, '--path-format=absolute', '--git-common-dir');
     if (!common) return null;
-    return canonicalRepoPath(
-      basename(common) === '.git' ? dirname(common) : common
-    );
+    if (basename(common) === '.git') return canonicalRepoPath(dirname(common));
+    if (/[\\/]\.git[\\/]modules[\\/]/.test(common))
+      return canonicalRepoPath(revParse(dir, '--show-toplevel'));
+    return canonicalRepoPath(common);
   } catch {
     return null;
   }

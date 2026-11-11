@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { homelessLabel, parentTarget, placeKey } from '../affiliation.js';
 import { registryNameOf, type TaggedSession } from '../session-identity.js';
@@ -242,5 +246,38 @@ describe('affiliation keys', () => {
 describe('mainCheckoutOf', () => {
   it('answers null outside a repository', () => {
     expect(mainCheckoutOf('/')).toBeNull();
+  });
+
+  it('answers a submodule’s own checkout, not its Git directory', () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'n10-submodule-')));
+    const git = (cwd: string, ...args: string[]) =>
+      execFileSync(
+        'git',
+        [
+          '-c',
+          'user.name=n10',
+          '-c',
+          'user.email=n10@example.invalid',
+          '-c',
+          'commit.gpgsign=false',
+          '-c',
+          'protocol.file.allow=always',
+          ...args,
+        ],
+        { cwd, stdio: 'ignore' }
+      );
+    try {
+      for (const name of ['lib', 'app']) {
+        mkdirSync(join(root, name));
+        git(join(root, name), 'init', '-q');
+        git(join(root, name), 'commit', '-q', '--allow-empty', '-m', 'x');
+      }
+      const app = join(root, 'app');
+      git(app, 'submodule', 'add', '-q', join(root, 'lib'), 'lib');
+      expect(mainCheckoutOf(join(app, 'lib'))).toBe(join(app, 'lib'));
+      expect(mainCheckoutOf(app)).toBe(app);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -100,4 +100,19 @@ describe('affiliation service', () => {
     service.observeFleet([{ peerId: SELF, isLocal: true, state: 'connected' }]);
     expect(service.of(far)).toBeUndefined();
   });
+
+  it('places a session no listing names yet by the listings’ own rule', () => {
+    const service = createAffiliationService({
+      placeOf: (dir) => (dir.startsWith('/repo/') ? '/repo' : dir),
+    });
+    expect(service.ofOrPlace('new', '/repo/apps/x')).toEqual({
+      kind: 'place',
+      key: 'place:/repo',
+      label: 'repo',
+    });
+    service.observe('local', [shell('new', { target: CLAUDE })]);
+    expect(
+      service.ofOrPlace(terminalSessionKey('new'), '/repo/apps/x').key
+    ).toBe(CLAUDE);
+  });
 });

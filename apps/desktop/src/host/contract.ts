@@ -559,8 +559,6 @@ export interface N10HostApi {
    *  each a tab in its own group. The open repository's own are left
    *  out — the sidebar describes those. */
   listForeignSessions(): Promise<ForeignSessionSummary[]>;
-  /** This machine's Orchestra orchestrators and their players, for the
-   *  tab strip to group player tabs under their orchestrator's tab. */
   /** Debounced per-session agent activity (same registry as the TUI's
    *  sidebar spinner): `active` = producing output now, `flashing` =
    *  went idle after a real work streak and the user hasn't looked. */

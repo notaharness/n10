@@ -34,9 +34,10 @@ export interface TerminalLaunch {
 export interface TerminalPorts {
   started(name: string, previousName?: string): void;
   ended(name: string): void;
-  /** What each terminal belongs to, once a listing has named it: the
-   *  repository service's, so both share one answer. */
-  affiliations?: Pick<AffiliationService, 'of'>;
+  /** What each terminal belongs to: the repository service's, so both
+   *  share one answer, and a terminal no listing names yet is placed by
+   *  the same rule. */
+  affiliations?: Pick<AffiliationService, 'ofOrPlace'>;
 }
 
 function assertLaunchableCwd(cwd: string): void {
@@ -61,7 +62,9 @@ function directoryFor(req: TerminalLaunch, machine?: string): Promise<string> {
 /** Process-wide directory terminals survive repository selection changes. */
 export function createTerminalService(ports: TerminalPorts) {
   const facts = (name: string, record: TerminalRecord) =>
-    terminalFacts(name, record, ports.affiliations?.of(name));
+    terminalFacts(name, record, (machine) =>
+      ports.affiliations?.ofOrPlace(name, record.cwd, machine)
+    );
   const known = new Map<string, TerminalRecord>();
   const starting = new Map<
     string,

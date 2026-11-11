@@ -287,9 +287,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   nothing but components; otherwise it re-runs it, reminting any context
   in it under a provider still mounted. New and touched modules keep
   contexts, hooks and helpers out of component modules
-  (`lib/fleet/fleet-context.ts` beside `fleet-provider.tsx`); older ones
-  that still mix them (`lib/tabs/tabs.tsx`, `lib/repo-context.tsx`, …)
-  are accepted until they are next changed.
+  (`lib/fleet/fleet-context.ts` beside `fleet-provider.tsx`,
+  `lib/tabs/tabs.ts` beside `tabs-provider.tsx`); older ones that still
+  mix them (`lib/repo-context.tsx`, …) are accepted until they are next
+  changed.
 - The theme painted is the host's (`services/theme.ts`), which main
   posts from `nativeTheme`; `lib/theme.ts` gives the UI class and every
   terminal that one value. Do not paint from `prefers-color-scheme`. Only

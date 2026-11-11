@@ -290,6 +290,38 @@ test.describe('Tab groups', () => {
     await expect.poll(order).toEqual({ home: 1, player: 2, alpha: 0 });
   });
 
+  test('a member carried out of its group is told it stays there', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    await createWorktree(page, 'alpha');
+    const first = spawnAgent(repoPath, homeDir);
+    const second = spawnAgent(repoPath, homeDir);
+    branches.push(first, second);
+    markOrchestrator(homeDir);
+    await expect(countOf(page, CLAUDE)).toHaveText('3', { timeout: 30_000 });
+    await chipOf(page, CLAUDE).locator('[data-group-disclosure]').click();
+    const player = tab(page, new RegExp(first));
+    await expect(player).toBeVisible();
+    const from = await player.boundingBox();
+    // Down off the strip, out of the group's box.
+    await page.mouse.move(
+      from!.x + from!.width / 2,
+      from!.y + from!.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(from!.x + from!.width / 2, from!.y + 160, {
+      steps: 15,
+    });
+    await expect(page.locator('[data-group-drag-hint]')).toHaveText(
+      'Tabs stay in their group'
+    );
+    await page.mouse.up();
+    await expect(page.locator('[data-group-drag-hint]')).toHaveCount(0);
+    await expect(group(page, CLAUDE).getByRole('tab')).toHaveCount(3);
+    await expect(group(page, CLAUDE)).toContainText(first);
+  });
+
   test('opens the roster on a rest, not on focus', async ({ desktop }) => {
     const { page, repoPath, homeDir } = desktop;
     branches.push(spawnAgent(repoPath, homeDir));
