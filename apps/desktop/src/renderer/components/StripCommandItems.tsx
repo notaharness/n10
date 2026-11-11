@@ -16,9 +16,9 @@ function shortcutText(keys: Parameters<typeof keysToDisplayString>[0]): string {
   return keysToDisplayString(keys) || 'Not assigned';
 }
 
-/** The palette's commands on the strip: the attention walk, collapsing
- *  other groups, and — with a tab active — pinning it, and renaming,
- *  tiling or following its group. */
+/** The palette's commands on the strip: the attention walk and — with
+ *  a tab active — pinning it, and renaming, tiling or following its
+ *  group. */
 export function StripCommandItems({ close }: { close: () => void }) {
   const tabs = useTabs();
   const bindings = useDesktopBindings();

@@ -1210,7 +1210,7 @@ describe('agents alive in other repositories', () => {
   });
 });
 
-describe('moving a group and collapsing', () => {
+describe('moving a group', () => {
   it('moves a group’s tabs as one block, in their order, past another tab', () => {
     let s = open(empty, 'branch:a');
     s = open(s, 'branch:b');
