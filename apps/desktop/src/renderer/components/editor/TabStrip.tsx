@@ -26,14 +26,18 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { collisionsEndingAt, END_ID, groupEndId } from './strip-collisions.js';
+import { useEdgeAutoScroll } from './use-edge-auto-scroll.js';
+import { StripScrollArrows } from './StripScrollArrows.js';
 import {
   acceptsDrop,
   dropMove,
@@ -42,6 +46,7 @@ import {
   type StripDragData,
 } from './strip-drag.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
+import { setStripDragging } from '../../lib/tabs/tab-switching.js';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
 import { cn } from '../../lib/utils.js';
 import {
@@ -147,7 +152,12 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
           : [restrictToHorizontalAxis, restrictToParentElement]
       }
       accessibility={{ announcements, screenReaderInstructions }}
-      onDragEnd={onDragEnd}
+      onDragStart={() => setStripDragging(true)}
+      onDragCancel={() => setStripDragging(false)}
+      onDragEnd={(event) => {
+        setStripDragging(false);
+        onDragEnd(event);
+      }}
     >
       <StripBlocksReport.Provider value={reportBlocks}>
         {children}
@@ -169,33 +179,73 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
 export function TabStrip({
   blocks,
   children,
+  controls,
 }: {
   /** Each block's sortable id and its tabs, in strip order. */
   blocks: readonly { id: string; ids: readonly string[] }[];
   children: ReactNode;
+  controls: ReactNode;
 }) {
   const wrap = useDesktopPrefs().tabOverflow === 'wrap';
   const report = useContext(StripBlocksReport);
   useLayoutEffect(() => report(blocks.map((b) => b.ids)), [report, blocks]);
+  const track = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({
+    overflow: false,
+    left: false,
+    right: false,
+  });
+  const blockKey = blocks.map((block) => block.id).join('\n');
+  const update = () => {
+    const el = track.current;
+    if (!el) return;
+    setEdges({
+      overflow: el.scrollWidth > el.clientWidth + 1,
+      left: el.scrollLeft > 1,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    });
+  };
+  useEffect(() => {
+    const el = track.current;
+    if (!el) return;
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    for (const child of el.children) observer.observe(child);
+    update();
+    return () => observer.disconnect();
+  }, [blockKey, wrap]);
+  useEdgeAutoScroll(track, !wrap);
   return (
     <SortableContext
       items={blocks.map((b) => b.id)}
       strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
     >
-      <div
-        role="tablist"
-        aria-label="Open tabs"
-        data-overflow={wrap ? 'wrap' : 'scroll'}
-        className={cn(
-          'flex shrink-0 items-stretch gap-2 border-b border-border bg-tab',
-          wrap
-            ? // Every row but the last is ruled off from the one below.
-              'flex-wrap [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
-            : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+      <div className="flex min-w-0 shrink-0 border-b border-border bg-tab">
+        <div
+          ref={track}
+          role="tablist"
+          aria-label="Open tabs"
+          data-overflow={wrap ? 'wrap' : 'scroll'}
+          className={cn(
+            'flex min-w-0 flex-1 items-stretch gap-2 bg-tab',
+            wrap
+              ? // Every row but the last is ruled off from the one below.
+                'flex-wrap [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
+              : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          )}
+          onScroll={update}
+        >
+          {children}
+          <StripEnd />
+        </div>
+        {!wrap && edges.overflow && (
+          <StripScrollArrows
+            left={edges.left}
+            right={edges.right}
+            track={track}
+          />
         )}
-      >
-        {children}
-        <StripEnd />
+        {controls}
       </div>
     </SortableContext>
   );

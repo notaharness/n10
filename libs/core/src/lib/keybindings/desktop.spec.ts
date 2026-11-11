@@ -30,6 +30,8 @@ describe('desktop default bindings', () => {
     ['PageUp', { ctrlKey: true }, 'desktop.tabs.previous'],
     ['Tab', { ctrlKey: true }, 'desktop.tabs.cycle-next'],
     ['Tab', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.cycle-previous'],
+    ['a', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.attention'],
+    ['j', { ctrlKey: true, shiftKey: true }, 'desktop.groups.collapse-others'],
   ] as const)('%s with %o fires %s', (key, mods, action) => {
     expect(resolveDesktopAction(press(key, mods), defaults)).toBe(action);
   });
@@ -47,11 +49,30 @@ describe('desktop default bindings', () => {
   it('reads as the chords the settings page and dialog show', () => {
     expect(
       Object.values(DESKTOP_DEFAULT_BINDINGS).map((d) => keysToDisplayString(d))
-    ).toEqual(['Ctrl+PgDn', 'Ctrl+PgUp', 'Ctrl+Tab', 'Ctrl+Shift+Tab']);
+    ).toEqual([
+      'Ctrl+PgDn',
+      'Ctrl+PgUp',
+      'Ctrl+Tab',
+      'Ctrl+Shift+Tab',
+      'Ctrl+Shift+a',
+      'Ctrl+Shift+j',
+    ]);
   });
 });
 
 describe('desktop overrides', () => {
+  it('leaves a new default unassigned when a user override owns its chord', () => {
+    const bindings = desktopBindings({
+      'desktop.tabs.next': [{ ctrl: true, shift: true, input: 'a' }],
+    });
+    expect(bindings['desktop.tabs.attention']).toEqual([]);
+    expect(
+      resolveDesktopAction(
+        press('a', { ctrlKey: true, shiftKey: true }),
+        bindings
+      )
+    ).toBe('desktop.tabs.next');
+  });
   it('replace the default for their action only', () => {
     const bindings = desktopBindings({
       'desktop.tabs.cycle-next': [{ meta: true, input: 'n' }],

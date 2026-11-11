@@ -113,7 +113,7 @@ test.describe('Tab strip overflow', () => {
       .toEqual(['spike-front-truncation', ...MANY.slice(0, -1)]);
   });
 
-  test('a full row is shared out among its tabs, and the last row keeps their own widths', async ({
+  test('wrapped rows stay inside the fixed control rail', async ({
     desktop,
   }) => {
     const { page } = desktop;
@@ -127,14 +127,15 @@ test.describe('Tab strip overflow', () => {
     for (const e of edges) ends.set(e.top, e.right);
     const stripBox = await box(strip(page));
     const stripRight = stripBox.x + stripBox.width;
+    const control = await box(page.getByRole('button', { name: 'All tabs' }));
+    expect(control.x).toBeGreaterThanOrEqual(stripRight);
     const rowEnds = [...ends.values()];
     expect(rowEnds.length).toBeGreaterThan(1);
-    for (const end of rowEnds.slice(0, -1))
-      expect(end).toBeCloseTo(stripRight, 0);
+    for (const end of rowEnds) expect(end).toBeLessThanOrEqual(stripRight);
     expect(rowEnds.at(-1)).toBeLessThan(stripRight - 40);
   });
 
-  test('over the room after the last tab, a dragged tab opens the end slot and drops there', async ({
+  test('dragging a group member to its last member moves it to the end', async ({
     desktop,
   }) => {
     const { page } = desktop;
@@ -145,14 +146,9 @@ test.describe('Tab strip overflow', () => {
 
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
     await page.mouse.down();
-    await page.mouse.move(to.x + to.width + 40, to.y + to.height / 2, {
+    await page.mouse.move(to.x + to.width * 0.75, to.y + to.height / 2, {
       steps: 15,
     });
-    // Before the drop, the last tab has slid aside to open the end slot,
-    // as it does with the pointer over it.
-    await expect
-      .poll(() => last.evaluate((el) => el.style.transform))
-      .toMatch(/^translate3d\((?!0px, 0px)/);
     await page.mouse.up();
     await expect
       .poll(() => tabNames(page))

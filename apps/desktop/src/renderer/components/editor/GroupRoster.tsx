@@ -85,7 +85,7 @@ function rowName(
     .join(', ');
 }
 
-function RosterRow({
+export function RosterRow({
   face,
   active,
   onJump,
@@ -147,7 +147,7 @@ function RosterRow({
 
 /** Arrow keys walk the rows without wrapping; Home and End go to the
  *  ends. */
-function walkRows(e: KeyboardEvent<HTMLUListElement>): void {
+export function walkRows(e: KeyboardEvent<HTMLElement>): void {
   const rows = [
     ...e.currentTarget.querySelectorAll<HTMLElement>('[data-roster-row]'),
   ];

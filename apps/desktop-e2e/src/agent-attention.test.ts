@@ -44,8 +44,20 @@ test.describe('An agent that finishes while you are elsewhere', () => {
       timeout: 30_000,
     });
 
+    await expect(
+      page.getByRole('button', { name: 'All tabs, 1 need attention' })
+    ).toBeVisible();
+    await page.keyboard.press('Control+Shift+a');
+    await expect(tab(page, /worker/)).toHaveAttribute('aria-selected', 'true');
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.activeElement?.classList.contains('xterm-helper-textarea')
+        )
+      )
+      .toBe(true);
+
     // Looking at it is what clears it.
-    await tab(page, /worker/).click();
     await expect(tab(page, /worker/)).not.toHaveClass(/tab-attention/, {
       timeout: 20_000,
     });

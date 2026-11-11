@@ -14,7 +14,9 @@ export type DesktopActionId =
   | 'desktop.tabs.next'
   | 'desktop.tabs.previous'
   | 'desktop.tabs.cycle-next'
-  | 'desktop.tabs.cycle-previous';
+  | 'desktop.tabs.cycle-previous'
+  | 'desktop.tabs.attention'
+  | 'desktop.groups.collapse-others';
 
 export const DESKTOP_ACTIONS: readonly {
   id: DesktopActionId;
@@ -41,6 +43,16 @@ export const DESKTOP_ACTIONS: readonly {
     label: 'Cycle tabs backwards',
     description: 'Along the strip, or by recent use when that is on.',
   },
+  {
+    id: 'desktop.tabs.attention',
+    label: 'Next attention',
+    description: 'Visit tabs with new output.',
+  },
+  {
+    id: 'desktop.groups.collapse-others',
+    label: 'Collapse others',
+    description: 'Keep the active group open and collapse other groups.',
+  },
 ];
 
 export type DesktopBindings = Record<DesktopActionId, KeyDescriptor[]>;
@@ -52,6 +64,8 @@ export const DESKTOP_DEFAULT_BINDINGS: DesktopBindings = {
   'desktop.tabs.cycle-previous': [
     { ctrl: true, shift: true, flags: { tab: true } },
   ],
+  'desktop.tabs.attention': [{ ctrl: true, shift: true, input: 'a' }],
+  'desktop.groups.collapse-others': [{ ctrl: true, shift: true, input: 'j' }],
 };
 
 export function isDesktopActionId(id: string): id is DesktopActionId {
@@ -219,5 +233,28 @@ export function desktopOverrides(
 export function desktopBindings(
   overrides: Record<string, unknown> | undefined
 ): DesktopBindings {
-  return { ...DESKTOP_DEFAULT_BINDINGS, ...desktopOverrides(overrides) };
+  const custom = desktopOverrides(overrides);
+  const resolved = { ...DESKTOP_DEFAULT_BINDINGS, ...custom };
+  // Persisted user choices win when a newly introduced default uses
+  // their chord. The new action stays visible, without a binding.
+  for (const id of [
+    'desktop.tabs.attention',
+    'desktop.groups.collapse-others',
+  ] as const) {
+    if (id in custom) continue;
+    if (
+      resolved[id].some((binding) =>
+        Object.entries(custom).some(
+          ([other, choices]) =>
+            other !== id &&
+            choices?.some(
+              (choice) =>
+                keyDescriptorToString(choice) === keyDescriptorToString(binding)
+            )
+        )
+      )
+    )
+      resolved[id] = [];
+  }
+  return resolved;
 }

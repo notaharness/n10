@@ -119,7 +119,7 @@ function ShortcutRow({ actionId }: { actionId: DesktopActionId }) {
           <Button
             variant="outline"
             size="sm"
-            className="min-w-36 font-mono"
+            className="min-w-36"
             data-testid={`shortcut-${actionId}`}
             aria-label={`Shortcut for ${
               ACTION.get(actionId)?.label ?? actionId
@@ -133,7 +133,7 @@ function ShortcutRow({ actionId }: { actionId: DesktopActionId }) {
           >
             {recording
               ? 'Press keys…'
-              : keysToDisplayString(bindings[actionId])}
+              : keysToDisplayString(bindings[actionId]) || 'Not assigned'}
           </Button>
         </>
       }

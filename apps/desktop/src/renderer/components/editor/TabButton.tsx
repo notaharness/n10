@@ -167,6 +167,7 @@ export function TabButton({
       }}
       title={tabTitle(tab, foreignRepo)}
       data-face={kind}
+      data-tab-id={tab.id}
       data-unseen={face.unseen || undefined}
       className={tabClassName({
         active,
