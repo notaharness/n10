@@ -80,11 +80,17 @@ describe('strip drag', () => {
   it('moves a block onto another pane’s block beside it there', () => {
     const left = { ...block(['a', 'b'], 0), pane: 'pane-1' };
     const right = { ...block(['c', 'd'], 2), pane: 'pane-2' };
-    expect(dropMove('block:g', left, 'block:h', right, [['a', 'b']])).toEqual({
+    // On the side of it the pointer is on, whatever either index.
+    expect(
+      dropMove('block:g', left, 'block:h', right, [['a', 'b']], 'after')
+    ).toEqual({ kind: 'move', ids: ['a', 'b'], targetId: 'd', side: 'after' });
+    expect(
+      dropMove('block:g', left, 'block:h', right, [['a', 'b']], 'before')
+    ).toEqual({
       kind: 'move',
       ids: ['a', 'b'],
-      targetId: 'd',
-      side: 'after',
+      targetId: 'c',
+      side: 'before',
     });
   });
   it('makes no move onto itself or another group’s member', () => {

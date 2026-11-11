@@ -40,6 +40,15 @@ type Drag = Pick<DragEndEvent, 'active' | 'over'>;
  * own events do, and each one re-reads the zone under it.
  */
 let pointer: { x: number; y: number } | null = null;
+
+/** Which half of `rect` the pointer is over, left or right: a strip drop
+ *  across panes lands on that side. */
+export function pointerSide(rect: {
+  left: number;
+  width: number;
+}): 'before' | 'after' {
+  return pointer && pointer.x > rect.left + rect.width / 2 ? 'after' : 'before';
+}
 let following: { drag: Drag; ws: Workspace } | null = null;
 
 function followPointer(e: PointerEvent) {

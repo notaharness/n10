@@ -23,7 +23,7 @@ import {
   ChordKeyboardSensor,
   screenReaderInstructions,
 } from './tab-keyboard.js';
-import { usePaneDrop } from './use-pane-drop.js';
+import { pointerSide, usePaneDrop } from './use-pane-drop.js';
 
 /** How far the pointer travels before a press becomes a drag, so
  *  clicks and double clicks on a tab stay clicks. */
@@ -71,7 +71,8 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
       dragged,
       String(over.id),
       target,
-      blocks.current.get(dragged.pane ?? '') ?? []
+      blocks.current.get(dragged.pane ?? '') ?? [],
+      pointerSide(over.rect)
     );
     if (drop?.kind === 'move')
       tabs.moveTabs(drop.ids, drop.targetId, drop.side);

@@ -84,21 +84,30 @@ export type StripDrop =
  *  block there (the reducer moves them across, `workspace-reduce.ts`). */
 type BlockData = Extract<StripDragData, { kind: 'block' }>;
 
-function beside(dragged: BlockData, over: BlockData): StripDrop | null {
-  const side = dragged.index < over.index ? 'after' : 'before';
+const samePane = (a: StripDragData, b: StripDragData) =>
+  (a.pane ?? '') === (b.pane ?? '');
+
+function beside(
+  dragged: BlockData,
+  over: BlockData,
+  side: 'before' | 'after' = 'before'
+): StripDrop | null {
   const targetId = side === 'after' ? over.ids.at(-1) : over.ids[0];
   return targetId ? { kind: 'move', ids: dragged.ids, targetId, side } : null;
 }
 
 /** The move a drop makes. `null` for a drop on itself, nowhere legal, or
  *  from a strip that has changed under the drag. `blocks` are the
- *  dragged block's pane's, as presented. */
+ *  dragged block's pane's, as presented. Onto another pane's block, the
+ *  tabs land on the side of it the pointer is on (`pointerSide`, before
+ *  when unknown): positions in two strips say nothing of each other. */
 export function dropMove(
   activeId: string,
   dragged: StripDragData,
   overId: string,
   over: StripDragData,
-  blocks: StripBlocks
+  blocks: StripBlocks,
+  pointerSide?: 'before' | 'after'
 ): StripDrop | null {
   if (activeId === overId || !acceptsDrop(over, dragged)) return null;
   if (dragged.kind === 'member') {
@@ -108,7 +117,7 @@ export function dropMove(
     return { kind: 'move', ids: [activeId], targetId: overId, side };
   }
   if (over.kind !== 'block') return null;
-  if ((dragged.pane ?? '') !== (over.pane ?? '')) return beside(dragged, over);
+  if (!samePane(dragged, over)) return beside(dragged, over, pointerSide);
   const from = dragged.index;
   const to = over.index;
   if (from === to || !sameIds(blocks[from], dragged.ids) || !blocks[to])
