@@ -1,5 +1,7 @@
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
 import { clickAppMenuItem } from './menu.js';
 import { terminalSessionTags } from '@n10/core/testing/session-tags';
 import { listTaggedSessions, socketEnv, tagTmuxSession } from './tmux.js';
@@ -117,4 +119,27 @@ export function startSurvivingTerminal(
     }),
     opts.homeDir
   );
+}
+
+/**
+ * Shell tabs that stand alone on the strip: each runs in a directory of
+ * its own (`<name>-XXXXXX` under the fixture HOME, which teardown
+ * removes), so no place gathers two of them behind a chip. Their labels
+ * start with `name`. For specs of the strip's own mechanics, which need
+ * tabs on the strip rather than in a group's roster.
+ */
+export function startLoneShells(
+  homeDir: string,
+  names: readonly string[]
+): void {
+  const root = join(homeDir, 'places');
+  mkdirSync(root, { recursive: true });
+  for (const name of names) {
+    startSurvivingTerminal({
+      name: `${name}-shell`,
+      cwd: mkdtempSync(join(root, `${name}-`)),
+      command: 'sleep 600',
+      homeDir,
+    });
+  }
 }

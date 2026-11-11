@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
-import type { Page } from '@playwright/test';
+import { join } from 'node:path';
+import type { Locator, Page } from '@playwright/test';
 import { orchestraTags } from '@n10/core/testing/session-tags';
 import { test, expect } from './fixtures/desktop.js';
 import { createWorktree, focusTerminal, tab } from './setup/app.js';
@@ -30,10 +30,18 @@ const CLAUDE = 'claude:5afe7e11-0000-4abc-8def-0123456789ab';
 const ORCHESTRATOR = 'supervisor-shell';
 
 const panes = (page: Page) => page.locator('[data-pane-id]');
-const paneWith = (page: Page, branch: string) =>
-  page.locator('[data-pane-id]', { has: tab(page, new RegExp(branch)) });
-const chip = (page: Page) =>
-  page.locator(`[data-group-chip="${CLAUDE}"]`).first();
+const chipIn = (scope: Page | Locator) =>
+  scope.locator(`[data-group-chip="${CLAUDE}"]`);
+const chip = (page: Page) => chipIn(page).first();
+const countIn = (scope: Page | Locator) =>
+  chipIn(scope).locator('[data-group-count]');
+/** Choose `name`'s row in the roster of the group's chip in `scope`. */
+async function choose(page: Page, scope: Page | Locator, name: RegExp) {
+  await chipIn(scope).first().click();
+  const roster = page.locator('[data-group-roster]');
+  await roster.getByRole('button', { name }).click();
+  await expect(roster).toHaveCount(0);
+}
 const followLine = (page: Page) => page.locator('[data-follow-line]');
 
 test.describe('Supervising layouts', () => {
@@ -97,22 +105,23 @@ test.describe('Supervising layouts', () => {
     });
 
     await armContextMenuChoice(app, 'Tile group');
-    await chip(page).getByRole('tab').click({ button: 'right' });
+    await chip(page).click({ button: 'right' });
 
+    // Each pane shows the group as its own chip: the home in the source,
+    // the players beside it.
     await expect(panes(page)).toHaveCount(2);
     const home = panes(page).nth(0);
     const players = panes(page).nth(1);
-    await expect(home.getByRole('tab', { selected: true })).toHaveText(
-      new RegExp(basename(folder))
-    );
+    await expect(countIn(home)).toHaveText('1');
+    await expect(chipIn(home)).toHaveAttribute('aria-selected', 'true');
+    await expect(chipIn(home)).toHaveAttribute('data-home-tab', /.+/);
     await expect(tab(page, /alpha/)).toHaveCount(1);
     await expect(home.getByRole('tab', { name: /alpha/ })).toHaveCount(1);
+    await expect(countIn(players)).toHaveText('2');
+    await expect(chipIn(players)).toHaveAttribute('aria-selected', 'true');
     await expect(
-      players.getByRole('tab', { name: new RegExp(first) })
-    ).toBeVisible();
-    await expect(
-      players.getByRole('tab', { name: new RegExp(second) })
-    ).toBeVisible();
+      chipIn(players).locator('[data-group-active-label]')
+    ).toHaveText(new RegExp(`${first}|${second}`));
     // The source keeps focus, for supervision.
     await expect(home).toHaveAttribute('data-pane-focused', 'true');
   });
@@ -131,8 +140,8 @@ test.describe('Supervising layouts', () => {
       timeout: 30_000,
     });
     // The orchestrator's own terminal is shown, and typed in.
-    const home = chip(page).getByRole('tab');
-    await home.click();
+    const home = chip(page);
+    await choose(page, page, /^Orchestrator/);
     await expect(home).toHaveAttribute('aria-selected', 'true');
     await armContextMenuChoice(app, 'Rename group…');
     await home.click({ button: 'right' });
@@ -161,7 +170,7 @@ test.describe('Supervising layouts', () => {
     await expect(followLine(page)).toHaveText(/^Following /);
     await expect(followLine(page)).toContainText('Following Release crew');
     await expect(follow.locator('[data-follow-line]')).toHaveCount(1);
-    await expect(follow.getByRole('tab')).toHaveCount(2);
+    await expect(countIn(follow)).toHaveText('2');
     await expect(source).toHaveAttribute('data-pane-focused', 'true');
     await expect(home).toHaveAttribute('aria-selected', 'true');
     // Focus is where the menu left it, on the same tab element: the
@@ -175,11 +184,14 @@ test.describe('Supervising layouts', () => {
         [pressed, terminal] as const
       )
     ).toBe(true);
+    // The follow pane's chip names the member it shows.
     const shownIn = (branch: string) =>
-      follow.getByRole('tab', { name: new RegExp(branch) });
+      chipIn(follow).locator('[data-group-active-label]', {
+        hasText: branch,
+      });
     // It starts on the first in strip order; the other is `second`.
-    const selected = await follow
-      .getByRole('tab', { selected: true })
+    const selected = await chipIn(follow)
+      .locator('[data-group-active-label]')
       .innerText();
     const first = players.find((b) => selected.includes(b))!;
     const second = players.find((b) => b !== first)!;
@@ -187,44 +199,38 @@ test.describe('Supervising layouts', () => {
 
     // The other player's new output takes the follow pane; focus stays.
     go(second);
-    await expect(shownIn(second)).toHaveAttribute('aria-selected', 'true', {
-      timeout: 30_000,
-    });
+    await expect(shownIn(second)).toHaveCount(1, { timeout: 30_000 });
     await expect(source).toHaveAttribute('data-pane-focused', 'true');
     expect(
       await follow.evaluate((el) => el.contains(document.activeElement))
     ).toBe(false);
 
     // In the pane, the user's choice stays put while new output arrives.
-    await shownIn(first).click();
+    await choose(page, follow, new RegExp(first));
     await expect(follow).toHaveAttribute('data-pane-focused', 'true');
     await expect(followLine(page)).toHaveText(/^Following paused · /);
     // What it showed before is seen; only new output counts.
-    await expect(shownIn(second)).not.toHaveClass(/tab-attention/);
+    const newOutput = chipIn(follow).locator('[data-status="new-output"]');
+    await expect(newOutput).toHaveCount(0);
     go(second);
-    await expect(shownIn(second)).toHaveClass(/tab-attention/, {
-      timeout: 30_000,
-    });
+    await expect(newOutput).toHaveCount(1, { timeout: 30_000 });
     // Asserting that nothing switches needs a window: well past the
     // 250 ms a switch would wait for.
     // eslint-disable-next-line playwright/no-wait-for-timeout -- a negative check has no event to wait on
     await page.waitForTimeout(1_500);
-    await expect(shownIn(first)).toHaveAttribute('aria-selected', 'true');
+    await expect(shownIn(first)).toHaveCount(1);
 
     // Leaving the pane resumes: the waiting output is shown.
     await tab(page, /alpha/).click();
     await expect(source).toHaveAttribute('data-pane-focused', 'true');
     await expect(followLine(page)).toHaveText(/^Following (?!paused)/);
-    await expect(shownIn(second)).toHaveAttribute('aria-selected', 'true', {
-      timeout: 10_000,
-    });
+    await expect(shownIn(second)).toHaveCount(1, { timeout: 10_000 });
 
     // Stop following: the line goes, the pane and its tabs stay.
     await follow.getByRole('button', { name: 'Stop following' }).click();
     await expect(followLine(page)).toHaveCount(0);
     await expect(page.getByText(/^Stopped following /)).toBeVisible();
     await expect(panes(page)).toHaveCount(2);
-    await expect(follow.getByRole('tab')).toHaveCount(2);
-    await expect(paneWith(page, second)).toHaveCount(1);
+    await expect(countIn(follow)).toHaveText('2');
   });
 });
