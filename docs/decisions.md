@@ -914,15 +914,24 @@ an ordered list and its active tab, beside the workspace-wide sets);
 and foreign agent has a tab unless its session is dismissed. Every close
 dismisses the sessions of the tabs it takes away (`dismissKeyOf`: an item's
 stamped `session`, a terminal's name with its tmux creation time when the tab
-knew it); a sync forgets each one whose listing has it gone, or that has a
-tab again. A listing that has not answered (`entries`, `terminals` or
-`foreign` undefined) forgets nothing. So the record is never longer than the
-sessions running, closing an agent tab whose kill failed, or a foreign
-agent's, keeps it closed across syncs and restarts, and an agent started
-again later gets its tab. A terminal in a branch's checkout is dismissed as
-it is listed: it lives in the branch's tab. Item sessions carry no creation
-time, so a dismissed worktree whose agent is replaced while n10 is closed
-stays dismissed until that agent ends.
+knew it); a sync forgets each one that has ended, or that has a tab again.
+Only tmux says an agent ended: the foreign-session answer names every agent
+session alive here (`alive`), and an agent key goes once that lacks it and
+neither the sidebar nor the foreign listing reports it running. The
+sidebar's `running` means this host attached the session, which discovery
+may not have done yet, so it never ends one on its own. A foreign answer
+that left out another repository than the one open is no answer. A terminal
+key goes once a listing complete for its machine lacks it: the terminal
+listing comes with the machines whose discovery scan has finished, its
+terminals adopted (`scanned`), and until this machine's has there is no
+listing at all. An agent on another machine is in no answer here, so its
+dismissal lasts until its tab is opened again. So the record is never longer
+than the sessions running (here), closing an agent tab whose kill failed, or
+a foreign agent's, keeps it closed across syncs and restarts, and an agent
+started again later gets its tab. A terminal in a branch's checkout is
+dismissed as it is listed: it lives in the branch's tab. Item sessions carry
+no creation time, so a dismissed worktree whose agent is replaced while n10
+is closed stays dismissed until that agent ends.
 
 Pins are a flag set. `present` puts pinned tabs first, alone and outside
 their group, in pane order; unpinning leaves the order alone, so the tab
@@ -935,20 +944,27 @@ Group names are a map by affiliation key, set from the rename dialog
 
 The host keeps `~/.n10/workspace.json` (`services/workspace-file.ts`), beside
 the desktop prefs and shared by dev and installed builds. Saves are debounced
-and written whole through a temporary file and a rename, and the host writes
-a pending save on shutdown. A save resolves once its write landed; a failed
-one keeps the last good file and the renderer says so once. A file that does
-not parse, or carries an unknown version, is renamed aside and never
-overwritten, and the workspace starts empty. The renderer saves everything
+and written whole through a synced temporary file of each write's own and a
+rename; the host writes a pending save on shutdown, and before answering a
+load. Two running instances do not coordinate: the last writer wins the
+whole file. A save resolves once its write landed; a failed one keeps the
+last good file and the renderer says so once. A file that does not parse, or
+carries an unknown version, is renamed aside and never overwritten, and the
+workspace starts empty. Only a missing file means there is none: one that
+cannot be read, or set aside, makes the run read-only — the host refuses
+every save, and the renderer sends none, nor after a load that failed. The renderer saves everything
 but `unseen` (`lib/tabs/workspace-file.ts`), and a terminal tab only once a
 listing has dated it; it checks every field on restore and drops what does
-not hold. `TabsProvider` draws nothing until the restore has answered, so the
-first `sync-items` reconciles against the restored tabs. A restored terminal
-tab attaches nothing ("Reconnecting…") until a listing binds it: the same
-name and creation time binds; a listing without it closes it — a later
-session under its name gets its own tab — unless the tab is on another
-machine, which may be offline; a listing that does not know the creation
-time yet waits. Item tabs reconcile through the re-key rules.
+not hold (ids must be own keys and match their session or repository).
+`TabsProvider` shows the connecting state until the restore has answered, so
+the first `sync-items` reconciles against the restored tabs. A restored
+terminal tab attaches nothing ("Reconnecting…", or the remote banner while
+its machine is not connected) until a listing binds it: the same name and
+creation time binds; a listing complete for its machine without it closes
+it, pin and all — a later session under its name gets its own tab; a listing
+not complete for its machine, or that does not know the creation time yet,
+waits. Item tabs reconcile through the re-key rules. Collapse choices keep
+the latest 64.
 
 ## Plans and auto-fixing
 

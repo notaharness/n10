@@ -130,8 +130,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   for now, in the shape splits need. Reducer passes run on a pane's
   `Strip`. `~/.n10/workspace.json` (host `services/workspace-file.ts`) keeps
   it across restarts; `TabsProvider` restores it before the strip draws.
-  `dismissed`, pins, group names and restore binding: decisions.md "Tab
-  workspace".
+  Only tmux's `alive` answer ends an agent's dismissal, and only a terminal
+  listing complete for its machine (`scanned`) ends a terminal's or closes
+  a restored tab; the sidebar's `running` is "attached here". `dismissed`,
+  pins, group names and restore binding: decisions.md "Tab workspace".
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Sessions · Files) beside one content pane that
   swaps between Overview, diff, a session's terminal (mounted only while shown) and
