@@ -34,21 +34,28 @@ export function spareFor(
  * while the deferred id catches up. Without that, switching back to the
  * tab left last would show it, then the stale deferred one, then it
  * again, and never settle.
+ *
+ * A deferred tab another editor pane now holds (`elsewhere`) is never
+ * shown: that pane mounts it at once, and a session has one view. The
+ * live tab is shown instead.
  */
 export function shownIdFor({
   activeId,
   deferredId,
   spare,
   shown,
+  elsewhere = () => false,
 }: {
   activeId: string | null;
   deferredId: string | null;
   spare: Tab | null;
   shown: Tab | null;
+  elsewhere?: (id: string) => boolean;
 }): string | null {
   const rendered =
     activeId !== null && (spare?.id === activeId || shown?.id === activeId);
-  return rendered ? activeId : deferredId;
+  if (rendered) return activeId;
+  return deferredId !== null && elsewhere(deferredId) ? activeId : deferredId;
 }
 
 /**

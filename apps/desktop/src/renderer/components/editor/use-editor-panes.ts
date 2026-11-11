@@ -36,6 +36,7 @@ export function useEditorPanes(
     deferredId: paneActiveId,
     spare,
     shown: shown.tab,
+    elsewhere: (id) => others.some((t) => t.id === id),
   });
   const live = shownId === activeId;
   const activePane = (live ? tabs : paneTabs).find((t) => t.id === shownId);
