@@ -326,7 +326,7 @@ function WorkspaceInner({
               <PanelSeparator
                 disableDoubleClick
                 onDoubleClick={sidebarWidth.onReset}
-                className="relative w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary"
+                className="relative z-10 w-px bg-border transition-colors after:absolute after:inset-y-0 after:-left-1 after:w-2 hover:bg-primary data-[resize-handle-state=drag]:bg-primary"
               />
             </>
           )}
