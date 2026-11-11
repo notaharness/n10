@@ -860,44 +860,49 @@ The strip derives groups from a pane's tab order on every render
 (`lib/tabs/tab-groups.ts` `present`): one per affiliation, in the order of
 each group's first tab, members in their relative order, the home's tab
 first. Contiguity is derived, never an invariant: nothing re-sorts the tabs
-on sync and no move is refused. Every parent group shows a chip, and a place
-group of two or more; a lone place tab is an ordinary tab. The chip is three
-sibling controls: its one icon, a folder closed or open, which collapses and
-expands it; a body (the home's own tab, or a label that opens the roster for
-a stand-in parent or a place); and the roster button
-with the group's tab count and the count of each state present. Status comes
-from the activity snapshot only: `flashing` is new output, `active` working.
-Nothing yet says blocked, failed or done, and none is inferred from silence,
-an exit or a pull request; the status type keeps those states for a source
-(tmux's pane program state). The roster (`GroupRoster.tsx`) is a controlled
-popover anchored to the chip: resting on the chip opens it without focus,
-a press pins it, Alt+ArrowDown opens it on the active row, Escape returns
-focus to its button and keeps hover from reopening it until the pointer
-leaves.
+on sync and no move is refused. Every parent group is a chip, and so is a
+place group of two or more; a lone place tab is an ordinary tab. Nothing of
+a chipped group expands into the row: the strip shows pinned tabs, then one
+block per chip or lone tab, so a group costs the same room however many
+tabs it holds, and a member is one hover away. The chip is one control
+(`GroupChip.tsx`): a folder, open while its roster is; the group's name; its
+tab count; and the count of each state present. Status comes from the
+activity snapshot only: `flashing` is new output, `active` working. Nothing
+yet says blocked, failed or done, and none is inferred from silence, an exit
+or a pull request; the status type keeps those states for a source (tmux's
+pane program state). While the pane's active tab is a member, the chip takes
+the active tab's treatment and reads "group / member", the group's part cut
+first; it is the row's Tab stop then, as the active tab would be.
 
-Collapse is in `Workspace.collapsed`, an explicit choice per group over one
-rule by affiliation kind (`initiallyCollapsed`: a parent group starts
-collapsed, its players behind the chip, and a place group expanded),
-saved with the workspace. A collapsed group shows its chip alone; activating a tab in
-it from anywhere expands it, while collapsing the group the active tab is in
-leaves the active content as it is. A collapsed group the active tab joins
-behind its chip, when a later scan gives it its parent, expands too. Collapse others is on the native menus.
-Positional keyboard switching walks the presented order, collapsed members
-included (`tab-switching.ts`). Close Others closes every other unpinned tab.
+The roster (`GroupRoster.tsx`) is a controlled popover anchored to the chip,
+listing the home first ("Orchestrator …"), then the members in strip order,
+each with its state and the active one marked. Resting on the chip opens it
+without focus (400 ms, closing 180 ms after the pointer leaves chip and
+roster); a press, Enter or Alt+ArrowDown pins it open, the keyboard with its
+rows focused; Escape returns focus to the chip unless a rest opened it over
+a terminal. Choosing a row shows that tab and closes the roster, and the row
+of tabs does not change. A row's native menu is the tab's own (pin, split,
+move to a pane, close); the chip's is the group's (show tabs, rename, tile,
+follow). Pinning is how a member is kept in view: a pinned tab stands
+outside its group.
 
-Drag (`strip-drag.ts`): a member moves only among its group's members, and a
-group, dragged by its chip body, or a lone tab moves only between blocks.
+Positional keyboard switching walks the presented order, members behind
+chips included (`tab-switching.ts`): activating a member marks its chip.
+Close Others closes every other unpinned tab.
+
+Drag (`strip-drag.ts`): a chip or a lone tab moves between blocks; a pinned
+one only among the pinned. A member moves through its roster row's menu, not
+by dragging: the roster is a portal that closes as a drag starts, which
+would leave dnd-kit without the node it is dragging.
 Illegal places are disabled droppables (`useSortable`'s `disabled.droppable`),
 so pointer and keyboard drags meet only legal slots and the slot the strip
 opens is the one the drop takes. A block's drop arranges the whole strip in
 its presented order with the block moved, since the stored order may
 interleave groups; a group shown behind the one it follows moves with it as
-one block. The room after the last tab, the strip's or a wrapped group's, is
-the last legal place by index, not by dnd-kit's mount order. A member
-carried outside its group is told "Tabs stay in their group", and drags
-announce "Moving", "Position n of m", "Moved" and "Move cancelled". A home's
-tab selects on click, not on press, so dragging its group does not activate
-it.
+one block. The room after the last tab is the last legal place by index,
+not by dnd-kit's mount order. Drags announce "Moving", "Position n of m",
+"Moved" and "Move cancelled". A chip opens its roster on click, not on
+press, so dragging its group opens nothing.
 
 ### Contextual tab labels
 
@@ -924,7 +929,7 @@ that metadata and reserves a stable width for an agent's changing title.
 
 The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): tabs by id, a
 layout tree of splits over panes (each with its order and active tab), the
-focused pane, and the user's marks — pins, collapsed groups, group names and
+focused pane, and the user's marks — pins, group names and
 dismissed sessions — beside `unseen` and `lastActiveByRepo`. Every reducer
 pass works on one pane's `Strip` (its tabs as an ordered list and its active
 tab, beside the workspace-wide sets); `reduceStrip` is the pass layer.
@@ -1059,8 +1064,7 @@ its machine is not connected) until a listing binds it: the same name and
 creation time binds; a listing complete for its machine without it closes
 it, pin and all — a later session under its name gets its own tab; a listing
 not complete for its machine, or that does not know the creation time yet,
-waits. Item tabs reconcile through the re-key rules. Collapse choices keep
-the latest 64.
+waits. Item tabs reconcile through the re-key rules.
 
 One deliberate exception to "an unavailable repository is not proof of
 deletion": a restored item tab whose repository directory is gone from this

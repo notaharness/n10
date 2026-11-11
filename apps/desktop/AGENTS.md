@@ -123,7 +123,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   rows (`lib/tabs/tab-affiliation.ts`). Groups are presentation only:
   `present` (`lib/tabs/tab-groups.ts`) derives them from a pane's tab order
   every render, pinned tabs first, and positional switching walks its
-  order. Collapse is `Workspace.collapsed`; drag legality is
+  order. Each group is one chip whose roster lists its tabs; nothing
+  expands into the row. Drag legality is
   `components/editor/strip-drag.ts`. Rules and reasoning: decisions.md
   "Tab groups".
 - The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): a layout
