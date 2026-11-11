@@ -9,20 +9,25 @@ import type { TabFace } from '../../lib/tabs/tab-presentation.js';
 import { cn } from '../../lib/utils.js';
 
 /** The tab's kind icon, with the agent's state hung off its corner,
- *  set off by a ring of the tab's own background. */
+ *  set off by a ring of the tab's own background: the spinner while it
+ *  works (`working`, else its snapshot's word), else a dot while it
+ *  runs. */
 export function TabIcon({
   Icon,
   running,
   snapshot,
   active,
+  working,
   iconClassName = 'size-4',
 }: {
   Icon: typeof SettingsIcon;
   running: boolean;
   snapshot: SessionActivitySnapshot | undefined;
   active: boolean;
+  working?: boolean;
   iconClassName?: string;
 }) {
+  const spinning = working ?? snapshot?.active ?? false;
   const fill = active ? 'bg-tab-active' : 'bg-tab group-hover:bg-tab-hover';
   const ring = active
     ? 'ring-tab-active'
@@ -30,7 +35,7 @@ export function TabIcon({
   return (
     <span className="relative flex shrink-0">
       <Icon aria-hidden className={iconClassName} />
-      {snapshot?.active ? (
+      {spinning ? (
         <span
           className={cn(
             'absolute -right-1 -bottom-1 flex items-center justify-center rounded-full p-0.5',

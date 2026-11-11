@@ -1,16 +1,13 @@
-import { FolderClosedIcon, FolderOpenIcon } from 'lucide-react';
 import type { KeyboardEvent, RefObject } from 'react';
 import { toast } from 'sonner';
 import { harnessLabel } from '@n10/core/ui';
-import { groupSummary } from '../../lib/tabs/group-status.js';
-import type { TabGroup, TabStatus } from '../../lib/tabs/tab-groups.js';
-import { cn, errorMessage } from '../../lib/utils.js';
+import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
+import { chipSignal, groupSummary } from '../../lib/tabs/group-status.js';
+import type { TabGroup } from '../../lib/tabs/tab-groups.js';
+import { errorMessage } from '../../lib/utils.js';
 import { PopoverAnchor } from '../ui/popover.js';
-import { StatusClusters } from './StatusClusters.js';
-import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
-import { usePlanTotal } from '../../lib/plan/plan.js';
-import { PlanCountBadge, RepoBand } from './tab-marks.js';
-import { TabIcon } from './TabIcon.js';
+import { ChipFace } from './ChipLook.js';
+import { chipClassName } from './tab-look-class.js';
 import { runGroupMenu, type GroupMenu } from './tab-menu.js';
 import type { useSortableTab } from './TabStrip.js';
 import type { useRosterOpen } from './use-roster-open.js';
@@ -40,82 +37,22 @@ function chipTitle(
     .join('\n');
 }
 
-/** The folder, open while the roster is: on a home's chip it carries
- *  the home's activity, as the home's own tab icon would. */
-function ChipFolder({
-  head,
-  open,
-  active,
-}: {
-  head: TabFace | null;
-  open: boolean;
-  active: boolean;
-}) {
-  const Folder = open ? FolderOpenIcon : FolderClosedIcon;
-  if (!head) return <Folder aria-hidden className="size-3.5 shrink-0" />;
-  return (
-    <TabIcon
-      Icon={Folder}
-      running={head.item ? itemRunning(head.item) : head.running}
-      snapshot={head.snapshot}
-      active={active}
-    />
-  );
-}
-
-/**
- * The chip's name. With the pane's active tab among its members it reads
- * "group / member", as wide as a tab may be: the group's part is cut
- * first, so the member's label stays whole for as long as it can.
- */
-function ChipLabel({
-  label,
-  active,
-}: {
-  label: string;
-  active: TabFace | null;
-}) {
-  if (!active)
-    return (
-      <span data-group-label className="max-w-40 min-w-12 truncate">
-        {label}
-      </span>
-    );
-  return (
-    <span className="flex max-w-56 min-w-0 items-baseline gap-1">
-      <span
-        data-group-label
-        className="min-w-0 shrink-[100] truncate text-muted-foreground"
-      >
-        {label}
-      </span>
-      <span aria-hidden className="shrink-0 text-muted-foreground">
-        /
-      </span>
-      {/* Capped short of the whole width, so a long member's label
-          leaves the group a few letters rather than a bare "/". */}
-      <span data-group-active-label className="max-w-44 min-w-0 truncate">
-        {active.label}
-      </span>
-    </span>
-  );
-}
-
 /**
  * A group's chip: one control standing for the whole group on the
- * strip. Its folder, name, tab count and states. Pressing it shows the
- * group's first tab; Enter or Alt+ArrowDown opens the roster of its
- * tabs, as resting on it does; dragging it moves the group. It shows as active while the pane's
- * active tab is one of its members, and names that member.
+ * strip, drawn as a tab (`ChipFace`). Pressing it shows the group's
+ * first tab; Enter or Alt+ArrowDown opens the roster of its tabs, as
+ * resting on it does; dragging it moves the group. It shows as active
+ * while the pane's active tab is one of its members, and names that
+ * member. It blinks and spins for its orchestrator alone, or for any
+ * member of any other group (`chipSignal`).
  */
 export function GroupChip({
   group,
   label,
-  head,
-  statuses,
-  planIds,
+  faces,
   color,
   active,
+  dragging,
   setHandle,
   handle,
   roster,
@@ -126,14 +63,12 @@ export function GroupChip({
 }: {
   group: TabGroup;
   label: string;
-  head: TabFace | null;
-  statuses: readonly TabStatus[];
-  /** Its members' pull requests: the chip carries their plans' count,
-   *  which must show wherever the user has gone. */
-  planIds: readonly number[];
+  /** Its tabs' faces, in its order. */
+  faces: readonly TabFace[];
   color: string | null;
   /** The pane's active tab, when it is one of the group's. */
   active: TabFace | null;
+  dragging: boolean;
   setHandle: Sortable['setHandle'];
   handle: Sortable['handle'];
   roster: ReturnType<typeof useRosterOpen>;
@@ -144,8 +79,14 @@ export function GroupChip({
   /** A press of the chip (not the click a drop ends in). */
   onPress: () => void;
 }) {
+  const { tabOverflow } = useDesktopPrefs();
   const containsActive = active !== null;
-  const planned = usePlanTotal(planIds);
+  const head = group.head ? faces[0] ?? null : null;
+  const statuses = faces.map((f) => f.status);
+  const signal = chipSignal(
+    faces.map((f) => f.snapshot),
+    { parent: group.affiliation?.kind === 'parent', home: head !== null }
+  );
   return (
     <PopoverAnchor asChild>
       <div
@@ -179,30 +120,23 @@ export function GroupChip({
           );
         }}
         title={chipTitle(label, head, active)}
-        className={cn(
-          'group/chip relative my-0.5 flex h-8 shrink-0 cursor-default items-center gap-1.5 self-center overflow-hidden rounded-md border border-border pr-1.5 pl-1.5 text-[13px] leading-5 font-medium outline-none select-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-          containsActive || roster.open
-            ? 'bg-tab-active text-foreground'
-            : 'bg-tab text-muted-foreground hover:bg-tab-hover hover:text-foreground'
-        )}
+        className={chipClassName({
+          containsActive,
+          flashing: signal.flashing,
+          dragging,
+          wrap: tabOverflow === 'wrap',
+        })}
       >
-        {containsActive && (
-          <span
-            aria-hidden
-            className="absolute inset-x-0 top-0 h-0.5 bg-primary"
-          />
-        )}
-        <ChipFolder head={head} open={roster.open} active={containsActive} />
-        <ChipLabel label={label} active={active} />
-        <PlanCountBadge count={planned} />
-        <span
-          data-group-count
-          className="rounded bg-muted px-1 text-[11px] leading-4 tabular-nums text-muted-foreground"
-        >
-          {statuses.length}
-        </span>
-        <StatusClusters statuses={statuses} />
-        <RepoBand color={color} />
+        <ChipFace
+          head={head}
+          label={label}
+          active={active}
+          count={faces.length}
+          planIds={faces.flatMap((f) => f.item?.pr?.id ?? [])}
+          color={color}
+          signal={signal}
+          open={roster.open}
+        />
       </div>
     </PopoverAnchor>
   );

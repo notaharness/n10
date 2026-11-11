@@ -32,6 +32,14 @@ import { canShowTask } from './strip-labels.js';
 import { useTabFacts } from './use-tab-facts.js';
 import { useStripLabels } from './use-strip-labels.js';
 
+/** Where `tab` stands in its group: behind a chip, and its home. */
+function groupMarks(group: TabGroup | undefined, tab: Tab) {
+  return {
+    chipped: group?.chipped ?? false,
+    home: group?.head?.id === tab.id,
+  };
+}
+
 /** What a tab's button shows, wherever it is drawn: on the strip or as
  *  a roster row. */
 export interface TabFace {
@@ -54,6 +62,8 @@ export interface TabFace {
   branch?: string;
   harness?: string;
   chipped: boolean;
+  /** An orchestrator's own tab: the home its group's players report to. */
+  home: boolean;
 }
 
 export interface StripGroups {
@@ -184,7 +194,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
           ? terminalByName.get(tab.name)?.branch
           : undefined,
       harness: harnessOf(tab),
-      chipped: groupFor(tab)?.chipped ?? false,
+      ...groupMarks(groupFor(tab), tab),
     };
     faces.set(tab.id, face);
     return face;

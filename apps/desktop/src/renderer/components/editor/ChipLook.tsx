@@ -1,144 +1,146 @@
-import {
-  FolderClosedIcon,
-  FolderOpenIcon,
-  GripVerticalIcon,
-} from 'lucide-react';
+import { BrainIcon, FolderClosedIcon, FolderOpenIcon } from 'lucide-react';
+import type { ChipSignal } from '../../lib/tabs/group-status.js';
+import { usePlanTotal } from '../../lib/plan/plan.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
-import type { TabStatus } from '../../lib/tabs/tab-groups.js';
-import { cutSide } from '../../lib/tabs/tab-presentation.js';
-import { StatusClusters } from './StatusClusters.js';
-import { CHIP_BODY, chipClassName } from './tab-look-class.js';
-import { RepoBand } from './tab-marks.js';
+import { chipClassName } from './tab-look-class.js';
+import { PlanCountBadge, RepoBand } from './tab-marks.js';
 import { TabIcon } from './TabIcon.js';
-import { TabLabel } from './TabLabel.js';
-import { TabEnd } from './TabLook.js';
 import type { TabFace } from './use-strip-groups.js';
 
 /**
  * What a group's chip shows, drawn the same on the strip (`GroupChip`,
- * which wires each part to its control) and in the copy that follows
- * the pointer out of it (`CarriedOverlay`).
+ * which wires it to its control) and in the copy that follows the
+ * pointer out of it (`CarriedOverlay`). A chip is a tab to look at: the
+ * same frame, colours, blink and spinner, with a folder or an
+ * orchestrator's brain for its icon and its tab count at its end.
  */
 
-/** The grip a chip shows on hover or focus, in a slot kept for it. */
-export function Grip() {
-  return (
-    <GripVerticalIcon
-      aria-hidden
-      className="size-3.5 shrink-0 opacity-0 group-hover/chip:opacity-60 group-focus-within/chip:opacity-60"
-    />
-  );
-}
-
-/** The rule along the top of a chip whose group holds the active tab. */
-export function ChipActiveRule() {
-  return (
-    <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-primary" />
-  );
-}
-
-/** The chip's one icon, its disclosure's: a closed folder collapsed, an
- *  open one expanded, with the home's activity hanging off it. */
-export function ChipIcon({
+/** The chip's icon: an orchestrator's brain, with its home's running
+ *  dot, or a folder, open while the roster is. It spins while the
+ *  chip's signal says its group works. */
+function ChipIcon({
   head,
-  collapsed,
+  open,
   active,
+  working,
 }: {
   head: TabFace | null;
-  collapsed: boolean;
+  open: boolean;
   active: boolean;
+  working: boolean;
 }) {
-  const Folder = collapsed ? FolderClosedIcon : FolderOpenIcon;
-  return head ? (
+  const Icon = head ? BrainIcon : open ? FolderOpenIcon : FolderClosedIcon;
+  const running = head
+    ? head.item
+      ? itemRunning(head.item)
+      : head.running
+    : false;
+  return (
     <TabIcon
-      Icon={Folder}
-      iconClassName="size-3.5"
-      running={head.item ? itemRunning(head.item) : head.running}
-      snapshot={head.snapshot}
+      Icon={Icon}
+      running={running}
+      snapshot={undefined}
+      working={working}
       active={active}
     />
-  ) : (
-    <Folder aria-hidden className="size-3.5" />
   );
 }
 
-/** The home's label in the chip: the group's name, cut as the home's
- *  own label would be when it is that, with the home's marks. */
-export function HomeLabel({ face, name }: { face: TabFace; name: string }) {
-  const { label, labelKind: kind } = face;
-  return (
-    <>
-      <span className="flex max-w-40 min-w-16">
-        <TabLabel
-          label={name}
-          preview={face.tab.preview}
-          cut={name === label && face.labelSource !== 'task' ? cutSide(kind) : 'end'}
-        />
+/**
+ * The chip's name. With the pane's active tab among its members it reads
+ * "group / member", as wide as a tab may be: the group's part is cut
+ * first, and the member's label is capped short of the whole width, so
+ * a few letters of the group always show.
+ */
+function ChipLabel({
+  label,
+  active,
+}: {
+  label: string;
+  active: TabFace | null;
+}) {
+  if (!active)
+    return (
+      <span data-group-label className="min-w-0 flex-1 truncate">
+        {label}
       </span>
-      <TabEnd item={face.item} unseen={face.unseen} />
-      <Grip />
-    </>
+    );
+  return (
+    <span className="flex min-w-0 flex-1 items-baseline gap-1">
+      <span
+        data-group-label
+        className="min-w-0 shrink-[100] truncate text-muted-foreground"
+      >
+        {label}
+      </span>
+      <span aria-hidden className="shrink-0 text-muted-foreground">
+        /
+      </span>
+      <span data-group-active-label className="max-w-36 min-w-0 truncate">
+        {active.label}
+      </span>
+    </span>
   );
 }
 
-/** A chip with no home here: its group's name. */
-export function PlaceLabel({ label }: { label: string }) {
+/** The chip's insides: icon, name, its members' plan total, tab count
+ *  and repository band. */
+export function ChipFace({
+  head,
+  label,
+  active,
+  count,
+  planIds,
+  color,
+  signal,
+  open,
+}: {
+  head: TabFace | null;
+  label: string;
+  /** The pane's active tab, when it is one of the group's. */
+  active: TabFace | null;
+  count: number;
+  /** Its members' pull requests: a plan is built in a tab and walked
+   *  away from, so the chip carries their plans' total. */
+  planIds: readonly number[];
+  color: string | null;
+  signal: ChipSignal;
+  open: boolean;
+}) {
+  const planned = usePlanTotal(planIds);
   return (
     <>
-      <span className="max-w-40 min-w-16 truncate">{label}</span>
-      <Grip />
-    </>
-  );
-}
-
-/** The group's count and its members' states. */
-export function ChipCount({ statuses }: { statuses: readonly TabStatus[] }) {
-  return (
-    <>
+      <ChipIcon
+        head={head}
+        open={open}
+        active={active !== null}
+        working={signal.working}
+      />
+      <ChipLabel label={label} active={active} />
+      <PlanCountBadge count={planned} />
       <span
         data-group-count
-        className="rounded bg-muted px-1 text-[11px] leading-4 tabular-nums text-muted-foreground"
+        className="shrink-0 rounded bg-muted px-1 text-[11px] leading-4 tabular-nums text-muted-foreground"
       >
-        {statuses.length}
+        {count}
       </span>
-      <StatusClusters statuses={statuses} />
+      <RepoBand color={color} />
     </>
   );
 }
 
 /** A whole chip, inert: what a carried group looks like. */
-export function ChipLook({
-  head,
-  label,
-  statuses,
-  color,
-  collapsed,
-  containsActive,
-}: {
-  head: TabFace | null;
-  label: string;
-  statuses: readonly TabStatus[];
-  color: string | null;
-  collapsed: boolean;
-  containsActive: boolean;
-}) {
+export function ChipLook(face: Parameters<typeof ChipFace>[0]) {
   return (
-    <div className={chipClassName(containsActive)}>
-      {containsActive && <ChipActiveRule />}
-      <span className="flex h-full w-6 shrink-0 items-center justify-center">
-        <ChipIcon head={head} collapsed={collapsed} active={containsActive} />
-      </span>
-      <span className={CHIP_BODY}>
-        {head ? (
-          <HomeLabel face={head} name={label} />
-        ) : (
-          <PlaceLabel label={label} />
-        )}
-      </span>
-      <span className="flex h-full shrink-0 items-center gap-2 pr-1.5 pl-1">
-        <ChipCount statuses={statuses} />
-      </span>
-      <RepoBand color={color} />
+    <div
+      className={chipClassName({
+        containsActive: face.active !== null,
+        flashing: face.signal.flashing,
+        dragging: false,
+        wrap: false,
+      })}
+    >
+      <ChipFace {...face} />
     </div>
   );
 }

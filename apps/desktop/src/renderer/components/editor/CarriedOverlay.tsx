@@ -1,6 +1,7 @@
 import { DragOverlay, useDndContext } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
-import { isCollapsed, type TabGroup } from '../../lib/tabs/tab-groups.js';
+import { chipSignal } from '../../lib/tabs/group-status.js';
+import type { TabGroup } from '../../lib/tabs/tab-groups.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { Strip } from '../../lib/tabs/workspace.js';
 import { cn } from '../../lib/utils.js';
@@ -54,22 +55,29 @@ function carriedLook(
   id: string,
   data: StripDragData,
   { groups, faceOf, labelOf, colorOf }: Looks,
-  tabs: Pick<Strip, 'activeId' | 'collapsed'> & { paneId: string }
+  tabs: Pick<Strip, 'activeId'> & { paneId: string }
 ) {
   const group = groups.find((g) => chipBlockId(tabs.paneId, g.key) === id);
   if (group) {
+    const faces = group.tabs.map(faceOf);
+    const head = group.head ? faces[0] ?? null : null;
     return (
       <ChipLook
-        head={group.head ? faceOf(group.head) : null}
+        head={head}
         label={labelOf(group)}
-        statuses={group.tabs.map((t) => faceOf(t).status)}
+        active={faces.find((f) => f.tab.id === tabs.activeId) ?? null}
+        count={faces.length}
+        planIds={faces.flatMap((f) => f.item?.pr?.id ?? [])}
         color={colorOf(group)}
-        collapsed={isCollapsed(group, tabs.collapsed)}
-        containsActive={group.tabs.some((t) => t.id === tabs.activeId)}
+        signal={chipSignal(
+          faces.map((f) => f.snapshot),
+          { parent: group.affiliation?.kind === 'parent', home: !!head }
+        )}
+        open={false}
       />
     );
   }
-  const tabId = data.kind === 'member' ? id : data.ids[0];
+  const tabId = data.ids[0];
   const tab = groups.flatMap((g) => g.tabs).find((t) => t.id === tabId);
   if (!tab) return null;
   const face = faceOf(tab);

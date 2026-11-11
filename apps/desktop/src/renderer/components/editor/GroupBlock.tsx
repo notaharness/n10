@@ -24,9 +24,14 @@ function opensRoster(e: KeyboardEvent<HTMLElement>): boolean {
   return e.key === 'ArrowDown' && e.altKey && !e.ctrlKey && !e.metaKey;
 }
 
-/** Its followers sit as far off as the strip's blocks do. */
-function blockClassName(dragging: boolean): string {
-  return cn('flex shrink-0 items-stretch gap-2', dragging && 'z-10 opacity-90');
+/** Its followers sit as far off as the strip's blocks do. Wrapped, it
+ *  shares its row's width as a tab does. */
+function blockClassName(dragging: boolean, wrap: boolean): string {
+  return cn(
+    'flex items-stretch gap-2',
+    wrap ? 'grow' : 'shrink-0',
+    dragging && 'z-10 opacity-90'
+  );
 }
 
 /**
@@ -117,7 +122,7 @@ export function GroupBlock({
       role="presentation"
       data-tab-group={group.key}
       style={style}
-      className={blockClassName(isDragging)}
+      className={blockClassName(isDragging, tabOverflow === 'wrap')}
     >
       <Popover
         open={roster.open}
@@ -128,11 +133,10 @@ export function GroupBlock({
         <GroupChip
           group={group}
           label={label}
-          head={head ? faceOf(head) : null}
-          statuses={faces.map((f) => f.status)}
-          planIds={faces.flatMap((f) => f.item?.pr?.id ?? [])}
+          faces={faces}
           color={color}
           active={faces.find((f) => f.tab.id === tabs.activeId) ?? null}
+          dragging={isDragging}
           setHandle={setHandle}
           handle={handle}
           roster={roster}

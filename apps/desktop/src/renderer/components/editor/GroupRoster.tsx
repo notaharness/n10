@@ -1,4 +1,4 @@
-import { CheckIcon } from 'lucide-react';
+import { BrainIcon, CheckIcon } from 'lucide-react';
 import { useEffect, useRef, type RefObject } from 'react';
 import {
   groupSummary,
@@ -11,10 +11,11 @@ import type { Tab } from '../../lib/tabs/tabs.js';
 import { cn } from '../../lib/utils.js';
 import { PopoverContent } from '../ui/popover.js';
 import { ScrollArea } from '../ui/scroll-area.js';
-import { STATUS_MARK } from './StatusClusters.js';
 import { usePlanCount } from '../../lib/plan/plan.js';
 import { PlanCountBadge, UnseenDot } from './tab-marks.js';
-import { FACE_ICON } from './TabIcon.js';
+import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
+import type { TabStatus } from '../../lib/tabs/tab-groups.js';
+import { FACE_ICON, TabIcon } from './TabIcon.js';
 import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
 import type { useRosterOpen } from './use-roster-open.js';
@@ -22,7 +23,16 @@ import { walkRows } from './roster-keys.js';
 import { rosterEntries } from './roster-order.js';
 import { rosterSecondary } from './roster-text.js';
 
-/** The row's state, at its end: active first, then the state. */
+/** Each state's colour token in a row's words; idle has none. */
+const STATUS_TONE: Partial<Record<TabStatus, string>> = {
+  blocked: 'text-warning',
+  error: 'text-destructive',
+  'done-unseen': 'text-success',
+  'new-output': 'text-info',
+};
+
+/** The row's state, at its end, in words: active first, then the
+ *  state. The row itself blinks and spins as its tab would. */
 function RowStatus({
   face,
   active,
@@ -32,19 +42,40 @@ function RowStatus({
   active: boolean;
   status: string;
 }) {
-  const mark = STATUS_MARK[face.status];
   return (
     <span
       className={cn(
         'flex w-[100px] shrink-0 items-center justify-end gap-1 truncate text-[11px] leading-4',
-        mark?.className ?? 'text-muted-foreground'
+        STATUS_TONE[face.status] ?? 'text-muted-foreground'
       )}
     >
       {active && <CheckIcon aria-hidden className="size-3 shrink-0" />}
-      {mark && <mark.Icon aria-hidden className="size-3 shrink-0" />}
       <span className="truncate">
         {[active ? 'Active' : '', status].filter(Boolean).join(' · ')}
       </span>
+    </span>
+  );
+}
+
+/** The row's icon, an orchestrator's brain for the home, spinning
+ *  while its tab works, as the tab's own would. */
+function RowIcon({
+  face,
+  home,
+  active,
+}: {
+  face: TabFace;
+  home: boolean;
+  active: boolean;
+}) {
+  return (
+    <span className="flex shrink-0 text-muted-foreground">
+      <TabIcon
+        Icon={home ? BrainIcon : FACE_ICON[face.labelKind]}
+        running={face.item ? itemRunning(face.item) : face.running}
+        snapshot={face.snapshot}
+        active={active}
+      />
     </span>
   );
 }
@@ -130,7 +161,7 @@ export function RosterRow({
   const label = home
     ? ['Orchestrator', face.taskTitle].filter(Boolean).join(' · ')
     : face.label;
-  const Icon = FACE_ICON[face.labelKind];
+  const flashing = !active && (face.snapshot?.flashing ?? false);
   const status = rowStatus(face.status, {
     exited: face.snapshot?.exited ?? false,
     unseen: face.unseen,
@@ -155,10 +186,11 @@ export function RosterRow({
         }
         className={cn(
           'flex h-11 w-full items-center gap-2 px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-          active ? 'bg-tab-active' : 'hover:bg-tab-hover'
+          active ? 'bg-tab-active' : 'bg-tab hover:bg-tab-hover',
+          flashing && 'tab-attention'
         )}
       >
-        <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+        <RowIcon face={face} home={home} active={active} />
         <RowText face={face} label={label} home={home} where={where} />
         <RowStatus face={face} active={active} status={status} />
       </button>
