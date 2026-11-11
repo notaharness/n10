@@ -148,6 +148,15 @@ const paneAction: fc.Arbitrary<TabsAction> = fc.oneof(
       { nil: undefined }
     ),
   }),
+  // A strip drop onto another pane's tab, with that pane's order as
+  // its strip showed it.
+  fc.record({
+    type: fc.constant('move' as const),
+    ids: picks,
+    targetId: pick,
+    side: fc.constantFrom<'before' | 'after'>('before', 'after'),
+    order: fc.option(fc.shuffledSubarray([...IDS]), { nil: undefined }),
+  }),
   fc.record({ type: fc.constant('close-pane' as const), pane: pick }),
   fc.record({ type: fc.constant('focus-pane' as const), pane: pick }),
   fc.record({
@@ -281,6 +290,10 @@ const stripAction: fc.Arbitrary<TabsAction> = fc.oneof(
     type: fc.constant('set-pinned' as const),
     ids: fc.subarray([...IDS], { minLength: 1, maxLength: 3 }),
     pinned: fc.boolean(),
+  }),
+  fc.record({
+    type: fc.constant('arrange' as const),
+    ids: fc.shuffledSubarray([...IDS]),
   }),
   fc.record({
     type: fc.constant('rename-group' as const),
@@ -1153,6 +1166,18 @@ describe('the workspace', () => {
     );
   });
 
+  it('counts only live panes as arranged by hand', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const ws = sequenceWs(actions);
+        const live = panesOf(ws.layout).map((p) => p.id);
+        for (const id of ws.arranged) expect(live).toContain(id);
+        expect(new Set(ws.arranged).size).toBe(ws.arranged.length);
+      }),
+      { numRuns: 500 }
+    );
+  });
+
   it('follows a group from live panes only, one each, with tabs they hold', () => {
     fc.assert(
       fc.property(sequence, (actions) => {
@@ -1400,6 +1425,9 @@ describe('the workspace', () => {
         expect(back.focusedPane === ws.focusedPane || !focusKept).toBe(true);
         expect(back.pinned).toEqual(ws.pinned.filter(saved));
         expect(back.groupNames).toEqual(ws.groupNames);
+        expect(back.arranged).toEqual(
+          ws.arranged.filter((id) => restored.some((p) => p.id === id))
+        );
         expect(back.dismissed).toEqual(ws.dismissed);
         expect(back.lastActiveByRepo).toEqual(ws.lastActiveByRepo);
         expect(back.unseen).toEqual([]);

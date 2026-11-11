@@ -328,7 +328,15 @@ function settle(ws: Workspace): Workspace {
   const unseen = next.unseen.filter((id) => !shown.has(id));
   const seen =
     unseen.length === next.unseen.length ? next : { ...next, unseen };
-  return prunePaneLabels(remembered(seen));
+  return pruneArranged(prunePaneLabels(remembered(seen)));
+}
+
+/** Only live panes stay arranged: a pane id is minted again after its
+ *  pane closes, and the new pane is nobody's arrangement. */
+function pruneArranged(ws: Workspace): Workspace {
+  const live = new Set(panesOf(ws.layout).map((p) => p.id));
+  const arranged = ws.arranged.filter((id) => live.has(id));
+  return arranged.length === ws.arranged.length ? ws : { ...ws, arranged };
 }
 
 function remembered(ws: Workspace): Workspace {
