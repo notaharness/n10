@@ -4,7 +4,6 @@ import {
   createWorktree,
   showChanges,
   sidebarRow,
-  tab,
   visibleText,
 } from './setup/app.js';
 import type { FakeGitHub } from './setup/fake-gh.js';
@@ -306,12 +305,18 @@ test.describe('Reaching the plan from elsewhere', () => {
     await addToPlan(page, UNBOUNDED);
 
     // A queue you built and then walked away from should not go quiet.
+    // The pull request's tab now stands behind its repository's chip,
+    // which carries the count, as does its row in the chip's roster.
     await createWorktree(page, 'elsewhere');
-    await expect(tab(page, /elsewhere/)).toBeVisible();
+    const chip = page.locator('[data-group-chip^="place:"]');
+    await expect(chip).toHaveAttribute('aria-selected', 'true');
+    await expect(chip.getByLabel('1 comment in the plan')).toBeVisible();
+    await chip.click();
     await expect(
-      tab(page, /Add undo support|undo-support/).getByLabel(
-        '1 comment in the plan'
-      )
+      page
+        .locator('[data-group-roster]')
+        .getByRole('button', { name: /Add undo support|undo-support/ })
+        .getByLabel('1 comment in the plan')
     ).toBeVisible();
   });
 });

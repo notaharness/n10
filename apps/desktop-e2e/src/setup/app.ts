@@ -56,6 +56,21 @@ export function stripTab(
   return tab(page, name, exact).and(page.locator('[data-tab-id]'));
 }
 
+/** Open the roster of the chip `name`'s tab stands behind, and give
+ *  its row there; the roster stays open. */
+async function rosterRowFor(page: Page, name: RegExp): Promise<Locator> {
+  const roster = page.locator('[data-group-roster]');
+  for (const chip of await page.locator('[data-group-chip]').all()) {
+    await chip.click();
+    await roster.waitFor({ state: 'visible' });
+    const row = roster.getByRole('button', { name });
+    if ((await row.count()) > 0) return row.first();
+    await page.keyboard.press('Escape');
+    await roster.waitFor({ state: 'hidden' });
+  }
+  throw new Error(`no tab or roster row named ${String(name)}`);
+}
+
 /**
  * Show the tab `name` names wherever it stands: its own tab on the
  * strip, else its row in its group's roster, the dropdown its chip
@@ -67,20 +82,41 @@ export async function showTab(page: Page, name: RegExp): Promise<void> {
     await own.click();
     return;
   }
+  await (await rosterRowFor(page, name)).click();
+  await page.locator('[data-group-roster]').waitFor({ state: 'hidden' });
+}
+
+/**
+ * Choose `label` from the native menu of tab `name`: its own tab's, else
+ * its roster row's in its group's dropdown, which has the same items.
+ */
+export async function chooseFromTabMenu(
+  page: Page,
+  app: ElectronApplication,
+  name: RegExp,
+  label: string
+): Promise<void> {
+  const own = stripTab(page, name);
+  const target = (await own.count()) > 0 ? own : await rosterRowFor(page, name);
+  await armContextMenuChoice(app, label);
+  await target.click({ button: 'right' });
   const roster = page.locator('[data-group-roster]');
-  for (const chip of await page.locator('[data-group-chip]').all()) {
-    await chip.click();
-    await roster.waitFor({ state: 'visible' });
-    const row = roster.getByRole('button', { name });
-    if ((await row.count()) > 0) {
-      await row.first().click();
-      await roster.waitFor({ state: 'hidden' });
-      return;
-    }
+  if ((await roster.count()) > 0) {
     await page.keyboard.press('Escape');
     await roster.waitFor({ state: 'hidden' });
   }
-  throw new Error(`no tab or roster row named ${String(name)}`);
+}
+
+/** Keep a preview tab open, as a double click on its own tab does; a
+ *  tab behind its group's chip is kept from its roster row's menu. */
+export async function keepOpen(
+  page: Page,
+  app: ElectronApplication,
+  name: RegExp
+): Promise<void> {
+  const own = stripTab(page, name);
+  if ((await own.count()) > 0) await own.dblclick();
+  else await chooseFromTabMenu(page, app, name, 'Keep Open');
 }
 
 /**

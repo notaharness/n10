@@ -8,7 +8,6 @@ import {
   paletteInput,
   sidebarRow,
   tab,
-  tabs,
 } from './setup/app.js';
 
 test.describe('Worktree lifecycle', () => {
@@ -41,7 +40,10 @@ test.describe('Worktree lifecycle', () => {
 
     await expect(sidebarRow(page, /feature-one/)).toBeVisible();
     await expect(sidebarRow(page, /feature-two/)).toBeVisible();
-    await expect(tabs(page)).toHaveCount(2);
+    // The repository's two tabs, behind its chip.
+    await expect(
+      page.locator('[data-group-chip^="place:"] [data-group-count]')
+    ).toHaveText('2');
   });
 });
 

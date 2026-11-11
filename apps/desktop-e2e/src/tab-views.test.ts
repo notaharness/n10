@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import type { Page } from '@playwright/test';
+import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import {
   fileTree,
   launchAgentFromRail,
+  keepOpen,
+  showTab,
   sidebarRow,
   switchRepo,
   tab,
@@ -40,9 +42,12 @@ test.use({
 
 /** Open the branch's tab and keep it: a single click is a preview,
  *  which the next one replaces. */
-async function openKept(page: Page, branch: string): Promise<void> {
+async function openKept(
+  { page, app }: { page: Page; app: ElectronApplication },
+  branch: string
+): Promise<void> {
   await sidebarRow(page, new RegExp(branch)).click();
-  await tab(page, new RegExp(branch)).dblclick();
+  await keepOpen(page, app, new RegExp(branch));
   await expect(visibleText(page, `${branch}-a line 1`)).toBeVisible({
     timeout: 30_000,
   });
@@ -52,7 +57,7 @@ async function openKept(page: Page, branch: string): Promise<void> {
  *  screen. Until then the pane being left is still shown, and a locator
  *  resolved in it stays with it when it becomes the hidden spare. */
 async function switchTo(page: Page, branch: string): Promise<void> {
-  await tab(page, new RegExp(branch)).click();
+  await showTab(page, new RegExp(branch));
   await expect(
     page
       .locator('[data-editor-panes] > :not([data-spare-pane])')
@@ -102,7 +107,7 @@ async function scrollDiff(page: Page, pixels: number): Promise<void> {
 
 test('each tab opens where it was left', async ({ desktop }) => {
   const { page } = desktop;
-  for (const branch of BRANCHES) await openKept(page, branch);
+  for (const branch of BRANCHES) await openKept(desktop, branch);
 
   // gamma: a file picked.
   await pick(page, 'b.txt');
@@ -141,8 +146,8 @@ test('a file gone from the diff when its tab comes back starts from the top', as
   desktop,
 }) => {
   const { page, repoPath } = desktop;
-  await openKept(page, 'alpha');
-  await openKept(page, 'beta');
+  await openKept(desktop, 'alpha');
+  await openKept(desktop, 'beta');
   await switchTo(page, 'alpha');
   await pick(page, 'd.txt');
   await scrollDiff(page, 600);
@@ -153,7 +158,7 @@ test('a file gone from the diff when its tab comes back starts from the top', as
   execFileSync('git', ['commit', '-q', '-m', 'drop d'], { cwd: worktree });
   // Beta is left for a third tab, so alpha is no longer the spare and
   // mounts again, reading its diff afresh.
-  await openKept(page, 'gamma');
+  await openKept(desktop, 'gamma');
 
   await switchTo(page, 'alpha');
   await expect(visibleText(page, 'alpha-a line 1')).toBeVisible();
@@ -174,7 +179,7 @@ test('a tab keeps where it was left across a repository switch', async ({
   const { page, repoPath } = desktop;
   const elsewhere = createTestRepo({ name: 'elsewhere' });
   try {
-    await openKept(page, 'alpha');
+    await openKept(desktop, 'alpha');
     await pick(page, 'd.txt');
     await scrollDiff(page, 600);
     await expect.poll(() => topLine(page)).toMatch(/^alpha-d line/);
@@ -199,7 +204,7 @@ test('a tab in a pane without focus keeps where it was left', async ({
   desktop,
 }) => {
   const { page } = desktop;
-  for (const branch of BRANCHES) await openKept(page, branch);
+  for (const branch of BRANCHES) await openKept(desktop, branch);
   await switchTo(page, 'alpha');
   await pick(page, 'd.txt');
   await switchTo(page, 'beta');

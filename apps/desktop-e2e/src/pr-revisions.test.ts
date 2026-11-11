@@ -2,7 +2,14 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { showChanges, sidebarRow, tab } from './setup/app.js';
+import {
+  chooseFromTabMenu,
+  keepOpen,
+  showChanges,
+  showTab,
+  sidebarRow,
+  tab,
+} from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -369,13 +376,13 @@ test.describe('beside other tabs', () => {
 
     // Left for two other tabs, so its pane is no longer the spare and
     // mounts again when it comes back: the same revisions.
-    await tab(page, /Revisions, pushed/).dblclick();
+    await keepOpen(page, desktop.app, /Revisions, pushed/);
     for (const branch of ['elsewhere', 'further']) {
       await sidebarRow(page, new RegExp(branch)).click();
-      await tab(page, new RegExp(branch)).dblclick();
+      await keepOpen(page, desktop.app, new RegExp(branch));
       await expect(diffText(page, branch)).toBeVisible({ timeout: 30_000 });
     }
-    await tab(page, /Revisions, pushed/).click();
+    await showTab(page, /Revisions, pushed/);
     await expect(selector(page)).toHaveText(/Chosen revisions/, {
       timeout: 30_000,
     });
@@ -384,9 +391,7 @@ test.describe('beside other tabs', () => {
 
     // Closed and opened again — a new pane: the same revisions, held
     // with its pinned head rather than with the tab.
-    await tab(page, /Revisions, pushed/)
-      .getByLabel('Close tab')
-      .click();
+    await chooseFromTabMenu(page, desktop.app, /Revisions, pushed/, 'Close');
     await expect(tab(page, /Revisions, pushed/)).toHaveCount(0);
     await openAs(page, /Revisions, pushed/);
     await expect(selector(page)).toHaveText(/Chosen revisions/, {
@@ -561,13 +566,21 @@ test.describe('a pull request opened behind another tab', () => {
       worktreePath: worktree,
       command: 'sleep 120',
     });
-    const behind = tab(page, /Behind/);
-    await expect(behind).toHaveAttribute('data-unseen', 'true', {
+    // It joins the open one behind their repository's chip, unseen.
+    const chip = page.locator('[data-group-chip^="place:"]');
+    await expect(chip.locator('[data-group-count]')).toHaveText('2', {
       timeout: 30_000,
     });
+    await chip.click();
+    await expect(
+      page
+        .locator('[data-group-roster]')
+        .getByRole('button', { name: /Behind/ })
+    ).toHaveAccessibleName(/Not yet opened/);
+    await page.keyboard.press('Escape');
 
     // Opened, it shows the agent; its files are listed in the rail.
-    await behind.click();
+    await showTab(page, /Behind/);
     const tree = page.locator('[data-file-tree]').filter({ visible: true });
     await expect(tree.getByRole('button', { name: /c\.txt/ })).toBeVisible({
       timeout: 30_000,

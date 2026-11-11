@@ -2,12 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import {
-  createWorktree,
-  focusTerminal,
-  tab,
-  visibleText,
-} from './setup/app.js';
+import { createWorktree, focusTerminal, visibleText } from './setup/app.js';
 import { tmuxAvailable } from './setup/external.js';
 import { armContextMenuChoice } from './setup/menu.js';
 import {
@@ -69,10 +64,15 @@ test('a pane keeps its terminal mounted, with focus, as it is split off and coll
   await mark(page);
   expect(await kept(page)).toEqual({ grid: true, focus: true });
 
-  // The first split: alpha goes right from its tab's menu, and the
-  // terminal's pane, the sole one until now, becomes the left half.
+  // The first split: alpha goes right from its tab's menu, on its row
+  // in the repository chip's roster, and the terminal's pane, the sole
+  // one until now, becomes the left half.
+  await page.locator('[data-group-chip^="place:"]').click();
   await armContextMenuChoice(app, 'Split right');
-  await tab(page, /^alpha/).click({ button: 'right' });
+  await page
+    .locator('[data-group-roster]')
+    .getByRole('button', { name: /alpha/ })
+    .click({ button: 'right' });
   await expect(panes(page)).toHaveCount(2);
   await expect.poll(async () => (await kept(page)).grid).toBe(true);
   await expect(visibleText(page, 'kept-42')).toBeVisible();
