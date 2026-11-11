@@ -285,14 +285,19 @@ describe('a restored terminal tab', () => {
   });
 
   it('closes when its name now belongs to a later session, which gets a tab of its own', () => {
-    // Saved ahead of an item tab: a bound tab keeps its place, a new one
-    // for the later session opens at the end.
-    const saved = run(sync([], [shell(1)]), open('branch:a'));
+    // Saved ahead of an item tab, pinned: a bound tab keeps its place, a
+    // new one for the later session opens at the end, unpinned.
+    const saved = run(sync([], [shell(1)]), open('branch:a'), {
+      type: 'set-pinned',
+      ids: [terminalTabId('notes-shell')],
+      pinned: true,
+    });
     const file = JSON.parse(JSON.stringify(toSaved(saved))) as SavedWorkspace;
     const ws = then(restoreWorkspace(file), sync([], [shell(2)]));
     expect(ids(ws)).toEqual([id('branch:a'), terminalTabId('notes-shell')]);
     expect(view(ws).tabs[1]).toMatchObject({ created: 2, listed: true });
     expect(view(ws).tabs[1]).not.toHaveProperty('restored');
+    expect(ws.pinned).toEqual([]);
   });
 
   it('keeps its place when it binds', () => {

@@ -170,12 +170,20 @@ function bindRestored(
     if (tab.kind !== 'terminal' || !tab.restored) continue;
     const entry = byName.get(tab.name);
     const fate = restoredFate(tab, entry, scanned);
-    if (fate === 'gone') next = closeTab(next, tab.id, repo);
+    // Gone with its pin: a later session under the name gets a tab of
+    // its own, in the same sync, under the same id.
+    if (fate === 'gone') next = unpinned(closeTab(next, tab.id, repo), tab.id);
     if (fate !== 'bind' || !entry) continue;
     const bound = restamp(withoutRestored(tab), entry);
     next = { ...next, tabs: next.tabs.map((t) => (t === tab ? bound : t)) };
   }
   return next;
+}
+
+function unpinned(state: Strip, id: string): Strip {
+  return state.pinned.includes(id)
+    ? { ...state, pinned: state.pinned.filter((p) => p !== id) }
+    : state;
 }
 
 function withoutRestored(tab: TerminalTab): TerminalTab {
