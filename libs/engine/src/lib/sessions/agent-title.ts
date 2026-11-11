@@ -10,14 +10,18 @@ const CONTROLS = new RegExp(
   'gu'
 );
 const GLYPHS =
-  /^(?:[\u2800-\u28ff\u2733\u2736-\u273b\u273d\u2722\u2723\u00b7\u2022\u25cf\u25cb\u2713\u2714\u23f3\u231b]\ufe0f?\s*)+/u;
+  /^(?:[\u2800-\u28ff\u2733\u2736-\u273b\u273d\u2722\u2723\u00b7\u2022\u25cf\u25cb\u25d0-\u25d3\u2713\u2714\u23f3\u231b][\ufe0e\ufe0f]?\s*)+/u;
 const GENERIC =
   /^(?:claude(?: code)?|codex|openai codex|agent|terminal|bash|zsh|fish|sh)(?:\s+v?\d+(?:\.\d+)*)?$/i;
 const EMOJI = new RegExp('^\\p{RGI_Emoji}$', 'v');
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
+function basenameOf(path?: string): string | undefined {
+  return path?.split(/[\\/]/).filter(Boolean).at(-1);
+}
+
 function isPathOrPrompt(title: string, path?: string): boolean {
-  const basename = path?.split(/[\\/]/).filter(Boolean).at(-1);
+  const basename = basenameOf(path);
   if (/^~(?:[\\/]|$)/.test(title)) return true;
   if (/^[^\s@]+@[^\s:]+:\s*(?:~|[\\/])/.test(title)) return true;
   return (
@@ -49,6 +53,10 @@ export function normalizeAgentTitle(
     if (title === before) break;
   }
   title = title.replace(/\s*\|\s*(?:claude code|codex)\s*$/i, '');
+  const basename = basenameOf(path);
+  const cwdSuffix = basename ? ` | ${basename}` : '';
+  if (cwdSuffix && title.endsWith(cwdSuffix))
+    title = title.slice(0, -cwdSuffix.length);
   title = [...segmenter.segment(title)]
     .map(({ segment }) => (EMOJI.test(segment) ? '' : segment))
     .slice(0, 160)

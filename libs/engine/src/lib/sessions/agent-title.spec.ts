@@ -32,4 +32,38 @@ describe('normalizeAgentTitle', () => {
       ),
     ]).toHaveLength(160);
   });
+
+  it('removes all half-circle spinner frames and their variation selectors', () => {
+    for (const frame of ['◐', '◓', '◑', '◒']) {
+      for (const selector of ['', '\ufe0e', '\ufe0f']) {
+        expect(
+          normalizeAgentTitle(`${frame}${selector} Desktop group dropdowns (…`)
+        ).toBe('Desktop group dropdowns (…');
+      }
+    }
+  });
+
+  it('strips one cwd basename suffix, preserving unrelated and differently cased pipes', () => {
+    expect(
+      normalizeAgentTitle(
+        'Define n10 tab group UX | scratchpad',
+        '/tmp/scratchpad'
+      )
+    ).toBe('Define n10 tab group UX');
+    expect(
+      normalizeAgentTitle(
+        'Add desktop tab strip controls | feat-desktop-strip-controls',
+        '/tmp/feat-desktop-strip-controls'
+      )
+    ).toBe('Add desktop tab strip controls');
+    expect(
+      normalizeAgentTitle('Keep | scratchpad | scratchpad', '/tmp/scratchpad')
+    ).toBe('Keep | scratchpad');
+    expect(normalizeAgentTitle('Keep | Scratchpad', '/tmp/scratchpad')).toBe(
+      'Keep | Scratchpad'
+    );
+    expect(normalizeAgentTitle('Keep | other', '/tmp/scratchpad')).toBe(
+      'Keep | other'
+    );
+  });
 });
