@@ -58,7 +58,7 @@ apps/desktop/                    — Electron GUI shell, shipped inside `@notaha
     lib/                         — grouped by subsystem, not one flat folder (see below)
     lib/data/                    — queries.ts (TanStack Query over window.n10), mutations.ts, query-keys.ts
     lib/diff/                    — diff-model.ts (fold, split pairing), diff-virtual.ts, word-diff.ts, highlight.ts, thread-model.ts
-    lib/tabs/                    — tabs-model.ts (pure reducer: preview/pinned, `sync-items`), tabs.ts, tabs-provider.tsx, tab-groups.ts (`present`), use-close-tabs.tsx
+    lib/tabs/                    — tabs-model.ts (pure reducer: preview/pinned, `sync-items`), workspace-reduce.ts (which pane), layout.ts + layout-geometry.ts (the split tree), pane-moves.ts, tabs.ts, tabs-provider.tsx, tab-groups.ts (`present`), use-close-tabs.tsx
     lib/plan/                    — plan-model.ts (rows, numbering), plan.ts, use-plan-checkout.ts
     lib/review/                  — review-model.ts (what the workspace shows), review-submission.ts, severity.ts, use-comment-navigator.ts
     lib/guide/                   — guide-model.ts (layout, steps, staleness), mermaid.ts (lazy, strict, themed by tokens)

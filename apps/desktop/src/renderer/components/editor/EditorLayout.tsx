@@ -8,7 +8,7 @@ import {
   type LayoutChangedMeta,
 } from 'react-resizable-panels';
 import type { SidebarItem } from '../../../host/contract.js';
-import { nodeId, splitKey } from '../../lib/tabs/layout.js';
+import { nodeId, panesOf, splitKey } from '../../lib/tabs/layout.js';
 import { minExtent } from '../../lib/tabs/layout-geometry.js';
 import { PaneFocusedContext } from '../../lib/tabs/pane-shown.js';
 import { usePrewarm } from '../../lib/tabs/prewarm.js';
@@ -209,13 +209,18 @@ function SplitView({ split, shared }: { split: SplitNode; shared: Shared }) {
 function PaneView({ pane, shared }: { pane: PaneNode; shared: Shared }) {
   const panes = usePanes();
   const focused = panes.focusedPane === pane.id;
+  // Landmarks a screen reader can tell apart, the focused one named so.
+  const at = panesOf(panes.layout).findIndex((p) => p.id === pane.id) + 1;
+  const label = shared.split
+    ? `Editor pane ${at} of ${panes.count}${focused ? ', focused' : ''}`
+    : 'Editor pane';
   const take = () => {
     if (!focused) panes.focus(pane.id);
   };
   return (
     <PaneScopeContext.Provider value={pane.id}>
       <section
-        aria-label="Editor pane"
+        aria-label={label}
         data-pane-id={pane.id}
         data-pane-focused={(shared.split && focused) || undefined}
         className="relative flex h-full min-h-0 min-w-0 flex-col [container-type:size]"
