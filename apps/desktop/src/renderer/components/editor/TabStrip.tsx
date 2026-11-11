@@ -26,18 +26,16 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useLayoutEffect,
   useRef,
-  useState,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { collisionsEndingAt, END_ID, groupEndId } from './strip-collisions.js';
-import { useEdgeAutoScroll } from './use-edge-auto-scroll.js';
 import { StripScrollArrows } from './StripScrollArrows.js';
+import { useStripScrollEdges } from './use-strip-scroll-edges.js';
 import {
   acceptsDrop,
   dropMove,
@@ -189,32 +187,8 @@ export function TabStrip({
   const wrap = useDesktopPrefs().tabOverflow === 'wrap';
   const report = useContext(StripBlocksReport);
   useLayoutEffect(() => report(blocks.map((b) => b.ids)), [report, blocks]);
-  const track = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({
-    overflow: false,
-    left: false,
-    right: false,
-  });
   const blockKey = blocks.map((block) => block.id).join('\n');
-  const update = () => {
-    const el = track.current;
-    if (!el) return;
-    setEdges({
-      overflow: el.scrollWidth > el.clientWidth + 1,
-      left: el.scrollLeft > 1,
-      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
-    });
-  };
-  useEffect(() => {
-    const el = track.current;
-    if (!el) return;
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    for (const child of el.children) observer.observe(child);
-    update();
-    return () => observer.disconnect();
-  }, [blockKey, wrap]);
-  useEdgeAutoScroll(track, !wrap);
+  const { track, edges, update } = useStripScrollEdges(blockKey, wrap);
   return (
     <SortableContext
       items={blocks.map((b) => b.id)}

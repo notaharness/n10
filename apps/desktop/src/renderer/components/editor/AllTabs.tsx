@@ -48,7 +48,7 @@ export function AllTabs({
           <ListIcon aria-hidden className="size-4" />
           {count > 0 && (
             <span
-              className="absolute top-0 right-0 flex items-center gap-0.5 rounded-bl bg-info px-0.5 text-[10px] leading-4 text-background tabular-nums"
+              className="absolute top-1 right-1 flex items-center gap-0.5 rounded bg-info px-0.5 text-[10px] leading-4 text-background tabular-nums"
               aria-hidden
             >
               <BellIcon className="size-2.5" />

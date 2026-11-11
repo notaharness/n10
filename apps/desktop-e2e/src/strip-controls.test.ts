@@ -32,6 +32,10 @@ test.describe('scroll strip controls', () => {
       await createWorktree(page, `feature-${i}-long-branch-name`);
     const strip = page.getByRole('tablist', { name: 'Open tabs' });
     await expect(strip).toHaveAttribute('data-overflow', 'scroll');
+    const firstTab = strip.locator('[data-tab-id]').first();
+    await expect
+      .poll(() => firstTab.evaluate((el) => el.getBoundingClientRect().width))
+      .toBeGreaterThan(215);
     const right = page.getByRole('button', { name: 'Scroll tabs right' });
     await expect(right).toBeEnabled();
     await expect(page.getByRole('button', { name: 'All tabs' })).toBeVisible();
