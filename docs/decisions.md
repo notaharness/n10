@@ -923,8 +923,9 @@ may not have done yet, so it never ends one on its own. A foreign answer
 that left out another repository than the one open is no answer. A terminal
 key goes once a listing complete for its machine lacks it: the terminal
 listing comes with the machines whose discovery scan has finished, its
-terminals adopted (`scanned`), and until this machine's has there is no
-listing at all. An agent on another machine is in no answer here, so its
+terminals adopted (`scanned`); a listing opens tabs for what it names
+from its first answer, but says a terminal is gone only on those
+machines. An agent on another machine is in no answer here, so its
 dismissal lasts until its tab is opened again. So the record is never longer
 than the sessions running (here), closing an agent tab whose kill failed, or
 a foreign agent's, keeps it closed across syncs and restarts, and an agent

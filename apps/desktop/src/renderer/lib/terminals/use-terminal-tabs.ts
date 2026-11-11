@@ -72,17 +72,16 @@ export function useTerminalTabs() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [remoteError, setRemoteError] = useState<string | null>(null);
 
-  // `undefined` until the host's listing is complete for this machine —
-  // discovery's first scan has adopted what tmux kept — and it stays the
-  // previous answer across a refetch (`placeholderData`), so the strip
-  // never sees "no terminals" when the truth is "not found yet". The
-  // reducer closes the tab of any terminal a listing does not name.
+  // `undefined` until the host has answered once — and it stays the
+  // previous answer across a refetch (`placeholderData`) — so the strip
+  // never sees "no terminals" when the truth is "not asked yet". Beside
+  // it, `scanned` says which machines the listing is complete for: a
+  // terminal it lacks is gone only on one of those (a restored tab
+  // closes, a dismissal is forgotten); elsewhere it may not be found yet.
   const data = listing.data;
-  const complete = data?.scanned.includes('local') ?? false;
   const entries = useMemo(
-    () =>
-      complete ? data?.terminals.map((t) => toEntry(t, machines)) : undefined,
-    [complete, data, machines]
+    () => data?.terminals.map((t) => toEntry(t, machines)),
+    [data, machines]
   );
   const scanned = data?.scanned;
 
@@ -125,7 +124,7 @@ export function useTerminalTabs() {
 
   return {
     /** The host's terminal listing, for Workspace's sync effect;
-     *  `undefined` before it is complete for this machine. */
+     *  `undefined` before the first answer. */
     entries,
     /** The machines the listing is complete for. */
     scanned,
