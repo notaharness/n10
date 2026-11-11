@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chipSignal,
   groupSummary,
   rosterSummary,
   rowStatus,
@@ -39,5 +40,38 @@ describe('group status text', () => {
     expect(rowStatus('working', { exited: false, unseen: true })).toBe(
       'Working'
     );
+  });
+});
+
+describe('chipSignal', () => {
+  const idle = { active: false, flashing: false };
+  const flashing = { active: false, flashing: true };
+  const working = { active: true, flashing: false };
+
+  it('carries only the home’s own activity for an orchestrator’s group', () => {
+    const players = [idle, flashing, working];
+    expect(chipSignal(players, { parent: true, home: true })).toEqual({
+      flashing: false,
+      working: false,
+    });
+    expect(
+      chipSignal([{ active: true, flashing: true }, idle], {
+        parent: true,
+        home: true,
+      })
+    ).toEqual({ flashing: true, working: true });
+    expect(chipSignal(players, { parent: true, home: false })).toEqual({
+      flashing: false,
+      working: false,
+    });
+  });
+
+  it('carries any member’s activity for any other group', () => {
+    expect(
+      chipSignal([idle, undefined, flashing, working], {
+        parent: false,
+        home: false,
+      })
+    ).toEqual({ flashing: true, working: true });
   });
 });

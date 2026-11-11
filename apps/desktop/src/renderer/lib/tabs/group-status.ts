@@ -62,3 +62,33 @@ export function rowStatus(
   if (facts.unseen) return 'Not yet opened';
   return ROW_WORDS.idle;
 }
+
+/** What a chip shows of its tabs' activity: whether it blinks for new
+ *  output and spins for work. */
+export interface ChipSignal {
+  flashing: boolean;
+  working: boolean;
+}
+
+/** A tab's activity, as its session's snapshot has it. */
+type Activity = { active: boolean; flashing: boolean } | undefined;
+
+/**
+ * The activity a chip carries. An orchestrator's chip carries its
+ * home's own alone: its players are the orchestrator's to watch, and
+ * blink and spin on their own rows. Any other group's chip carries
+ * every member's. `activity` is the group's tabs', in its order; `home`
+ * says whether the first is the orchestrator's (`TabGroup.head`), and
+ * `parent` whether the group is an orchestrator's at all, home here or
+ * not.
+ */
+export function chipSignal(
+  activity: readonly Activity[],
+  { parent, home }: { parent: boolean; home: boolean }
+): ChipSignal {
+  const own = parent ? (home ? activity.slice(0, 1) : []) : activity;
+  return {
+    flashing: own.some((a) => a?.flashing),
+    working: own.some((a) => a?.active),
+  };
+}
