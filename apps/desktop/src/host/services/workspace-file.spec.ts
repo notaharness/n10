@@ -65,7 +65,25 @@ describe('loadWorkspace', () => {
     expect(loadWorkspace()).toEqual({
       status: 'restored',
       workspace: { pinned: [] },
+      goneRepos: [],
     });
+  });
+
+  // A repository moved or deleted while n10 was closed: its item tabs
+  // name a directory that is not there. Terminals are not repositories.
+  it('names the repositories item tabs are of that are gone from disk', () => {
+    const here = mkdtempSync(join(home, 'repo-'));
+    const gone = join(home, 'moved-away');
+    const tabs = {
+      a: { kind: 'item', repo: here },
+      b: { kind: 'item', repo: gone },
+      c: { kind: 'item', repo: gone },
+      d: { kind: 'terminal', repo: join(home, 'also-gone') },
+      e: 'junk',
+    };
+    write(JSON.stringify({ version: WORKSPACE_VERSION, workspace: { tabs } }));
+    const loaded = loadWorkspace();
+    expect(loaded.status === 'restored' && loaded.goneRepos).toEqual([gone]);
   });
 
   it.each([
@@ -139,6 +157,7 @@ describe('saveWorkspace', () => {
     expect(loadWorkspace()).toEqual({
       status: 'restored',
       workspace: { a: 1 },
+      goneRepos: [],
     });
   });
 
@@ -148,6 +167,7 @@ describe('saveWorkspace', () => {
     expect(loadWorkspace()).toEqual({
       status: 'restored',
       workspace: { a: 2 },
+      goneRepos: [],
     });
   });
 
@@ -165,6 +185,7 @@ describe('saveWorkspace', () => {
     expect(loadWorkspace()).toEqual({
       status: 'restored',
       workspace: { a: 1 },
+      goneRepos: [],
     });
   });
 
@@ -182,6 +203,7 @@ describe('saveWorkspace', () => {
     expect(loadWorkspace()).toEqual({
       status: 'restored',
       workspace: { a: 3 },
+      goneRepos: [],
     });
   });
 });

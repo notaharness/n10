@@ -12,7 +12,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 describe('startFrom', () => {
   it.each<[LoadedWorkspace, boolean]>([
     [{ status: 'none' }, true],
-    [{ status: 'restored', workspace: {} }, true],
+    [{ status: 'restored', workspace: {}, goneRepos: [] }, true],
     [{ status: 'set-aside', path: '/x' }, true],
     [{ status: 'unreadable' }, false],
   ])('saves after %j: %s', (loaded, canSave) => {

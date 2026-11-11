@@ -142,12 +142,19 @@ function restoredTab(v: unknown): Tab | null {
   return v.kind === 'terminal' ? terminalTab(v) : null;
 }
 
-function restoredTabs(v: unknown): Record<string, Tab> {
+/** A tab of a repository that is gone from disk: it cannot open. */
+const ofGone = (tab: Tab, gone: ReadonlySet<string>) =>
+  tab.kind === 'item' && gone.has(tab.repo);
+
+function restoredTabs(
+  v: unknown,
+  gone: ReadonlySet<string>
+): Record<string, Tab> {
   if (!isRecord(v)) return {};
   return Object.fromEntries(
     Object.entries(v).flatMap(([id, raw]) => {
       const tab = restoredTab(raw);
-      return tab && tab.id === id ? [[id, tab]] : [];
+      return tab && tab.id === id && !ofGone(tab, gone) ? [[id, tab]] : [];
     })
   );
 }
@@ -194,10 +201,16 @@ function recordOf<T>(
   ) as Record<string, T>;
 }
 
-/** The workspace a saved one describes; the empty one for `null`. */
-export function restoreWorkspace(saved: SavedWorkspace | null): Workspace {
+/** The workspace a saved one describes; the empty one for `null`. Item
+ *  tabs of `goneRepos`, repositories no longer on disk, are left out:
+ *  one moved while n10 was closed has its agent's tab back under its
+ *  new path when it opens, and a tab for the old path could not open. */
+export function restoreWorkspace(
+  saved: SavedWorkspace | null,
+  goneRepos: readonly string[] = []
+): Workspace {
   if (!saved) return EMPTY_WORKSPACE;
-  const all = restoredTabs(saved.tabs);
+  const all = restoredTabs(saved.tabs, new Set(goneRepos));
   const pane = onePane(savedPanes(saved.layout), saved.focusedPane, all);
   const tabs = Object.fromEntries(pane.order.map((id) => [id, all[id]]));
   return {

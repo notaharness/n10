@@ -406,6 +406,19 @@ describe('restoring a file', () => {
     expect(ids(ws)).toEqual([]);
   });
 
+  it('leaves out the item tabs of a repository gone from disk', () => {
+    const other = { ...item, id: id('branch:a', OTHER), repo: OTHER };
+    const ws = restoreWorkspace(
+      file({ [item.id]: item, [other.id]: other, [terminal.id]: terminal }, [
+        item.id,
+        other.id,
+        terminal.id,
+      ]),
+      [REPO]
+    );
+    expect(ids(ws)).toEqual([other.id, terminal.id]);
+  });
+
   it('drops an item tab whose id is not of its repository', () => {
     const wrong = { ...item, id: id('branch:a', OTHER) };
     const ws = restoreWorkspace(file({ [wrong.id]: wrong }, [wrong.id]));

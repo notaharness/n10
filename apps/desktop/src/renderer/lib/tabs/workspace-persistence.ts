@@ -18,7 +18,10 @@ const UNRESTORED: Restored = { workspace: EMPTY_WORKSPACE, canSave: false };
 export function startFrom(loaded: LoadedWorkspace): Restored {
   switch (loaded.status) {
     case 'restored':
-      return { workspace: restoreWorkspace(loaded.workspace), canSave: true };
+      return {
+        workspace: restoreWorkspace(loaded.workspace, loaded.goneRepos),
+        canSave: true,
+      };
     case 'none':
       return { workspace: EMPTY_WORKSPACE, canSave: true };
     case 'set-aside':

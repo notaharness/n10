@@ -966,6 +966,16 @@ not complete for its machine, or that does not know the creation time yet,
 waits. Item tabs reconcile through the re-key rules. Collapse choices keep
 the latest 64.
 
+One deliberate exception to "an unavailable repository is not proof of
+deletion": a restored item tab whose repository directory is gone from this
+machine is dropped (the host names those repositories with the load,
+`goneRepos`). An item tab is a local checkout, so a missing directory means
+the repository was moved or deleted; a moved one gets its agent's tab back
+under the new path when it opens, and a tab for the old path could only fail
+to open beside it. A repository on an unmounted drive loses its restored
+tabs for that launch; they come back by the usual auto-open when it is
+opened. Remote and offline machines' tabs are unchanged.
+
 ## Plans and auto-fixing
 
 Plan items are value snapshots taken when queued. Later comment edits or

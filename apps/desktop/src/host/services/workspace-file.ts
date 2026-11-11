@@ -1,5 +1,6 @@
 import {
   closeSync,
+  existsSync,
   fsyncSync,
   mkdirSync,
   openSync,
@@ -58,6 +59,26 @@ function readable(raw: string): SavedWorkspace | null {
   }
 }
 
+/**
+ * The repositories the saved item tabs name that are no longer on disk.
+ * Their tabs cannot open, and a repository moved while n10 was closed
+ * gets a live tab under its new path; so the renderer drops them. An
+ * item tab is a checkout on this machine, so a missing directory says
+ * the repository went, unlike an offline machine's. Only `kind` and
+ * `repo` of each tab are read; the renderer checks the rest.
+ */
+function goneRepos(workspace: SavedWorkspace): string[] {
+  const tabs = isRecord(workspace.tabs) ? Object.values(workspace.tabs) : [];
+  const repos = new Set(
+    tabs.flatMap((t) =>
+      isRecord(t) && t.kind === 'item' && typeof t.repo === 'string'
+        ? [t.repo]
+        : []
+    )
+  );
+  return [...repos].filter((repo) => !existsSync(repo));
+}
+
 /** Set once a file was found that this run must not overwrite. */
 let readOnly = false;
 
@@ -94,7 +115,8 @@ export function loadWorkspace(): LoadedWorkspace {
     return { status: 'unreadable' };
   }
   const workspace = readable(raw);
-  if (workspace !== null) return { status: 'restored', workspace };
+  if (workspace !== null)
+    return { status: 'restored', workspace, goneRepos: goneRepos(workspace) };
   const aside = setAside(path);
   if (aside !== null) return { status: 'set-aside', path: aside };
   readOnly = true;

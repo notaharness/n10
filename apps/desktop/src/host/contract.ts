@@ -344,7 +344,13 @@ export type SavedWorkspace = Readonly<Record<string, unknown>>;
  *  save for the rest of its run, so that file is never overwritten. */
 export type LoadedWorkspace =
   | { status: 'none' }
-  | { status: 'restored'; workspace: SavedWorkspace }
+  | {
+      status: 'restored';
+      workspace: SavedWorkspace;
+      /** The repositories item tabs name whose directory is gone from
+       *  this machine: moved or deleted while n10 was closed. */
+      goneRepos: string[];
+    }
   | { status: 'set-aside'; path: string }
   | { status: 'unreadable' };
 
