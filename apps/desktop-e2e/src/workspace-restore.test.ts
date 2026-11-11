@@ -123,6 +123,26 @@ test.describe('Workspace restore', () => {
       .poll(() => (saved(homeDir)?.pinned as string[] | undefined)?.length)
       .toBe(1);
 
+    // Beta before alpha inside the chip: its row dropped on alpha's.
+    await openRoster(page, placeChip(page));
+    const [alpha, beta] = await Promise.all(
+      [/^alpha/, /^beta/].map((name) =>
+        rosterRows(page).filter({ hasText: name }).boundingBox()
+      )
+    );
+    await page.mouse.move(
+      beta!.x + beta!.width / 2,
+      beta!.y + beta!.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(alpha!.x + alpha!.width / 2, alpha!.y + 6, {
+      steps: 15,
+    });
+    await page.mouse.up();
+    await expect(rosterRows(page)).toHaveText([/^beta/, /^alpha/]);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-group-roster]')).toHaveCount(0);
+
     // Reorder: the shell after the repository's chip, by keyboard, and
     // quit at once: the save is still waiting out its debounce, and only
     // the host's shutdown writes it.
@@ -149,7 +169,7 @@ test.describe('Workspace restore', () => {
     );
     await expect.poll(() => tabNames(next)).toEqual([gamma, repo, shellName]);
     await openRoster(next, placeChip(next));
-    await expect(rosterRows(next)).toHaveText([/^alpha/, /^beta/]);
+    await expect(rosterRows(next)).toHaveText([/^beta/, /^alpha/]);
     await next.keyboard.press('Escape');
 
     // The terminal tab is bound to the session it was saved with: it

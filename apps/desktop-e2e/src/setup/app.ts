@@ -68,6 +68,10 @@ export async function openRoster(page: Page, chip: Locator): Promise<void> {
     await page.mouse.move(0, 0);
     await chip.hover();
     await expect(roster).toBeVisible({ timeout: 2_000 });
+    // This chip's, not another's still open.
+    await expect(chip).toHaveAttribute('aria-expanded', 'true', {
+      timeout: 500,
+    });
   }).toPass({ timeout: 20_000 });
 }
 

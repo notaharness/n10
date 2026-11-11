@@ -319,6 +319,12 @@ test.describe('Tab groups', () => {
     await expect(lone.locator('[data-tab-label]')).toContainText(
       basename(folder)
     );
+    // A shell's label is as wide as its name, not a task's fixed width.
+    const shellLabel = lone.locator('[data-tab-label]');
+    expect(
+      await shellLabel.evaluate((el) => el.getBoundingClientRect().width)
+    ).toBeLessThan(176);
+    await expect(shellLabel).not.toHaveClass(/w-36/);
     const soloTab = tab(page, new RegExp(solo));
     await expect(soloTab).toBeVisible({ timeout: 30_000 });
     const fallbackWidth = await soloTab.evaluate(
@@ -430,12 +436,20 @@ test.describe('Tab groups', () => {
     const target = await alpha.boundingBox();
     await drag(page, chip, target!.x + 8, target!.y + target!.height / 2);
     await expect.poll(order).toEqual({ home: 0, alpha: 1 });
+    // Its player went with it: every tab, in order, is home, player,
+    // then alpha.
+    const home = await chip.getAttribute('data-home-tab');
     await page.getByRole('button', { name: 'All tabs' }).click();
-    await expect(
-      page
-        .getByRole('dialog', { name: 'All tabs' })
-        .locator('[data-roster-row]')
-    ).toHaveCount(3);
+    const listed = page
+      .getByRole('dialog', { name: 'All tabs' })
+      .locator('[data-roster-row]');
+    await expect(listed).toHaveCount(3);
+    const ids = await listed.evaluateAll((rows) =>
+      rows.map((r) => r.getAttribute('data-roster-row') ?? '')
+    );
+    expect(ids[0]).toBe(home);
+    expect(ids[1]).toContain(first);
+    expect(ids[2]).toContain('alpha');
   });
 
   test('a roster row’s menu pins its tab onto the strip, out of the chip', async ({
@@ -463,10 +477,15 @@ test.describe('Tab groups', () => {
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
-    branches.push(spawnAgent(repoPath, homeDir));
+    const player = spawnAgent(repoPath, homeDir);
+    branches.push(player);
     markOrchestrator(homeDir);
     await expect(countOf(page, CLAUDE)).toHaveText('2', { timeout: 30_000 });
     const chip = chipOf(page, CLAUDE);
+    // The home shown, its row the current one.
+    await chip.click();
+    await expect(shownTerminal(page)).toContainText(CONDUCTOR_READY);
+    await page.mouse.move(0, 600);
 
     await page.clock.install();
     await chip.hover();
@@ -482,21 +501,27 @@ test.describe('Tab groups', () => {
     await page.clock.runFor(450);
     await expect(roster(page)).toHaveCount(0);
     await page.clock.resume();
-    // Alt+ArrowDown opens it from the keyboard, its rows focused.
-    const focusedRow = roster(page).locator('[data-roster-row]:focus');
+    // Alt+ArrowDown opens it from the keyboard, on the shown tab's row.
+    const currentRow = roster(page).locator(
+      '[data-roster-row][aria-current=true]'
+    );
+    await chip.focus();
     await page.keyboard.press('Alt+ArrowDown');
     await expect(roster(page)).toBeVisible();
-    await expect(focusedRow).toHaveCount(1);
+    await expect(currentRow).toBeFocused();
+    await expect(currentRow).toContainText('Orchestrator');
     await page.keyboard.press('Escape');
     await expect(roster(page)).toHaveCount(0);
     await expect(chip).toBeFocused();
     // So does Enter; a row chosen by keyboard shows its tab.
     await page.keyboard.press('Enter');
-    await expect(focusedRow).toHaveCount(1);
+    await expect(currentRow).toBeFocused();
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
     await expect(roster(page)).toHaveCount(0);
     await expect(chip).toHaveAttribute('aria-selected', 'true');
+    await expect(activeLabel(page, CLAUDE)).toContainText(player);
+    await expect(shownTerminal(page)).toContainText(ready(player));
   });
 
   test('marks the chip active when the shown tab joins its group', async ({
@@ -545,13 +570,17 @@ test.describe('Tab groups', () => {
     await openRoster(page, chip);
     await rosterRows(page).filter({ hasText: player }).click();
     await expect(shownTerminal(page)).toContainText(ready(player));
+    await page.mouse.move(0, 600);
+    // A press is no rest: the roster stays shut past the rest's 400 ms.
+    await page.clock.install();
     await chip.click();
+    await page.clock.runFor(450);
     await expect(roster(page)).toHaveCount(0);
+    await page.clock.resume();
     await expect(shownTerminal(page)).toContainText(CONDUCTOR_READY);
 
     await focusTerminal(page);
     await page.mouse.move(0, 600);
-    await page.clock.install();
     await chip.hover();
     await page.clock.runFor(450);
     await expect(roster(page)).toBeVisible();

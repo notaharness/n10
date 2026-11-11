@@ -130,6 +130,15 @@ test.describe('Tab switching keys', () => {
     await expectActive(page, /beta/);
     await page.keyboard.press('Control+Shift+Tab');
     await expectActive(page, /alpha/);
+
+    // By position too, the chip's members counted one by one: the
+    // terminal is third, and last.
+    await page.keyboard.press('Control+3');
+    await expect(shown).toHaveText(terminal);
+    await page.keyboard.press('Control+1');
+    await expectActive(page, /alpha/);
+    await page.keyboard.press('Control+9');
+    await expect(shown).toHaveText(terminal);
   });
 
   test('Ctrl+Tab walks recently used tabs while Ctrl is held', async ({

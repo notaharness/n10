@@ -4,6 +4,7 @@ import {
   createWorktree,
   launchAgentFromRail,
   showTab,
+  stripTab,
   visibleText,
 } from './setup/app.js';
 import { sessionKey } from './setup/session-keys.js';
@@ -128,6 +129,16 @@ test.describe('Typing into an agent after a switch', () => {
     await expect(visibleText(page, /echo:back/)).toBeVisible({
       timeout: 15_000,
     });
+
+    // A plain press of its own tab on the strip, not a roster row: alpha
+    // pinned stands outside the chip.
+    await page.keyboard.press('Control+Alt+p');
+    const pinned = stripTab(page, /alpha/);
+    await expect(pinned).toHaveAttribute('data-pinned', 'true');
+    await showTab(page, /beta/);
+    await pinned.click();
+    await expect(pinned).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator(`${SHOWN_TERMINAL} textarea`)).toBeFocused();
   });
 });
 

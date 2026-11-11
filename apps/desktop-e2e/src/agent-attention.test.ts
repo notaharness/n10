@@ -72,6 +72,41 @@ test.describe('An agent that finishes while you are elsewhere', () => {
     });
   });
 
+  test('marks the chip it is behind, and the attention key shows it there', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await createWorktree(page, 'worker');
+    await launchAgentFromRail(page);
+    await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
+      timeout: 30_000,
+    });
+    // A second worktree of the repository: the two are one chip, the
+    // worker a member behind it.
+    await createWorktree(page, 'other');
+    const chip = page.locator('[data-group-chip^="place:"]');
+    await expect(chip.locator('[data-group-count]')).toHaveText('2');
+    await lookElsewhere(page, desktop.homeDir);
+
+    await expect(chip).toHaveClass(/tab-attention/, { timeout: 30_000 });
+    await page.keyboard.press('Control+Shift+KeyA');
+    await expect(chip).toHaveAttribute('aria-selected', 'true');
+    await expect(chip.locator('[data-group-active-label]')).toContainText(
+      'worker'
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.activeElement?.classList.contains('xterm-helper-textarea')
+        )
+      )
+      .toBe(true);
+    await expect(chip).not.toHaveClass(/tab-attention/, { timeout: 20_000 });
+    await expect(
+      page.getByRole('button', { name: 'All tabs', exact: true })
+    ).toBeVisible();
+  });
+
   test('clears the mark when the agent tab is clicked', async ({ desktop }) => {
     const { page } = desktop;
     await createWorktree(page, 'worker');
