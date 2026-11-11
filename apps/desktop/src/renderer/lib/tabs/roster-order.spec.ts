@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { terminalTabId, type Tab } from '../../lib/tabs/tabs.js';
+import { terminalTabId, type Tab } from './tab-identity.js';
 import { rosterEntries, type RosterEntry } from './roster-order.js';
 
 const player = (name: string): { tab: Tab } => ({

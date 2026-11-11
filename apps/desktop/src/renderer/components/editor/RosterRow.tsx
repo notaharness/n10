@@ -1,21 +1,19 @@
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { BrainIcon, CheckIcon } from 'lucide-react';
-import { useContext, useRef, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { rowStatus } from '../../lib/tabs/group-status.js';
 import { cutSide } from '../../lib/tabs/tab-presentation.js';
-import { PaneScopeContext, type Tab } from '../../lib/tabs/tabs.js';
+import type { Tab } from '../../lib/tabs/tabs.js';
 import { cn } from '../../lib/utils.js';
 import { usePlanCount } from '../../lib/plan/plan.js';
 import { PlanCountBadge, UnseenDot } from './tab-marks.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
 import type { TabStatus } from '../../lib/tabs/tab-groups.js';
-import { useSlotStyle } from './drag-preview.js';
 import { FACE_ICON, TabIcon } from './TabIcon.js';
 import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
-import type { RosterEntry } from './roster-order.js';
+import type { RosterEntry } from '../../lib/tabs/roster-order.js';
 import { rosterSecondary } from './roster-text.js';
+import type { useRosterRowDrag } from './use-roster-row-drag.js';
 
 /**
  * A roster's row: one of its group's tabs, drawn as the tab would be,
@@ -284,59 +282,4 @@ export function RosterRow({
       {band && <RowBand color={face.repoColor} />}
     </li>
   );
-}
-
-/** A roster row's sortable id: the tab's, in `pane`, apart from the
- *  strip's blocks. */
-export const rosterRowId = (pane: string, tabId: string) =>
-  `row:${pane}:${tabId}`;
-
-/**
- * A row of `group`'s roster as a sortable place (`strip-drag.ts`): its
- * tab, at `index` among the rows, in the pane the roster's chip is on.
- * The click a drop ends in is no press (`justDropped`).
- */
-export function useRosterRowDrag(group: string, face: TabFace, index: number) {
-  const pane = useContext(PaneScopeContext) ?? '';
-  const id = rosterRowId(pane, face.tab.id);
-  const slot = useSlotStyle(id);
-  const {
-    setNodeRef,
-    attributes,
-    listeners,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id,
-    data: {
-      kind: 'block',
-      label: face.label,
-      ids: [face.tab.id],
-      index,
-      pane,
-      row: group,
-    },
-  });
-  const dropped = useRef(false);
-  return {
-    setNode: setNodeRef,
-    handle: {
-      // A button already: its role and focus stay its own.
-      'aria-roledescription': 'sortable tab',
-      'aria-describedby': attributes['aria-describedby'],
-      ...listeners,
-      onPointerUp: () => {
-        // Moved far enough to drag: the click that follows is the drop's.
-        dropped.current = isDragging;
-        setTimeout(() => (dropped.current = false), 0);
-      },
-    },
-    style: {
-      position: 'relative' as const,
-      zIndex: isDragging ? 10 : undefined,
-      ...slot(isDragging, CSS.Translate.toString(transform), transition),
-    },
-    justDropped: () => dropped.current,
-  };
 }

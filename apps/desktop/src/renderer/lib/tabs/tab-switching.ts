@@ -32,7 +32,8 @@ import {
 let mru: TabMru = EMPTY_MRU;
 
 /** The order the strip presents its tabs in (`presentedIds`): each
- *  group together, collapsed members included. Noted by the strip; the
+ *  group together, the members behind its chip included, in its
+ *  roster's order. Noted by the strip; the
  *  positional shortcuts walk it. */
 let presented: readonly string[] = [];
 
@@ -145,7 +146,7 @@ function commit(): void {
 
 /**
  * The tab `n` (1-based) of the focused pane's presented order, pinned
- * tabs first and collapsed members included; 9 is the last. `null` for
+ * tabs first and chips' members included; 9 is the last. `null` for
  * a position the pane does not have.
  */
 export function presentedAt(

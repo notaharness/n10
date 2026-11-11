@@ -1,4 +1,5 @@
 import type { Affiliation, SessionRef } from '@n10/core/ui';
+import { rosterEntries } from './roster-order.js';
 import type { Tab } from './tab-identity.js';
 
 /**
@@ -194,7 +195,20 @@ export function groupName(
 /** Every tab in the order the strip presents them, members behind
  *  chips included: what positional switching walks. */
 export function presentedIds(groups: readonly TabGroup[]): string[] {
-  return groups.flatMap((g) => g.tabs.map((t) => t.id));
+  return groups.flatMap((g) => rosterOrder(g).map((t) => t.id));
+}
+
+/** A group's tabs in the order its roster lists them: an orchestrator's
+ *  players each followed by its own tabs (`rosterEntries`), so the keys
+ *  that walk tabs walk the rows the roster shows. */
+export function rosterOrder(group: TabGroup): Tab[] {
+  if (!group.chipped) return group.tabs;
+  const rows = rosterEntries(
+    group.tabs.map((tab) => ({ tab })),
+    group.head?.id,
+    group.affiliation?.kind === 'parent'
+  );
+  return rows.map((row) => row.face.tab);
 }
 
 /** What stands for `group` on the row: its chip, else its one tab. */

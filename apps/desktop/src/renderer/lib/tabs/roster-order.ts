@@ -1,4 +1,4 @@
-import type { Tab } from '../../lib/tabs/tabs.js';
+import type { Tab } from './tab-identity.js';
 
 /**
  * The rows of a group's roster, and how far each is indented. An

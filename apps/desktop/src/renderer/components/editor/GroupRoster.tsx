@@ -1,3 +1,4 @@
+import { useDndContext } from '@dnd-kit/core';
 import {
   useContext,
   useEffect,
@@ -16,13 +17,14 @@ import { ScrollArea } from '../ui/scroll-area.js';
 import type { TabFace } from './use-strip-groups.js';
 import type { useRosterOpen } from './use-roster-open.js';
 import { walkRows } from './roster-keys.js';
-import { rosterEntries } from './roster-order.js';
+import { rosterEntries } from '../../lib/tabs/roster-order.js';
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { PaneScopeContext } from '../../lib/tabs/tabs.js';
-import { RosterRow, rosterRowId, useRosterRowDrag } from './RosterRow.js';
+import { RosterRow } from './RosterRow.js';
+import { rosterRowId, useRosterRowDrag } from './use-roster-row-drag.js';
 
 /** A row that drags: its place among `group`'s rows. */
 function SortableRow({
@@ -95,6 +97,9 @@ export function GroupRoster({
   const entries = rosterEntries(faces, homeId, players);
   const rowId = (face: TabFace) => rosterRowId(pane, face.tab.id);
   const summary = rosterSummary(statuses);
+  // While a row is dragged by the keyboard, the arrows move it, not
+  // the focus.
+  const dragging = useDndContext().active !== null;
   return (
     <PopoverContent
       data-group-roster
@@ -166,7 +171,7 @@ export function GroupRoster({
           <ul
             ref={list}
             data-roster-list
-            onKeyDown={walkRows}
+            onKeyDown={dragging ? undefined : walkRows}
             className="flex flex-col"
           >
             {entries.map(({ face, depth, tree }, index) => (

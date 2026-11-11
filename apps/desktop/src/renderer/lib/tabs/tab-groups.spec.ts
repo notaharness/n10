@@ -158,6 +158,32 @@ describe('present', () => {
     ]);
   });
 
+  it('walks a chip’s tabs in its roster’s order: a player’s own tab right after it', () => {
+    const worktree = (name: string): Tab => ({
+      id: `item:${name}`,
+      kind: 'item',
+      repo: '/r',
+      itemKey: `branch:${name}`,
+      preview: false,
+      worktree: `/r/wt/${name}`,
+    });
+    const aShell = terminal('a-shell');
+    if (aShell.kind === 'terminal') aShell.cwd = '/r/wt/a';
+    const conductor = terminal('conductor');
+    const tabs = [conductor, aShell, worktree('b'), worktree('a')];
+    const affiliation = parent('claude:c', 'conductor');
+    const facts = (tab: Tab): TabFacts => ({
+      affiliation,
+      session: tab.kind === 'terminal' ? tab.name : undefined,
+    });
+    expect(presentedIds(present(tabs, facts))).toEqual([
+      'terminal:conductor',
+      'item:b',
+      'item:a',
+      'terminal:a-shell',
+    ]);
+  });
+
   it('heads a parent group with its home’s tab, wherever it sits', () => {
     const groups = strip([
       ['p1', parent('claude:c', 'conductor')],
