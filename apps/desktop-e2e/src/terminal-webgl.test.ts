@@ -10,6 +10,7 @@ import {
   expectAgentFillsPane,
   paneGrid,
 } from './setup/terminal-grid.js';
+import { startLoneShells } from './setup/terminals.js';
 
 /**
  * Terminals draw with xterm's WebGL renderer where the window has
@@ -82,11 +83,19 @@ test.describe('Terminals coming and going around one on screen', () => {
   test('keeps WebGL through many more terminals than Chromium keeps contexts', async ({
     desktop,
   }) => {
-    const { page } = desktop;
+    const { page, homeDir } = desktop;
     const shown = page.locator(SHOWN_TERMINAL);
-    for (const branch of ['alpha', 'beta', 'gamma']) {
-      await createWorktree(page, branch);
-      await launchAgentFromRail(page);
+    await createWorktree(page, 'alpha');
+    await launchAgentFromRail(page);
+    await expect(shown).toHaveAttribute('data-terminal-renderer', 'webgl', {
+      timeout: 30_000,
+    });
+    // Shells each alone in a directory, so each stands on the strip
+    // beside alpha, where a rest on its tab holds its pane ready.
+    startLoneShells(homeDir, ['beta', 'gamma']);
+    for (const name of [/beta/, /gamma/]) {
+      await expect(tab(page, name)).toBeVisible({ timeout: 30_000 });
+      await tab(page, name).click();
       await expect(shown).toHaveAttribute('data-terminal-renderer', 'webgl', {
         timeout: 30_000,
       });

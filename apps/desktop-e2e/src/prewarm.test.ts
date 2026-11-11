@@ -1,3 +1,5 @@
+import { mkdirSync, mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
@@ -15,6 +17,7 @@ import {
   shownTerminal,
   spareText,
 } from './setup/prewarm.js';
+import { startLoneShells, startSurvivingTerminal } from './setup/terminals.js';
 
 /**
  * The editor keeps one pane besides the one on screen: the tab the
@@ -24,23 +27,57 @@ import {
  */
 
 const BANNER = 'n10-fake-agent-ready';
+/** Streams `working <n> @<directory>`. */
+const STREAM = fakeAgent({ stream: true, intervalMs: 100, tag: true });
+
 async function launch(page: Page, branch: string): Promise<void> {
   await createWorktree(page, branch);
   await launchAgentFromRail(page);
   await expect(visibleText(page, BANNER)).toBeVisible({ timeout: 30_000 });
 }
 
+/**
+ * The streaming agent in a terminal alone in a directory of its own,
+ * `<name>-XXXXXX` under the fixture HOME, for each name: tabs that stand
+ * on the strip rather than behind a group's chip, as a hover needs. The
+ * app finds them in the background; each is opened in turn, so the last
+ * is on screen and the one before it was left last.
+ */
+async function openLoneStreams(
+  page: Page,
+  homeDir: string,
+  names: readonly string[]
+): Promise<void> {
+  const root = join(homeDir, 'places');
+  mkdirSync(root, { recursive: true });
+  for (const name of names) {
+    startSurvivingTerminal({
+      name: `${name}-stream`,
+      cwd: mkdtempSync(join(root, `${name}-`)),
+      command: STREAM,
+      homeDir,
+    });
+  }
+  for (const name of names) {
+    const own = tab(page, new RegExp(name));
+    await expect(own).toBeVisible({ timeout: 30_000 });
+    await own.click();
+    await expect(own).toHaveAttribute('aria-selected', 'true');
+    await expect(visibleText(page, `@${name}-`)).toBeVisible({
+      timeout: 30_000,
+    });
+  }
+}
+
 test.describe('A pane held ready', () => {
-  test.use({
-    n10Config: {
-      aiCommand: fakeAgent({ stream: true, intervalMs: 100, tag: true }),
-    },
-  });
+  test.use({ n10Config: { aiCommand: STREAM } });
 
   test.beforeEach(async ({ desktop }) => {
-    for (const branch of ['alpha', 'beta', 'gamma']) {
-      await launch(desktop.page, branch);
-    }
+    await openLoneStreams(desktop.page, desktop.homeDir, [
+      'alpha',
+      'beta',
+      'gamma',
+    ]);
     await desktop.page.clock.install();
   });
 
@@ -74,6 +111,10 @@ test.describe('A pane held ready', () => {
     desktop,
   }) => {
     const { page } = desktop;
+    // Rows to sweep too: the sidebar's, for agents in two worktrees,
+    // which share their repository's chip on the strip.
+    await launch(page, 'delta');
+    await launch(page, 'epsilon');
     await page.evaluate(() => {
       const w = window as unknown as { held: number[] };
       w.held = [];
@@ -90,12 +131,12 @@ test.describe('A pane held ready', () => {
 
     const targets = [
       tab(page, /alpha/),
-      sidebarRow(page, /beta/),
+      sidebarRow(page, /delta/),
       tab(page, /beta/),
-      sidebarRow(page, /alpha/),
-      sidebarRow(page, /gamma/),
+      sidebarRow(page, /epsilon/),
+      tab(page, /gamma/),
       tab(page, /alpha/),
-      sidebarRow(page, /beta/),
+      sidebarRow(page, /delta/),
     ];
     for (let round = 0; round < 2; round++) {
       for (const target of targets) await restOn(page, target, 170);
@@ -125,11 +166,17 @@ test.describe('A pane held ready', () => {
 test('closing a tab the pointer rests on lets its pane go', async ({
   desktop,
 }) => {
-  const { page } = desktop;
-  // No agents: a tab without one closes at once, with no dialog
-  // coming up under the pointer.
+  const { page, homeDir } = desktop;
+  // A worktree's tab with no agent closes at once, with no dialog
+  // coming up under the pointer. Looking away at a shell alone in its
+  // directory leaves it a tab of its own on the strip, and the one
+  // left last.
   await createWorktree(page, 'alpha');
-  await createWorktree(page, 'beta');
+  startLoneShells(homeDir, ['beta']);
+  const beta = tab(page, /beta/);
+  await expect(beta).toBeVisible({ timeout: 30_000 });
+  await beta.click();
+  await expect(beta).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('[data-spare-pane]')).toHaveCount(1);
   await page.clock.install();
   await restOn(page, tab(page, /alpha/));
