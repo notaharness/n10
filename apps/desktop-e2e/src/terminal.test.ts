@@ -12,10 +12,10 @@ import {
   createWorktree,
   focusTerminal,
   launchAgentFromRail,
+  showTab,
   sidebarRow,
   startSessionFromMenu,
   tab,
-  tabs,
   visibleText,
   openSessions,
 } from './setup/app.js';
@@ -91,7 +91,10 @@ test.describe('Two agents at once', () => {
     await launch(page, 'beta');
     await typeAndExpectEcho(page, 'from-beta');
 
-    await expect(tabs(page)).toHaveCount(2);
+    // Two tabs, behind their repository's chip.
+    await expect(
+      page.locator('[data-group-chip^="place:"] [data-group-count]')
+    ).toHaveText('2');
     // Two PTYs sharing one key would cross their streams here.
     await expect(
       page.getByText(/echo:from-alpha/).filter({ visible: true })
@@ -99,7 +102,7 @@ test.describe('Two agents at once', () => {
 
     // Back to the first: its terminal mounts again and starts from the
     // host's ring buffer, which still holds the exchange.
-    await tab(page, /alpha/).click();
+    await showTab(page, /alpha/);
     await expect(visibleText(page, /echo:from-alpha/)).toBeVisible();
     await expect(
       page.getByText(/echo:from-beta/).filter({ visible: true })
@@ -128,7 +131,7 @@ test.describe('Two agents at once', () => {
     // re-render re-watching the session is the easy way in — writes the
     // history into the terminal a second time, under the copy already
     // there.
-    await tab(page, /alpha/).click();
+    await showTab(page, /alpha/);
     await expect(visibleText(page, /echo:from-alpha/)).toBeVisible();
     // A watch of our own is queued behind any the switch provoked: once
     // it answers, a second replay would already have been written.

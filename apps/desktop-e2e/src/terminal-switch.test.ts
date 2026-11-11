@@ -3,7 +3,7 @@ import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
   createWorktree,
   launchAgentFromRail,
-  tab,
+  showTab,
   visibleText,
 } from './setup/app.js';
 import { sessionKey } from './setup/session-keys.js';
@@ -99,7 +99,7 @@ test.describe('Streaming agents in several tabs', () => {
     await expect
       .poll(() => latestWork(page), { timeout: 10_000 })
       .toBeGreaterThanOrEqual(15);
-    await tab(page, /alpha/).click();
+    await showTab(page, /alpha/);
 
     // The terminal draws only the rows in its viewport, so reading
     // them also says it is scrolled to the latest, not somewhere above.
@@ -119,7 +119,7 @@ test.describe('Typing into an agent after a switch', () => {
     await launch(page, 'alpha');
     await launch(page, 'beta');
 
-    await tab(page, /alpha/).click();
+    await showTab(page, /alpha/);
     await expect(visibleText(page, BANNER)).toBeVisible();
     // No click into the terminal first: arriving is enough.
     await expect(page.locator(`${SHOWN_TERMINAL} textarea`)).toBeFocused();
@@ -148,7 +148,7 @@ test.describe('Fitting the terminal to its pane', () => {
       const [w, h] = win.getSize();
       win.setSize(w - 200, h - 120);
     });
-    await tab(page, /alpha/).click();
+    await showTab(page, /alpha/);
     await expect(visibleText(page, BANNER)).toBeVisible();
 
     // The window changed while alpha had no terminal to notice; the
@@ -183,13 +183,13 @@ test.describe('Fitting the terminal to its pane', () => {
     // arrivals is in the ring buffer by the third, so the last check
     // sees what they provoked, not what the third one does.
     for (let i = 0; i < 2; i++) {
-      await tab(page, /alpha/).click();
+      await showTab(page, /alpha/);
       await expect(visibleText(page, BANNER)).toBeVisible();
       await expect(page.locator(SHOWN_TERMINAL)).toHaveCount(1);
-      await tab(page, /beta/).click();
+      await showTab(page, /beta/);
       await expect(page.locator(SHOWN_TERMINAL)).toHaveCount(1);
     }
-    await tab(page, /alpha/).click();
+    await showTab(page, /alpha/);
     await expect.poll(() => reports()).toBeGreaterThanOrEqual(before);
     expect(await reports()).toBe(before);
   });
