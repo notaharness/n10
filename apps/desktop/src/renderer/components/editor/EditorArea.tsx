@@ -18,7 +18,6 @@ import {
   type TabGroup,
 } from '../../lib/tabs/tab-groups.js';
 import { indexItems } from '../../lib/tabs/tab-item.js';
-import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
 import { useRequestAgentView } from '../../lib/tabs/tab-views.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
@@ -83,7 +82,6 @@ export function EditorArea({
   }, [tabs.activeId]);
   const { labelOf, rename, renameAlone, renameActive, dialog } = useGroupRename(
     groups,
-    faceOf,
     derivedOf
   );
   const supervise = useSupervise({ groups, faceOf, factsOf, labelOf });
@@ -138,11 +136,7 @@ export function EditorArea({
       requestAgentView(target.tab.id);
     attentionActivation.current = target.tab.id;
     tabs.activate(target.tab.id);
-    const label = tabPresentation(
-      target.tab,
-      target.item,
-      target.machineLabel
-    ).label;
+    const label = target.label;
     const status = rowStatus(target.status, {
       exited: target.snapshot?.exited ?? false,
       unseen: target.unseen,

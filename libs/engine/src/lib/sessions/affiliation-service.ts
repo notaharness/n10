@@ -141,7 +141,15 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
   }
 
   function derive(): boolean | 'labels' {
-    const all = [...listings.values()].flat();
+    const unique = new Map<string, TaggedSession>();
+    for (const session of [...listings.values()].flat()) {
+      const key = registryNameOf(session);
+      const prior = unique.get(key);
+      if (!prior || session.created < prior.created) unique.set(key, session);
+    }
+    const all = [...unique.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, session]) => session);
     const nextCreated = new Map(all.map((s) => [registryNameOf(s), s.created]));
     const createdChanged = !isDeepStrictEqual(nextCreated, created);
     created = nextCreated;

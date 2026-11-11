@@ -27,6 +27,7 @@ import {
   heldTerminals,
   machineOf,
 } from './terminal-discovery.js';
+import { worthAnnouncing } from './discovery-announcement.js';
 
 /** Two batch listings per scan; measured cost and alternatives: docs/decisions.md. */
 const DISCOVERY_INTERVAL_MS = 4_000;
@@ -36,21 +37,7 @@ const WATCH_DEBOUNCE_MS = 200;
 
 /** Survive transient index.lock failures without retrying deterministic spawn errors forever. */
 const MAX_ADOPT_ATTEMPTS = 3;
-
-/** Offers alone are not changes: an adoption can lose a race without changing
- * anything a shell could display. `delta.changed` would refetch every such tick.
- * `touched` counts the sessions this scan attached or released. */
-function worthAnnouncing(delta: DiscoveryDelta, touched: number): boolean {
-  return (
-    touched > 0 ||
-    delta.appeared.length > 0 ||
-    delta.disappeared.length > 0 ||
-    delta.stranded.length > 0 ||
-    delta.switched.length > 0 ||
-    delta.ended.length > 0 ||
-    delta.endedTerminals.length > 0
-  );
-}
+type MetadataChange = boolean | 'labels' | undefined;
 
 /**
  * An agent that outlived its worktree has ended too, so nothing is left
@@ -86,7 +73,10 @@ export interface SessionDiscoveryOptions {
   onChanged: (delta: DiscoveryDelta) => void;
   onLabelsChanged?: () => void;
   /** Handed each machine's whole listing as a scan reads it. */
-  listed?: (machine: string, sessions: readonly TaggedSession[]) => boolean | 'labels' | undefined;
+  listed?: (
+    machine: string,
+    sessions: readonly TaggedSession[]
+  ) => boolean | 'labels' | undefined;
   /** Told each time a machine's scan has finished, the terminals it
    *  found adopted: from then on, a terminal of that machine no listing
    *  names is gone, not yet to be found. Withheld while an attach that
@@ -298,12 +288,20 @@ export function startSessionDiscovery(
     const adopted = await adoptAll(delta);
     if (live() && !awaitingAttach(delta.adoptableTerminals))
       opts.scanned?.(LOCAL_MACHINE);
-    const structural = first || worthAnnouncing(delta, adopted + released);
-    if (!stopped && isCurrent()) {
-      if (structural || metadataChanged === true) onChanged(delta);
-      else if (metadataChanged === 'labels') opts.onLabelsChanged?.();
-    }
+    announceScan(delta, first, adopted + released, metadataChanged);
     ensureWatch();
+  }
+
+  function announceScan(
+    delta: DiscoveryDelta,
+    first: boolean,
+    touched: number,
+    metadataChanged: MetadataChange
+  ): void {
+    if (stopped || !isCurrent()) return;
+    if (first || worthAnnouncing(delta, touched) || metadataChanged === true)
+      onChanged(delta);
+    else if (metadataChanged === 'labels') opts.onLabelsChanged?.();
   }
 
   function scanNow(): Promise<void> {

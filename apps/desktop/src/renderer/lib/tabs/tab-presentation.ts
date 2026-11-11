@@ -186,18 +186,6 @@ export function placeName(path: string): string {
 
 /** Canonical place carried by discovery; a tab-only group uses its one place. */
 export function groupPlacePath(group: TabGroup): string | undefined {
-  if (group.affiliation?.kind === 'parent' && !group.head) {
-    const paths = new Set(
-      group.tabs.flatMap((tab) =>
-        tab.kind === 'item'
-          ? [tab.repo]
-          : tab.kind === 'terminal'
-          ? [tab.repo ?? tab.cwd]
-          : []
-      )
-    );
-    if (paths.size > 1) return undefined;
-  }
   const known =
     group.affiliation?.place ??
     (group.affiliation?.kind === 'parent'

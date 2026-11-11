@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type {
   SessionActivitySnapshot,
   SidebarItem,
@@ -13,12 +13,10 @@ import {
 import { resolveMachineLabel } from '../../lib/machines/machine-model.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
-import { affiliationIndex, tabFacts } from '../../lib/tabs/tab-affiliation.js';
 import {
   expandsOnShow,
   groupOf,
   isCollapsed,
-  isHomeTab,
   present,
   presentedIds,
   statusFromActivity,
@@ -26,8 +24,7 @@ import {
   type TabGroup,
   type TabStatus,
 } from '../../lib/tabs/tab-groups.js';
-import { indexItems, tabItem } from '../../lib/tabs/tab-item.js';
-import { listedSessions, tabSessions } from '../../lib/tabs/tab-sessions.js';
+import { tabItem } from '../../lib/tabs/tab-item.js';
 import {
   collisionLabel,
   groupPlacePath,
@@ -38,6 +35,7 @@ import {
 import { notePresentedOrder } from '../../lib/tabs/tab-switching.js';
 import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import { bucketTabs, canShowTask } from './strip-labels.js';
+import { useTabFacts } from './use-tab-facts.js';
 
 /** What a tab's button shows, wherever it is drawn: on the strip or as
  *  a roster row. */
@@ -77,66 +75,6 @@ export interface StripGroups {
 }
 
 /**
- * What the strip needs of a tab to group it: the session it shows or
- * works beside, and its affiliation. Also how the workspace places a
- * tab a sync opens (`groupOf`), so it shares one answer with the strip.
- */
-export function useTabFacts(items: SidebarItem[]) {
-  const { repo } = useRepo();
-  const terminals = useTerminals();
-  const foreign = useForeignSessions();
-  const sessions = useSessions(repo.cwd);
-  const index = useMemo(() => indexItems(repo.cwd, items), [repo.cwd, items]);
-
-  const sessionRows = useMemo(
-    () => listedSessions(items, sessions.data),
-    [items, sessions.data]
-  );
-  const affiliations = useMemo(
-    () =>
-      affiliationIndex({
-        repo: repo.cwd,
-        sessions: sessionRows,
-        terminals: terminals.data ?? [],
-        foreign: foreign.data?.sessions ?? [],
-      }),
-    [repo.cwd, sessionRows, terminals.data, foreign.data]
-  );
-
-  const { sessionOf, ownSession } = tabSessions(items, index);
-
-  const factsOf = (tab: Tab) => tabFacts(tab, sessionOf(tab), affiliations);
-  return { index, sessionOf, ownSession, factsOf };
-}
-
-/** Whether `tab` is its parent group's home: the orchestrator's own. */
-export function isHomeIn(tab: Tab, facts: TabFacts): boolean {
-  const a = facts.affiliation;
-  return a?.kind === 'parent' && !!a.home && isHomeTab(tab, facts, a.home);
-}
-
-/** The group a tab belongs to as the strip reads it (`useTabFacts`), and
- *  whether it is that group's home, by functions that keep their
- *  identity and read the latest facts: a sync places the tabs it opens
- *  with them without re-running on every render. */
-export function useGrouping(items: SidebarItem[]) {
-  const { factsOf } = useTabFacts(items);
-  const latest = useRef(factsOf);
-  useEffect(() => {
-    latest.current = factsOf;
-  });
-  const groupOf = useCallback(
-    (tab: Tab) => latest.current(tab).affiliation?.key ?? null,
-    []
-  );
-  const isHome = useCallback(
-    (tab: Tab) => isHomeIn(tab, latest.current(tab)),
-    []
-  );
-  return useMemo(() => ({ groupOf, isHome }), [groupOf, isHome]);
-}
-
-/**
  * The strip's groups and every tab's face, from the open repository's
  * items, the host's session listings and the tabs. Notes the presented
  * order for positional switching, and expands a collapsed group when one
@@ -164,7 +102,10 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
   const foreignByCheckout = useMemo(
     () =>
       new Map(
-        (foreign.data?.sessions ?? []).map((row) => [`${row.repo}\0${row.worktree}`, row])
+        (foreign.data?.sessions ?? []).map((row) => [
+          `${row.repo}\0${row.worktree}`,
+          row,
+        ])
       ),
     [foreign.data]
   );
@@ -174,10 +115,13 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     if (!name) return null;
     const machineId =
       tab.kind === 'terminal'
-        ? terminalByName.get(name)?.machine
+        ? terminalByName.get(name)?.machine ?? tab.machine
         : sessionByName.get(name)?.machine;
     return !machineId || machineId === 'local'
       ? null
+      : tab.kind === 'terminal' &&
+        !machines.data?.some((m) => m.peerId === machineId)
+      ? tab.machineLabel ?? resolveMachineLabel(machineId, machines.data)
       : resolveMachineLabel(machineId, machines.data);
   };
   const colorOfTab = (tab: Tab): string | null => {

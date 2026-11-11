@@ -14,12 +14,7 @@
  * two repos routinely share branch names and so share item keys.
  */
 
-import {
-  isForeignTab,
-  tabHome,
-  terminalTabId,
-  type Tab,
-} from './tab-identity.js';
+import { tabHome, terminalTabId, type Tab } from './tab-identity.js';
 import type { Edge } from './layout.js';
 import type { Anchor } from './pane-moves.js';
 
@@ -42,6 +37,7 @@ import { assignOrdinals, presentationOrder } from './tab-label-state.js';
 import { pinLive, rekey } from './tab-sync.js';
 import {
   arrangeTabs,
+  focusRepo,
   keepTab,
   moveTabs,
   renameGroup,
@@ -124,8 +120,16 @@ export type TabsAction =
   /** Name a group, by affiliation key; `null` (or a blank name) gives it
    *  back its derived label. */
   | { type: 'rename-group'; key: string; name: string | null }
-  | { type: 'assign-collision-ordinals'; values: Readonly<Record<string, { base: string; ordinal: number }>> }
-  | { type: 'assign-chip-ordinals'; values: Readonly<Record<string, { label: string; ordinal: number; home?: boolean }>> }
+  | {
+      type: 'assign-collision-ordinals';
+      values: Readonly<Record<string, { base: string; ordinal: number }>>;
+    }
+  | {
+      type: 'assign-chip-ordinals';
+      values: Readonly<
+        Record<string, { label: string; ordinal: number; home?: boolean }>
+      >;
+    }
   /** The one reconciliation dispatched from Workspace's effect: the
    *  repo's sidebar items *and* the host's terminal listing, applied as
    *  one pure step. Terminals ride along on every sync rather than
@@ -289,30 +293,6 @@ function remember(state: Strip): Strip {
   };
 }
 
-/**
- * Show the repository that was just opened rather than the tab the user
- * was on before, when that tab belongs to somewhere else.
- *
- * Without this, switching repositories leaves the previous repo's tab
- * active — so the workspace you asked for opens onto a pane explaining
- * that it belongs to the one you left. A repo with no tabs of its own
- * goes to no active tab at all, which is the editor's empty state, with
- * the other repositories' tabs still on the strip.
- *
- * The settings tab is nobody's, so it survives a repo change.
- */
-function focusRepo(state: Strip, repo: string): Strip {
-  const active = state.tabs.find((t) => t.id === state.activeId);
-  if (active && !isForeignTab(active, repo)) return state;
-  const remembered = state.tabs.find(
-    (t) => t.id === state.lastActiveByRepo[repo]
-  );
-  const own =
-    remembered ?? [...state.tabs].reverse().find((t) => tabHome(t) === repo);
-  const activeId = own?.id ?? null;
-  return activeId === state.activeId ? state : { ...state, activeId };
-}
-
 /** The actions that take tabs off the strip. */
 type CloseAction = Extract<
   TabsAction,
@@ -435,7 +415,10 @@ function applyMark(state: Strip, action: MarkAction): Strip {
 }
 
 function applyStrip(state: Strip, action: StripAction): Strip {
-  if (action.type === 'assign-collision-ordinals' || action.type === 'assign-chip-ordinals')
+  if (
+    action.type === 'assign-collision-ordinals' ||
+    action.type === 'assign-chip-ordinals'
+  )
     return assignOrdinals(state, action);
   if (MARK_ACTIONS.has(action.type)) {
     return applyMark(state, action as MarkAction);

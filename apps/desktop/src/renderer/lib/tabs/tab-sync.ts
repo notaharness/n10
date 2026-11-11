@@ -2,16 +2,6 @@ import { pairKey } from './tab-identity.js';
 import type { ItemEntry, ItemTab, Tab } from './tabs-model.js';
 import type { Strip } from './workspace.js';
 
-/** Let a live session whose attempted close failed auto-open again. */
-export function forgetAutoOpened(state: Strip, keys: string[]): Strip {
-  if (keys.length === 0) return state;
-  const drop = new Set(keys);
-  const autoOpened = state.autoOpened.filter((key) => !drop.has(key));
-  return autoOpened.length === state.autoOpened.length
-    ? state
-    : { ...state, autoOpened };
-}
-
 /**
  * The passes `sync-items` runs over tabs that already exist:
  * following an item whose key changed identity, collapsing the
