@@ -856,7 +856,7 @@ onto their rows; the desktop also stamps its foreign-session listing.
 Orchestra tags a player without an event, so a change shows at the next
 discovery scan. Repositories play no part in parent membership.
 
-The strip derives groups from `TabsState.tabs` on every render
+The strip derives groups from a pane's tab order on every render
 (`lib/tabs/tab-groups.ts` `present`): one per affiliation, in the order of
 each group's first tab, members in their relative order, the home's tab
 first. Contiguity is derived, never an invariant: nothing re-sorts the tabs
@@ -875,15 +875,15 @@ a press pins it, Alt+ArrowDown opens it on the active row, Escape returns
 focus to its button and keeps hover from reopening it until the pointer
 leaves.
 
-Collapse is in `TabsState.collapsed`, an explicit choice per group over one
+Collapse is in `Workspace.collapsed`, an explicit choice per group over one
 rule by affiliation kind (`initiallyCollapsed`: a parent group starts
 collapsed, its players behind the chip, and a place group expanded),
-kept for the run. A collapsed group shows its chip alone; activating a tab in
+saved with the workspace. A collapsed group shows its chip alone; activating a tab in
 it from anywhere expands it, while collapsing the group the active tab is in
 leaves the active content as it is. A collapsed group the active tab joins
 behind its chip, when a later scan gives it its parent, expands too. Collapse others is on the native menus.
 Positional keyboard switching walks the presented order, collapsed members
-included (`tab-switching.ts`). Close Others closes every other tab.
+included (`tab-switching.ts`). Close Others closes every other unpinned tab.
 
 Drag (`strip-drag.ts`): a member moves only among its group's members, and a
 group, dragged by its chip body, or a lone tab moves only between blocks.
@@ -898,6 +898,57 @@ carried outside its group is told "Tabs stay in their group", and drags
 announce "Moving", "Position n of m", "Moved" and "Move cancelled". A home's
 tab selects on click, not on press, so dragging its group does not activate
 it.
+
+### Tab workspace
+
+The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): tabs by id, a
+layout tree of splits over panes (each with its order and active tab), the
+focused pane, and the user's marks — pins, collapsed groups, group names and
+dismissed sessions — beside `unseen` and `lastActiveByRepo`. The layout is
+one pane for now; it has the final shape so splitting needs no migration of
+the saved file. Every reducer pass works on one pane's `Strip` (its tabs as
+an ordered list and its active tab, beside the workspace-wide sets);
+`reduce` applies them to the focused pane, `reduceStrip` is the pass layer.
+
+`dismissed` replaces auto-open history. Every running agent, listed terminal
+and foreign agent has a tab unless its session is dismissed. Every close
+dismisses the sessions of the tabs it takes away (`dismissKeyOf`: an item's
+stamped `session`, a terminal's name with its tmux creation time when the tab
+knew it); a sync forgets each one whose listing has it gone, or that has a
+tab again. A listing that has not answered (`entries`, `terminals` or
+`foreign` undefined) forgets nothing. So the record is never longer than the
+sessions running, closing an agent tab whose kill failed, or a foreign
+agent's, keeps it closed across syncs and restarts, and an agent started
+again later gets its tab. A terminal in a branch's checkout is dismissed as
+it is listed: it lives in the branch's tab. Item sessions carry no creation
+time, so a dismissed worktree whose agent is replaced while n10 is closed
+stays dismissed until that agent ends.
+
+Pins are a flag set. `present` puts pinned tabs first, alone and outside
+their group, in pane order; unpinning leaves the order alone, so the tab
+shows in its group where it was. Close Others and Close All keep pins. A pin
+drags only among pins, everything else only outside them. Keep Open (ending
+a preview) is `keep`; pinning a preview keeps it.
+
+Group names are a map by affiliation key, set from the rename dialog
+(`lib/tabs/group-name.ts` rules); they survive the group's absence.
+
+The host keeps `~/.n10/workspace.json` (`services/workspace-file.ts`), beside
+the desktop prefs and shared by dev and installed builds. Saves are debounced
+and written whole through a temporary file and a rename, and the host writes
+a pending save on shutdown. A save resolves once its write landed; a failed
+one keeps the last good file and the renderer says so once. A file that does
+not parse, or carries an unknown version, is renamed aside and never
+overwritten, and the workspace starts empty. The renderer saves everything
+but `unseen` (`lib/tabs/workspace-file.ts`), and a terminal tab only once a
+listing has dated it; it checks every field on restore and drops what does
+not hold. `TabsProvider` draws nothing until the restore has answered, so the
+first `sync-items` reconciles against the restored tabs. A restored terminal
+tab attaches nothing ("Reconnecting…") until a listing binds it: the same
+name and creation time binds; a listing without it closes it — a later
+session under its name gets its own tab — unless the tab is on another
+machine, which may be offline; a listing that does not know the creation
+time yet waits. Item tabs reconcile through the re-key rules.
 
 ## Plans and auto-fixing
 

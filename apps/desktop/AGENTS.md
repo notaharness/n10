@@ -80,7 +80,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `spawned` and `ended`; everything else rides on the sidebar poll.
 - `libs/engine/src/lib/sessions/terminal-service.ts` owns process-wide terminal lifecycle;
   `services/terminals.ts` supplies output relays, recents and tab grouping.
-  Terminal tabs have no state file; tmux is the record: a shell tab carries
+  Terminals have no state file of their own; tmux is the record: a shell tab carries
   `@session-x-n10-session-type shell`, an agent tab is a `@session-*` record
   without both checkout keys (Orchestra's `dir` players too), the name is a label
   (`<directory>-shell`, suffixed on collision) and the key, the directory is
@@ -102,9 +102,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   Web-rendered menus only for what the OS cannot express.
 - Tabs have exactly one reconciliation point: `Workspace` hands the item list
   to `sync-items` in `lib/tabs/tabs-model.ts`, a pure reducer that re-keys
-  stale tabs, opens a tab per newly running agent (`autoOpened`,
-  repo-qualified) behind the active tab and marks it `unseen` until
-  activated, pins previews with a live agent, and adds foreign and
+  stale tabs, opens a tab per running agent not `dismissed`
+  (repo-qualified) behind the active tab and marks it `unseen` until
+  activated, keeps previews with a live agent, and adds foreign and
   terminal tabs. Add nothing to that seam from an effect. A tab is identified
   by PR id or `(repo, branch)`, `repo` being the real path
   (`canonicalRepoPath`), and follows its worktree's path first: `git switch`
@@ -121,10 +121,17 @@ Every rule below has its reasoning in `docs/decisions.md`.
 - The strip groups tabs by affiliation, the parent a session reports to
   else its place, which the engine stamps on session, terminal and foreign
   rows (`lib/tabs/tab-affiliation.ts`). Groups are presentation only:
-  `present` (`lib/tabs/tab-groups.ts`) derives them from `TabsState.tabs`
-  every render, and positional switching walks its order. Collapse is
-  `TabsState.collapsed`; drag legality is `components/editor/strip-drag.ts`.
-  Rules and reasoning: decisions.md "Tab groups".
+  `present` (`lib/tabs/tab-groups.ts`) derives them from a pane's tab order
+  every render, pinned tabs first, and positional switching walks its
+  order. Collapse is `Workspace.collapsed`; drag legality is
+  `components/editor/strip-drag.ts`. Rules and reasoning: decisions.md
+  "Tab groups".
+- The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): one pane
+  for now, in the shape splits need. Reducer passes run on a pane's
+  `Strip`. `~/.n10/workspace.json` (host `services/workspace-file.ts`) keeps
+  it across restarts; `TabsProvider` restores it before the strip draws.
+  `dismissed`, pins, group names and restore binding: decisions.md "Tab
+  workspace".
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Sessions · Files) beside one content pane that
   swaps between Overview, diff, a session's terminal (mounted only while shown) and
