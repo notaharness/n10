@@ -130,7 +130,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   tree of panes (`layout.ts`), each with its own strip. Reducer passes run
   on a pane's `Strip`; `workspace-reduce.ts` picks the pane, and runs the
   reconciliations across all of them. `EditorLayout` draws the tree with
-  nested resizable-panels groups; `useTabs` answers for the pane in
+  nested resizable-panels groups of empty slots; each pane's content is
+  portalled into a container its slot adopts (`pane-slots.ts`), so layout
+  changes never remount it. `useTabs` answers for the pane in
   `PaneScopeContext`, else the focused one. `~/.n10/workspace.json` (host
   `services/workspace-file.ts`) keeps it across restarts; `TabsProvider`
   restores it before the strip draws. Only tmux's `alive` answer ends an

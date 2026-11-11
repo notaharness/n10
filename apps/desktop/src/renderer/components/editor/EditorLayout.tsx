@@ -1,4 +1,12 @@
-import { Fragment, useEffect, useRef } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
 import {
   Group,
   Panel,
@@ -27,6 +35,7 @@ import {
 } from '../../lib/tabs/workspace.js';
 import { cn } from '../../lib/utils.js';
 import { EditorArea } from './EditorArea.js';
+import { createPaneSlots, type PaneSlots } from './pane-slots.js';
 import { paneFrame } from './reveal-tab.js';
 import { sayPane } from './use-pane-menus.js';
 
@@ -38,6 +47,8 @@ interface Shared {
   split: boolean;
   /** The pane that may hold the window's one spare (`EditorArea`). */
   spareOwner: PaneId;
+  /** Where each pane's content is placed in the tree (`pane-slots.ts`). */
+  slots: PaneSlots;
 }
 
 /**
@@ -57,6 +68,11 @@ export function EditorLayout({
   const panes = usePanes();
   const prewarm = usePrewarm();
   const { workspace } = useWorkspace();
+  const [slots] = useState(createPaneSlots);
+  const holder = useCallback(
+    (el: HTMLDivElement | null) => slots.holder(el),
+    [slots]
+  );
   // The pane shortcuts act on the focused pane and its active tab.
   useEffect(() => {
     setPaneCommands((command) => {
@@ -80,6 +96,7 @@ export function EditorLayout({
     onOpenPalette,
     split: panes.count > 1,
     spareOwner: hovered ?? panes.focusedPane,
+    slots,
   };
   return (
     <div className="h-full min-h-0 min-w-0 overflow-auto bg-background">
@@ -94,13 +111,38 @@ export function EditorLayout({
       >
         <LayoutView node={panes.layout} shared={shared} />
       </div>
+      <div ref={holder} hidden />
+      {panesOf(panes.layout).map((pane) => (
+        <PaneHost key={pane.id} pane={pane} shared={shared} />
+      ))}
     </div>
   );
 }
 
+/** A pane's content, mounted for as long as the pane exists wherever
+ *  the tree puts it: rendered into a container of its own, which its
+ *  slot in the tree adopts (`pane-slots.ts`). */
+function PaneHost({ pane, shared }: { pane: PaneNode; shared: Shared }) {
+  const [container] = useState(() => {
+    const el = document.createElement('div');
+    el.className = 'h-full w-full min-h-0 min-w-0';
+    return el;
+  });
+  const { slots } = shared;
+  useLayoutEffect(
+    () => slots.host(pane.id, container),
+    [slots, pane.id, container]
+  );
+  return createPortal(<PaneView pane={pane} shared={shared} />, container);
+}
+
 function LayoutView({ node, shared }: { node: LayoutNode; shared: Shared }) {
   return node.kind === 'pane' ? (
-    <PaneView pane={node} shared={shared} />
+    <div
+      ref={shared.slots.slot(node.id)}
+      data-pane-slot={node.id}
+      className="h-full w-full min-h-0 min-w-0"
+    />
   ) : (
     <SplitView split={node} shared={shared} />
   );

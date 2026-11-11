@@ -944,10 +944,15 @@ tab and marks its output seen; only the focused one takes the keyboard
 spare (`ownsSpare`): the focused pane's, or the pane whose strip tab the
 pointer rests on, and never a tab another pane holds. A split keeps its id
 (`split-N`) for as long as it stands, and React keys panels by pane and
-split ids, so panes beside a change keep their content. A pane's content
-remounts only when the pane changes level in the tree: the sole pane or a
-pane inside a split becoming a split of its own, or the survivor of a split
-that collapses moving up. A resize or focus change remounts nothing.
+split ids. Each pane's content renders once, keyed by pane id, through a
+portal into a container of its own (`pane-slots.ts`); the tree draws only
+an empty slot per pane, which adopts that container. So a pane changing
+level (the sole pane split, a collapsing split's survivor moving up) moves
+rather than remounts: its terminal, scroll, selection and focus stay. React
+detaches a removed subtree's refs before taking it out of the document and
+attaches the new slots in the same commit, so the container waits in a
+holder in between; the moves use `Element.moveBefore`, which keeps focus
+and scroll state (elsewhere, `appendChild` with focus restored).
 A wrapped strip takes at most three rows, or 40% of its pane if that is
 less (the pane is a size container, `cqh`); past that it scrolls inside
 itself and keeps the active tab in view, so a short pane keeps its content.
