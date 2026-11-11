@@ -23,11 +23,16 @@ export function PaneDropZone() {
       className="pointer-events-none absolute inset-0 z-20"
     >
       {target?.allowed && (
+        // The half (or the whole) the tab would take: tinted and edged
+        // in the primary colour, opaque enough to read over a terminal
+        // in either theme, with what the drop does.
         <div
-          className="absolute flex items-center justify-center bg-primary/15 outline-2 -outline-offset-2 outline-primary outline-solid"
+          className="absolute flex items-center justify-center border-2 border-primary bg-primary/30"
           style={zoneArea(target.zone)}
         >
-          <Label>{ZONE_LABEL[target.zone]}</Label>
+          <span className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow-md">
+            {ZONE_LABEL[target.zone]}
+          </span>
         </div>
       )}
       {target && !target.allowed && target.hint && (
