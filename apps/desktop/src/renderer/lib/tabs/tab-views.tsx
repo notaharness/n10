@@ -51,7 +51,8 @@ export const TabViewScope = TabIdContext.Provider;
  *  (Held in state rather than a ref because views read it while
  *  rendering.) */
 export function TabViewsHost({ children }: { children: ReactNode }) {
-  const { tabs } = useTabs();
+  // Every pane's tabs: a tab in a pane without focus is still open.
+  const { allTabs: tabs } = useTabs();
   const [views] = useState<TabViews>(() => new Map());
   const requestAgent = useCallback(
     (id: string) => {

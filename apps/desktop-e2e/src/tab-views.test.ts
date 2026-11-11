@@ -194,3 +194,28 @@ test('a tab keeps where it was left across a repository switch', async ({
     cleanupTestRepo(elsewhere);
   }
 });
+
+test('a tab in a pane without focus keeps where it was left', async ({
+  desktop,
+}) => {
+  const { page } = desktop;
+  for (const branch of BRANCHES) await openKept(page, branch);
+  await switchTo(page, 'alpha');
+  await pick(page, 'd.txt');
+  await switchTo(page, 'beta');
+
+  // gamma into a pane of its own, which takes focus: alpha is now a tab
+  // of a pane without it, and nothing shows it.
+  await switchTo(page, 'gamma');
+  await page.keyboard.press('Control+\\');
+  await expect(page.locator('[data-pane-id]')).toHaveCount(2);
+  await expect(
+    page.locator('[data-pane-id][data-pane-focused]').getByRole('tab')
+  ).toHaveText([/^gamma/]);
+
+  // The split closed again, alpha comes back with its file picked.
+  await page.keyboard.press('Control+Alt+w');
+  await expect(page.locator('[data-pane-id]')).toHaveCount(1);
+  await switchTo(page, 'alpha');
+  await expect(pickedFile(page)).toHaveAttribute('title', 'd.txt');
+});
