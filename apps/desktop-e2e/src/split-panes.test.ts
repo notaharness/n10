@@ -70,6 +70,17 @@ test.describe('Split panes', () => {
     await expect(pane(page, 1)).toHaveAttribute('data-pane-focused', 'true');
     await expect(pane(page, 0).getByRole('tab')).toHaveCount(3);
 
+    // Escape lets go of a drag over a pane's side with nothing moved.
+    await carryTo(page, tab(page, /^alpha/), content(pane(page, 1)), 0.97, 0.5);
+    await expect(
+      pane(page, 1).locator('[data-pane-drop="right"]')
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-pane-drop]')).toHaveCount(0);
+    await page.mouse.up();
+    await expect(panes(page)).toHaveCount(2);
+    await expect(pane(page, 0).getByRole('tab')).toHaveCount(3);
+
     // Dragging a tab onto the bottom of a pane shows the half it would
     // take, and dropping it there splits that pane.
     await carryTo(page, tab(page, /^gamma/), content(pane(page, 0)), 0.5, 0.97);

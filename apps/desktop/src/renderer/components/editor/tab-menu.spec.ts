@@ -187,3 +187,33 @@ describe('pins in a tab’s menu', () => {
     expect(rename).toHaveBeenCalled();
   });
 });
+
+describe('a tab’s pane entries', () => {
+  it('sit below its own items and run there, before any group choice', async () => {
+    const panes = {
+      items: vi.fn((): ContextMenuItem[] => [
+        { id: 'pane-split-right', label: 'Split right' },
+      ]),
+      run: vi.fn((chosen: string | null) => chosen === 'pane-split-right'),
+    };
+    const g = group();
+    choose = 'pane-split-right';
+    await runTabMenu(
+      home,
+      tabs as unknown as Parameters<typeof runTabMenu>[1],
+      closer as unknown as Parameters<typeof runTabMenu>[2],
+      'wrap',
+      g,
+      undefined,
+      panes
+    );
+    expect(labels().indexOf('Split right')).toBeGreaterThan(
+      labels().indexOf('Pin tab')
+    );
+    expect(labels().indexOf('Split right')).toBeLessThan(
+      labels().indexOf('Show tabs')
+    );
+    expect(panes.run).toHaveBeenCalledWith('pane-split-right', home);
+    expect(closer.close).not.toHaveBeenCalled();
+  });
+});

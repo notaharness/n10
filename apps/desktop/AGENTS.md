@@ -126,14 +126,18 @@ Every rule below has its reasoning in `docs/decisions.md`.
   order. Collapse is `Workspace.collapsed`; drag legality is
   `components/editor/strip-drag.ts`. Rules and reasoning: decisions.md
   "Tab groups".
-- The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): one pane
-  for now, in the shape splits need. Reducer passes run on a pane's
-  `Strip`. `~/.n10/workspace.json` (host `services/workspace-file.ts`) keeps
-  it across restarts; `TabsProvider` restores it before the strip draws.
-  Only tmux's `alive` answer ends an agent's dismissal, and only a terminal
-  listing complete for its machine (`scanned`) ends a terminal's or closes
-  a restored tab; the sidebar's `running` is "attached here". `dismissed`,
-  pins, group names and restore binding: decisions.md "Tab workspace".
+- The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): a layout
+  tree of panes (`layout.ts`), each with its own strip. Reducer passes run
+  on a pane's `Strip`; `workspace-reduce.ts` picks the pane, and runs the
+  reconciliations across all of them. `EditorLayout` draws the tree with
+  nested resizable-panels groups; `useTabs` answers for the pane in
+  `PaneScopeContext`, else the focused one. `~/.n10/workspace.json` (host
+  `services/workspace-file.ts`) keeps it across restarts; `TabsProvider`
+  restores it before the strip draws. Only tmux's `alive` answer ends an
+  agent's dismissal, and only a terminal listing complete for its machine
+  (`scanned`) ends a terminal's or closes a restored tab; the sidebar's
+  `running` is "attached here". `dismissed`, pins, group names, restore
+  binding and splits: decisions.md "Tab workspace".
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Sessions · Files) beside one content pane that
   swaps between Overview, diff, a session's terminal (mounted only while shown) and
@@ -208,7 +212,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   composed in the renderer so the preview is the delivery; `plan-model.spec.ts`
   asserts numbering against `planRows`. Adopting a respawned session carries
   the chunk `seq` forward.
-- `EditorArea` renders the active tab's pane and at most one spare, hidden
+- Each `EditorArea` (one per pane) renders the active tab's pane; one of
+  them holds the window's one spare, hidden
   and `inert` (`use-editor-panes.ts`, `lib/tabs/editor-panes.ts`): the tab a
   hover settled on (`lib/tabs/prewarm.tsx`, by hoverIntent's rule in
   `hover-intent.ts`; one at a time, superseded rather than queued, and
