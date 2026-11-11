@@ -84,8 +84,9 @@ export interface SessionDiscoveryOptions {
    *  the beam peerIds the fleet says are connected. */
   remoteMachines?: () => readonly string[];
   onChanged: (delta: DiscoveryDelta) => void;
+  onLabelsChanged?: () => void;
   /** Handed each machine's whole listing as a scan reads it. */
-  listed?: (machine: string, sessions: readonly TaggedSession[]) => void;
+  listed?: (machine: string, sessions: readonly TaggedSession[]) => boolean | 'labels' | undefined;
   /** Told each time a machine's scan has finished, the terminals it
    *  found adopted: from then on, a terminal of that machine no listing
    *  names is gone, not yet to be found. Withheld while an attach that
@@ -132,6 +133,7 @@ export function startSessionDiscovery(
   async function observe(): Promise<{
     scan: DiscoveryScan;
     held: Set<string>;
+    metadataChanged: boolean | 'labels';
   }> {
     const worktrees: DiscoveredWorktree[] = (
       await listWorktrees(opts.scope())
@@ -145,7 +147,7 @@ export function startSessionDiscovery(
     // sessions, it would end every terminal and release every exited
     // agent, and the next scan would not bring them back.
     if (!seen) throw new Error('tmux could not list its sessions');
-    opts.listed?.(LOCAL_MACHINE, seen.listed);
+    const metadataChanged = opts.listed?.(LOCAL_MACHINE, seen.listed) ?? false;
     // Stays stranded while its agent runs and git does not list it, even
     // if something recreates the directory.
     const listed = new Set(worktrees.map((wt) => wt.name));
@@ -165,6 +167,7 @@ export function startSessionDiscovery(
         terminals: adoptTerminal ? seen.terminals : [],
       },
       held: seen.held,
+      metadataChanged,
     };
   }
 
@@ -255,6 +258,7 @@ export function startSessionDiscovery(
     awaitingAttach,
     adopt: (terminal) => adoptOne(terminal, adoptTerminal ?? (() => undefined)),
     onChanged,
+    onLabelsChanged: opts.onLabelsChanged,
     listed: opts.listed,
     scanned: opts.scanned,
   });
@@ -264,7 +268,7 @@ export function startSessionDiscovery(
     // Other machines answer when they do, not as part of this scan.
     void machineScans.scan();
     const before = heldTerminals(LOCAL_MACHINE);
-    const { scan: next, held } = await observe();
+    const { scan: next, held, metadataChanged } = await observe();
     if (!live()) return;
     forgetFailures(
       LOCAL_MACHINE,
@@ -294,8 +298,11 @@ export function startSessionDiscovery(
     const adopted = await adoptAll(delta);
     if (live() && !awaitingAttach(delta.adoptableTerminals))
       opts.scanned?.(LOCAL_MACHINE);
-    const announce = first || worthAnnouncing(delta, adopted + released);
-    if (announce && !stopped && isCurrent()) onChanged(delta);
+    const structural = first || worthAnnouncing(delta, adopted + released);
+    if (!stopped && isCurrent()) {
+      if (structural || metadataChanged === true) onChanged(delta);
+      else if (metadataChanged === 'labels') opts.onLabelsChanged?.();
+    }
     ensureWatch();
   }
 

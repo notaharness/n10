@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
 import type { TabStatus } from '../../lib/tabs/tab-groups.js';
-import { cutSide, tabPresentation } from '../../lib/tabs/tab-presentation.js';
+import { cutSide } from '../../lib/tabs/tab-presentation.js';
 import { StatusClusters } from './StatusClusters.js';
 import { CHIP_BODY, chipClassName } from './tab-look-class.js';
 import { RepoBand } from './tab-marks.js';
@@ -65,19 +65,14 @@ export function ChipIcon({
 /** The home's label in the chip: the group's name, cut as the home's
  *  own label would be when it is that, with the home's marks. */
 export function HomeLabel({ face, name }: { face: TabFace; name: string }) {
-  const { label, face: kind } = tabPresentation(
-    face.tab,
-    face.item,
-    face.machineLabel
-  );
+  const { label, labelKind: kind } = face;
   return (
     <>
       <span className="flex max-w-40 min-w-16">
         <TabLabel
           label={name}
           preview={face.tab.preview}
-          foreignRepo={face.foreignRepo}
-          cut={name === label ? cutSide(kind) : 'end'}
+          cut={name === label && face.labelSource !== 'task' ? cutSide(kind) : 'end'}
         />
       </span>
       <TabEnd item={face.item} unseen={face.unseen} />

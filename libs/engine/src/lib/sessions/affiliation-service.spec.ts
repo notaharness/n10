@@ -25,6 +25,44 @@ function shell(name: string, tags: Partial<TaggedSession> = {}): TaggedSession {
 }
 
 describe('affiliation service', () => {
+  it('keeps a valid task through generic titles, then resets it on a new session or removal', () => {
+    const service = createAffiliationService({ placeOf: (dir) => dir });
+    const agent = shell('a', {
+      type: 'agent',
+      agent: 'claude',
+      paneTitle: 'Fix auth',
+    });
+    const key = terminalSessionKey('a');
+    service.observe('local', [agent]);
+    expect(service.titleOf(key)).toBe('Fix auth');
+    service.observe('local', [{ ...agent, paneTitle: 'Claude Code' }]);
+    expect(service.titleOf(key)).toBe('Fix auth');
+    service.observe('local', [
+      { ...agent, created: 2, paneTitle: 'Claude Code' },
+    ]);
+    expect(service.titleOf(key)).toBeUndefined();
+    service.observe('local', [{ ...agent, created: 2 }]);
+    expect(service.titleOf(key)).toBe('Fix auth');
+    service.observe('local', []);
+    expect(service.titleOf(key)).toBeUndefined();
+  });
+
+  it('uses the oldest duplicate identity without announcing title churn', () => {
+    const service = createAffiliationService({ placeOf: (dir) => dir });
+    const changed = vi.fn();
+    service.subscribe(changed);
+    const old = shell('a', {
+      type: 'agent',
+      agent: 'claude',
+      paneTitle: 'Old task',
+    });
+    const newer = { ...old, created: 2, paneTitle: 'Other task' };
+    service.observe('local', [old, newer]);
+    changed.mockClear();
+    service.observe('local', [newer, old]);
+    expect(service.titleOf(terminalSessionKey('a'))).toBe('Old task');
+    expect(changed).not.toHaveBeenCalled();
+  });
   it('derives over every machine’s last listing together', () => {
     const service = createAffiliationService({ placeOf: (dir) => dir });
     const remote = shell('far', {
@@ -109,6 +147,7 @@ describe('affiliation service', () => {
       kind: 'place',
       key: 'place:/repo',
       label: 'repo',
+      place: '/repo',
     });
     service.observe('local', [shell('new', { target: CLAUDE })]);
     expect(

@@ -146,6 +146,7 @@ export function taggedSession(
   if (!fields) return null;
   return {
     name: info.name,
+    ...(info.paneTitle ? { paneTitle: info.paneTitle } : {}),
     created: info.created,
     paneDead: info.paneDead,
     exitCode: info.exitCode,

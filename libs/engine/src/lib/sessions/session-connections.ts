@@ -33,6 +33,7 @@ export function createSessionConnections() {
           running: isSessionAlive(name),
           spawnedAt: getSpawnedAt(name) ?? 0,
           machine,
+          agent: getSession(name)?.agent,
           connectionState:
             machine === LOCAL_MACHINE
               ? undefined

@@ -12,6 +12,7 @@ import type { Affiliation } from '@n10/core';
 
 export interface SessionSummary {
   name: string;
+  agent?: string;
   running: boolean;
   spawnedAt: number;
   /** The machine this session runs on — `'local'` or a beam peerId
@@ -32,6 +33,8 @@ export interface SessionSummary {
  * is opened, when that repository's own discovery attaches it.
  */
 export interface ForeignSessionSummary {
+  taskTitle?: string;
+  agent?: string;
   /** The repository it runs in — the real path of the main checkout. */
   repo: string;
   /** The branch its checkout is on now. */

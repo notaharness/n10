@@ -43,6 +43,41 @@ afterEach(() => {
 });
 
 describe('retained tmux process lifecycle', () => {
+  it('reads the recorded primary pane title after another pane becomes active', async () => {
+    const request = spec('sleep 30');
+    const backend = await createTmuxBackend(request, {
+      mode: 'create',
+      label: request.name,
+      tags: { '@test-agent': 'first' },
+      paneOption: '@test-pane',
+      retainOnExit: true,
+    });
+    backends.push(backend);
+    const title = () =>
+      tmuxListSessionsDetailed([], '@test-pane').find(
+        (session) => session.name === backend.name
+      )?.paneTitle;
+    expect(title()).toBeUndefined(); // tmux's default hostname is not a task.
+    const primary = tmuxShowOption(backend.name!, '@test-pane')!;
+    execFileSync('tmux', ['select-pane', '-t', primary, '-T', 'Fix auth']);
+    const split = execFileSync(
+      'tmux',
+      [
+        'split-window',
+        '-d',
+        '-P',
+        '-F',
+        '#{pane_id}',
+        '-t',
+        `=${backend.name!}:`,
+        'sleep 30',
+      ],
+      { encoding: 'utf8' }
+    ).trim();
+    execFileSync('tmux', ['select-pane', '-t', split, '-T', 'Split pane']);
+    execFileSync('tmux', ['select-pane', '-t', split]);
+    expect(title()).toBe('Fix auth');
+  });
   it('publishes creation metadata together at native command boundaries', async () => {
     const request = spec('sleep 30');
     const tags = {

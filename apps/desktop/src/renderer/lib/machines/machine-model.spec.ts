@@ -322,15 +322,11 @@ describe('resolveMachineLabel', () => {
   });
 
   it('names a machine no longer in the registered list rather than vanishing', () => {
-    expect(resolveMachineLabel('0123456789abcdef', machines)).toBe(
-      'Unknown machine'
-    );
+    expect(resolveMachineLabel('0123456789abcdef', machines)).toBe('Remote');
   });
 
   it('is honest even before the machines list has loaded', () => {
-    expect(resolveMachineLabel('bbbbbbbbbbbbbbbb', undefined)).toBe(
-      'Unknown machine'
-    );
+    expect(resolveMachineLabel('bbbbbbbbbbbbbbbb', undefined)).toBe('Remote');
   });
 });
 

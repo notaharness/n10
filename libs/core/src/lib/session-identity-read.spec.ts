@@ -17,6 +17,13 @@ const read = (tags: Record<string, string> | undefined) =>
   taggedSession(listed('label', tags));
 
 describe('taggedSession', () => {
+  it('carries the dedicated primary-pane title column', () => {
+    const info = {
+      ...listed('agent', n10Terminal('agent')),
+      paneTitle: 'Fix auth',
+    };
+    expect(taggedSession(info)?.paneTitle).toBe('Fix auth');
+  });
   it('reads one of ours from its tags, never from its name', () => {
     expect(taggedSession(listed('anything-at-all', n10Worktree()))).toEqual({
       name: 'anything-at-all',

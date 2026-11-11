@@ -66,7 +66,8 @@ describe('affiliations', () => {
       kind: 'parent',
       key: CLAUDE,
       label: 'conductor',
-      home: { key: key(home), repo: home.repo, worktree: '' },
+      home: { key: key(home), repo: home.repo, worktree: '', place: home.path },
+      place: home.path,
     };
     expect(groups.get(key(home))).toEqual(head);
     expect(groups.get(key(a))).toEqual(head);
@@ -100,6 +101,7 @@ describe('affiliations', () => {
     expect(groups.get(key(a))).toMatchObject({
       key: 'tmux:boss',
       label: 'boss',
+      place: named.path,
     });
     expect(groups.get(key(named))).toMatchObject({ key: 'tmux:boss' });
     expect(groups.get(key(b))?.key).toBe(CLAUDE);
@@ -114,6 +116,7 @@ describe('affiliations', () => {
       kind: 'parent',
       key: 'tmux:boss',
       label: 'boss',
+      place: REPO,
     });
     expect(groups.get(key(remoteBoss))?.kind).toBe('place');
   });
@@ -127,7 +130,13 @@ describe('affiliations', () => {
       kind: 'parent',
       key: `beam:${PEER}/tmux:boss`,
       label: 'boss',
-      home: { key: key(remoteBoss), repo: remoteBoss.repo, worktree: '' },
+      home: {
+        key: key(remoteBoss),
+        repo: remoteBoss.repo,
+        worktree: '',
+        place: remoteBoss.path,
+      },
+      place: remoteBoss.path,
     };
     expect(groups.get(key(remote))).toEqual(head);
     expect(groups.get(key(remoteBoss))).toEqual(head);
@@ -158,6 +167,7 @@ describe('affiliations', () => {
       kind: 'parent',
       key: `beam:${PEER}/tmux:main`,
       label: 'main',
+      place: REPO,
     });
   });
 
@@ -168,6 +178,7 @@ describe('affiliations', () => {
       kind: 'parent',
       key: CODEX,
       label: 'Codex · repo',
+      place: REPO,
     });
     const elsewhere = shell('notes', { type: 'agent', orchestrator: CODEX });
     expect(of([a, elsewhere]).get(key(a))?.label).toBe('Codex');
@@ -234,12 +245,14 @@ describe('affiliations', () => {
       kind: 'place',
       key: placeKey(REPO),
       label: 'repo',
+      place: REPO,
     });
     expect(groups.get(key(inRepo))?.key).toBe(placeKey(REPO));
     expect(groups.get(key(loose))).toEqual({
       kind: 'place',
       key: placeKey('/home/u/loose'),
       label: 'loose',
+      place: '/home/u/loose',
     });
     expect(groups.get(key(remote))?.key).toBe(placeKey('/srv/far', PEER));
   });

@@ -119,6 +119,7 @@ export function AllTabs({
                     <RosterRow
                       key={tab.id}
                       face={faceOf(tab)}
+                      home={groups.some((group) => group.head?.id === tab.id)}
                       active={tab.id === activeId}
                       onJump={jump}
                     />

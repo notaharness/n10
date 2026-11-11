@@ -13,13 +13,27 @@ export interface TerminalRecord {
   cwd: string;
 }
 
+function taskFact(kind: TerminalKind, agent?: string, title?: string) {
+  return kind === 'agent' && agent && title ? { taskTitle: title } : {};
+}
+
+function connectionFact(
+  machine: string,
+  session: ReturnType<typeof getSession>
+) {
+  return machine !== LOCAL_MACHINE && session?.pty.connectionState
+    ? { connectionState: session.pty.connectionState }
+    : {};
+}
+
 /** Transport facts are independent of which shell or repository observes them. */
 export function terminalFacts(
   name: string,
   record: TerminalRecord,
   affiliationOf?: (machine: string) => Affiliation | undefined,
   /** When tmux created the session, once a listing has named it. */
-  created?: number
+  created?: number,
+  taskTitle?: string
 ) {
   const session = getSession(name);
   const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
@@ -31,10 +45,9 @@ export function terminalFacts(
     running: isSessionAlive(name),
     spawnedAt: getSpawnedAt(name) ?? 0,
     machine,
-    ...(machine !== LOCAL_MACHINE && session?.pty.connectionState
-      ? { connectionState: session.pty.connectionState }
-      : {}),
+    ...connectionFact(machine, session),
     ...listedFacts(affiliationOf?.(machine), created),
+    ...taskFact(record.kind, session?.agent, taskTitle),
   };
 }
 

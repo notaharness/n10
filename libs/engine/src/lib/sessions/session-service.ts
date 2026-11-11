@@ -55,6 +55,7 @@ export interface SessionWatchPorts extends SessionLaunchPorts {
   /** A machine's scan finished, its terminals adopted. */
   scanned?(machine: string): void;
   changed?(delta: DiscoveryDelta): void;
+  labelsChanged?(): void;
 }
 export type SessionService = ReturnType<typeof createSessionService>;
 
@@ -81,6 +82,9 @@ export function createSessionService(options: {
    *  repository's place. */
   const affiliated = (row: AgentSession): AgentSession => ({
     ...row,
+    ...(affiliations.titleOf(row.name)
+      ? { taskTitle: affiliations.titleOf(row.name) }
+      : {}),
     affiliation:
       affiliations.of(row.name) ??
       (row.path ? affiliations.ofCheckout(row.path) : undefined) ??
@@ -255,6 +259,7 @@ export function createSessionService(options: {
         remoteMachines: ports.remoteMachines,
         scanned: ports.scanned,
         listed: affiliations.observe,
+        onLabelsChanged: ports.labelsChanged,
         onChanged(delta) {
           void refresh();
           ports.changed?.(delta);

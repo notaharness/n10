@@ -119,6 +119,8 @@ export interface TmuxSessionInfo {
    *  or the server's cwd when it was not. Empty when tmux reports
    *  nothing. */
   path: string;
+  /** Optional title of the recorded primary pane, when requested. */
+  paneTitle?: string;
   /** The session user options {@link tmuxListSessionsDetailed} was
    *  asked for, by name, for those that have a value. An unset option
    *  expands to nothing in a format string, which is indistinguishable
@@ -127,13 +129,22 @@ export interface TmuxSessionInfo {
   options?: Record<string, string>;
 }
 
-export function sessionColumns(options: readonly string[]): string[] {
+function primaryPaneTitle(paneOption: string): string {
+  const title = `#{?#{${paneOption}},#{W:#{P:#{?#{==:#{pane_id},#{${paneOption}}},#{pane_title},}}},#{pane_title}}`;
+  return `#{?#{==:${title},#{host}},,#{?#{==:${title},#{host_short}},,${title}}}`;
+}
+
+export function sessionColumns(
+  options: readonly string[],
+  paneOption?: string
+): string[] {
   return [
     '#{session_name}',
     '#{session_created}',
     '#{pane_dead}',
     '#{pane_dead_status}',
     '#{pane_dead_signal}',
+    ...(paneOption ? [primaryPaneTitle(paneOption)] : []),
     ...options.map((option) => `#{${option}}`),
     '#{session_path}',
   ];
@@ -160,14 +171,23 @@ export function sessionColumns(options: readonly string[]): string[] {
 /** Pure argv builder, shared with the remote executor path (D3's
  *  per-machine poller): a machine change must not change what is
  *  asked of tmux. */
-export function listSessionsArgv(options: readonly string[] = []): string[] {
-  return [UTF8, 'list-sessions', '-F', sessionColumns(options).join('\t')];
+export function listSessionsArgv(
+  options: readonly string[] = [],
+  paneOption?: string
+): string[] {
+  return [
+    UTF8,
+    'list-sessions',
+    '-F',
+    sessionColumns(options, paneOption).join('\t'),
+  ];
 }
 
 export function tmuxListSessionsDetailed(
-  options: readonly string[] = []
+  options: readonly string[] = [],
+  paneOption?: string
 ): TmuxSessionInfo[] {
-  return tmuxListSessionsRead(options) ?? [];
+  return tmuxListSessionsRead(options, paneOption) ?? [];
 }
 
 /** {@link tmuxListSessionsDetailed} for a caller that must tell an
@@ -175,15 +195,16 @@ export function tmuxListSessionsDetailed(
  *  be run or answered with anything but "no server" (a failed fork, the
  *  timeout kill), as {@link TmuxPaneRead}'s `'failed'`. */
 export function tmuxListSessionsRead(
-  options: readonly string[] = []
+  options: readonly string[] = [],
+  paneOption?: string
 ): TmuxSessionInfo[] | null {
-  const result = runTmux(listSessionsArgv(options));
+  const result = runTmux(listSessionsArgv(options, paneOption));
   if (result.exitCode !== 0) return isNoServer(result) ? [] : null;
   return result.stdout
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => parseSessionLine(line, options));
+    .map((line) => parseSessionLine(line, options, paneOption));
 }
 
 /** Native columns before the optional user tags and final path. */
@@ -194,20 +215,37 @@ const FIXED_COLUMNS = 5;
  *  remainder is the path. */
 export function parseSessionLine(
   line: string,
-  options: readonly string[]
+  options: readonly string[],
+  paneOption?: string
 ): TmuxSessionInfo {
-  const leading = FIXED_COLUMNS + options.length;
+  const offset = FIXED_COLUMNS + (paneOption ? 1 : 0);
+  const leading = offset + options.length;
   const fields = line.split('\t', leading);
   const rest = fields.join('\t').length;
   const name = fields[0] ?? line;
   const created = Number.parseInt(fields[1] ?? '', 10) || 0;
   const path = fields.length >= leading ? line.slice(rest + 1) : '';
   const state = parsePaneState(fields.slice(2, 5));
-  if (options.length === 0) return { name, created, path, ...state };
+  const paneTitle = paneOption ? fields[FIXED_COLUMNS] : undefined;
+  if (options.length === 0)
+    return {
+      name,
+      created,
+      path,
+      ...state,
+      ...(paneTitle ? { paneTitle } : {}),
+    };
   const values: Record<string, string> = {};
   options.forEach((option, i) => {
-    const value = fields[i + FIXED_COLUMNS];
+    const value = fields[i + offset];
     if (value) values[option] = value;
   });
-  return { name, created, path, ...state, options: values };
+  return {
+    name,
+    created,
+    path,
+    ...state,
+    options: values,
+    ...(paneTitle ? { paneTitle } : {}),
+  };
 }

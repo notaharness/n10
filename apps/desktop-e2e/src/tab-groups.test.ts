@@ -15,7 +15,12 @@ import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 import { shownTerminal } from './setup/prewarm.js';
 import { orchestraTags } from '@n10/core/testing/session-tags';
 import { startSurvivingTerminal } from './setup/terminals.js';
-import { killFixtureSessions, tagTmuxSession } from './setup/tmux.js';
+import {
+  findN10SessionFor,
+  killFixtureSessions,
+  setTmuxPaneTitle,
+  tagTmuxSession,
+} from './setup/tmux.js';
 
 /**
  * The strip groups its tabs by what they belong to: Orchestra players
@@ -100,6 +105,8 @@ test.describe('Tab groups', () => {
       worktreePath: addExternalWorktree(repoPath, branch),
       command: `printf '%s\\n' ${ready(branch)}; sleep 300`,
     });
+    // A generic title keeps the branch fallback independent of tmux's process title.
+    setTmuxPaneTitle(name, 'Codex', homeDir);
     if (target)
       tagTmuxSession(name, orchestraTags({ orchestrator: target }), homeDir);
     return branch;
@@ -121,7 +128,10 @@ test.describe('Tab groups', () => {
 
     await expect(countOf(page, CLAUDE)).toHaveText('3', { timeout: 30_000 });
     const home = chipOf(page, CLAUDE).getByRole('tab');
-    await expect(home).toHaveText(new RegExp(basename(folder)));
+    await expect(home).toHaveAttribute(
+      'aria-label',
+      `Claude · ${basename(folder)}`
+    );
     // A parent's group starts collapsed: its players wait behind the
     // chip, and expand into ordinary tabs right behind it.
     const members = group(page, CLAUDE).getByRole('tab');
@@ -190,7 +200,7 @@ test.describe('Tab groups', () => {
     await expect(countOf(page, CODEX)).toHaveText('2', { timeout: 30_000 });
     // No tab of its own: a label that opens the roster.
     const standIn = chipOf(page, CODEX).locator('[data-group-label]');
-    await expect(standIn).toHaveText('Codex');
+    await expect(standIn).toHaveText('Codex · Multiple places');
     await expect(chipOf(page, CODEX).getByRole('tab')).toHaveCount(0);
     await standIn.click();
     await expect(roster(page)).toContainText('Codex');
@@ -247,6 +257,70 @@ test.describe('Tab groups', () => {
     await expect(
       page.locator('[data-tab-group]').filter({ has: lone })
     ).toHaveCount(0);
+  });
+
+  test('keeps shell labels short in groups and singletons, and updates an agent task', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    const first = spawnAgent(repoPath, homeDir, null);
+    const second = spawnAgent(repoPath, homeDir, null);
+    branches.push(first, second);
+    startSurvivingTerminal({
+      name: 'repo-shell',
+      cwd: repoPath,
+      command: 'sleep 300',
+      homeDir,
+    });
+    const place = page.locator(`[data-group-chip="place:${repoPath}"]`);
+    await expect(place).toBeVisible({ timeout: 30_000 });
+    const repoShell = page
+      .getByRole('tab')
+      .filter({
+        has: page.locator('[data-tab-label]', { hasText: basename(repoPath) }),
+      })
+      .filter({ hasNotText: first })
+      .filter({ hasNotText: second });
+    await expect(repoShell).toBeVisible();
+    await expect(tab(page, new RegExp(first))).toBeVisible();
+    const lone = tab(page, new RegExp(basename(folder)));
+    await expect(lone.locator('[data-tab-label]')).toContainText(
+      basename(folder)
+    );
+    const session = findN10SessionFor(first, homeDir);
+    expect(session).toBeDefined();
+    const name = session as string;
+    const fallbackWidth = await tab(page, new RegExp(first)).evaluate(
+      (element) => element.getBoundingClientRect().width
+    );
+    const shellLabelWidth = await repoShell
+      .locator('[data-tab-label]')
+      .evaluate((element) => element.getBoundingClientRect().width);
+    expect(shellLabelWidth).toBeLessThan(176);
+    await expect(repoShell.locator('[data-tab-label]')).not.toHaveClass(/w-36/);
+    setTmuxPaneTitle(name, '⠋ Fix auth', homeDir);
+    const task = tab(page, /Fix auth/);
+    await expect(task).toBeVisible({ timeout: 30_000 });
+    const width = await task.evaluate(
+      (element) => element.getBoundingClientRect().width
+    );
+    expect(width).toBe(fallbackWidth);
+    setTmuxPaneTitle(name, '⠙ Fix auth', homeDir);
+    const otherSession = findN10SessionFor(second, homeDir);
+    expect(otherSession).toBeDefined();
+    setTmuxPaneTitle(otherSession as string, 'Probe scan', homeDir);
+    // The other title proves the discovery scan consumed both pane titles.
+    await expect(tab(page, /Probe scan/)).toBeVisible({ timeout: 30_000 });
+    await expect(task).toBeVisible();
+    setTmuxPaneTitle(name, 'Fix token refresh', homeDir);
+    await expect(tab(page, /Fix token refresh/)).toBeVisible({
+      timeout: 30_000,
+    });
+    expect(
+      await tab(page, /Fix token refresh/).evaluate(
+        (element) => element.getBoundingClientRect().width
+      )
+    ).toBe(width);
   });
 
   test('collapses to its chip, and opens again for a tab activated in it', async ({

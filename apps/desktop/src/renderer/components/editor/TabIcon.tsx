@@ -9,20 +9,17 @@ import type { TabFace } from '../../lib/tabs/tab-presentation.js';
 import { cn } from '../../lib/utils.js';
 
 /** The tab's kind icon, with the agent's state hung off its corner,
- *  set off by a ring of the tab's own background. A group's home hangs
- *  it off the chip's folder instead (`iconClassName` sizes that). */
+ *  set off by a ring of the tab's own background. */
 export function TabIcon({
   Icon,
   running,
   snapshot,
   active,
-  iconClassName = 'size-4',
 }: {
   Icon: typeof SettingsIcon;
   running: boolean;
   snapshot: SessionActivitySnapshot | undefined;
   active: boolean;
-  iconClassName?: string;
 }) {
   const fill = active ? 'bg-tab-active' : 'bg-tab group-hover:bg-tab-hover';
   const ring = active
@@ -30,7 +27,7 @@ export function TabIcon({
     : 'ring-tab group-hover:ring-tab-hover';
   return (
     <span className="relative flex shrink-0">
-      <Icon aria-hidden className={iconClassName} />
+      <Icon className="size-4" />
       {snapshot?.active ? (
         <span
           className={cn(

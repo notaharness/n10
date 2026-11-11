@@ -1,5 +1,6 @@
 import type { Tab } from './tab-identity.js';
 import type { Strip } from './workspace.js';
+export { presentationOrder } from './tab-label-state.js';
 
 /**
  * What the user does to tabs and groups short of opening and closing

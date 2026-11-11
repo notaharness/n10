@@ -166,6 +166,7 @@ export function GroupBlock({
           roster={roster}
           returnFocus={rosterButton}
           onJump={jump}
+          homeId={head?.id}
         />
       </Popover>
       {!collapsed && (

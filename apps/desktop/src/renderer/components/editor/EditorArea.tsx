@@ -34,7 +34,8 @@ import { TabStrip } from './TabStrip.js';
 import { useEditorPanes } from './use-editor-panes.js';
 import { PaneDropZone } from './PaneDropZone.js';
 import { usePaneMenus } from './use-pane-menus.js';
-import { derivedLabel, useGroupRename } from './use-group-rename.js';
+import { useGroupRename } from './use-group-rename.js';
+import { useChipLabels } from './use-chip-labels.js';
 import { useStripGroups } from './use-strip-groups.js';
 import { FollowController } from './FollowController.js';
 import { useSupervise } from './use-supervise.js';
@@ -71,6 +72,7 @@ export function EditorArea({
   const index = indexItems(repo.cwd, items);
   const { groups, faceOf, colorOf, factsOf, activitySource } =
     useStripGroups(items);
+  const derivedOf = useChipLabels(groups, faceOf);
   const [announced, announce] = useState('');
   const round = useRef<AttentionRound | null>(null);
   const attentionActivation = useRef<string | null>(null);
@@ -81,7 +83,8 @@ export function EditorArea({
   }, [tabs.activeId]);
   const { labelOf, rename, renameAlone, renameActive, dialog } = useGroupRename(
     groups,
-    faceOf
+    faceOf,
+    derivedOf
   );
   const supervise = useSupervise({ groups, faceOf, factsOf, labelOf });
   const pins = groups.filter((g) => g.pinned).length;
@@ -191,7 +194,7 @@ export function EditorArea({
       menu={{
         canCollapseOthers,
         collapseOthers,
-        rename: () => rename(group.key, derivedLabel(group, faceOf)),
+        rename: () => rename(group.key, derivedOf(group)),
         setCollapsed: (collapsed) => tabs.setCollapsed([group.key], collapsed),
         ...supervise.menuFor(group),
       }}

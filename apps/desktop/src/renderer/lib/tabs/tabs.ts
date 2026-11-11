@@ -93,6 +93,8 @@ export interface TabsApi extends Strip {
   setCollapsed: (keys: readonly string[], collapsed: boolean) => void;
   /** Name a group, by affiliation key; `null` restores its label. */
   renameGroup: (key: string, name: string | null) => void;
+  assignCollisionOrdinals: (values: Readonly<Record<string, { base: string; ordinal: number }>>) => void;
+  assignChipOrdinals: (values: Readonly<Record<string, { label: string; ordinal: number; home?: boolean }>>) => void;
   /**
    * Reconcile the strip with the current sidebar items *and* the host's
    * terminal listing, in one step: follow re-keyed items, open a tab
@@ -174,6 +176,8 @@ export function tabsActions(
     setCollapsed: (keys, collapsed) =>
       dispatch({ type: 'set-collapsed', keys, collapsed }),
     renameGroup: (key, name) => dispatch({ type: 'rename-group', key, name }),
+    assignCollisionOrdinals: (values) => dispatch({ type: 'assign-collision-ordinals', values }),
+    assignChipOrdinals: (values) => dispatch({ type: 'assign-chip-ordinals', values }),
     syncItems: (repo, listings) =>
       dispatch({ type: 'sync-items', repo, ...listings }),
     repoOpened: (repo) => dispatch({ type: 'repo-opened', repo }),

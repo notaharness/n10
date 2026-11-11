@@ -19,6 +19,7 @@ import {
   tileGroup,
 } from './supervise.js';
 import { placeFor } from './tab-placement.js';
+import { prunePaneLabels } from './tab-label-state.js';
 import type { TabsAction } from './tabs-model.js';
 import {
   focusedPaneOf,
@@ -313,7 +314,7 @@ function settle(ws: Workspace): Workspace {
   const unseen = next.unseen.filter((id) => !shown.has(id));
   const seen =
     unseen.length === next.unseen.length ? next : { ...next, unseen };
-  return remembered(seen);
+  return prunePaneLabels(remembered(seen));
 }
 
 function remembered(ws: Workspace): Workspace {

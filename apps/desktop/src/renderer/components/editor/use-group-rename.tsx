@@ -33,7 +33,8 @@ function derivedLabel(
  */
 export function useGroupRename(
   groups: readonly TabGroup[],
-  faceOf: (tab: TabGroup['tabs'][number]) => TabFace
+  faceOf: (tab: TabGroup['tabs'][number]) => TabFace,
+  derivedOf: (group: TabGroup) => string = (group) => derivedLabel(group, faceOf)
 ): {
   labelOf(group: TabGroup): string;
   rename(key: string, derived: string): void;
@@ -56,18 +57,18 @@ export function useGroupRename(
     });
   const renameAlone = (group: TabGroup) => {
     const a = group.affiliation;
-    return a?.kind === 'place' ? () => rename(a.key, a.label) : undefined;
+    return a?.kind === 'place' ? () => rename(a.key, derivedOf(group)) : undefined;
   };
   const renameActive = () => {
     const at = groupOf(groups, tabs.activeId);
     if (!at) return;
-    if (at.chipped) return rename(at.key, derivedLabel(at, faceOf));
+    if (at.chipped) return rename(at.key, derivedOf(at));
     const a = at.affiliation;
-    if (a) rename(a.key, a.label);
+    if (a) rename(a.key, derivedOf(at));
   };
   return {
     labelOf: (group) =>
-      groupName(group, tabs.groupNames, derivedLabel(group, faceOf)),
+      groupName(group, tabs.groupNames, derivedOf(group)),
     rename,
     renameAlone,
     renameActive,

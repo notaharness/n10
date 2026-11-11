@@ -1,10 +1,10 @@
 import type { KeyboardEvent, RefObject } from 'react';
 import { toast } from 'sonner';
+import { harnessLabel } from '@n10/core/ui';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { groupSummary } from '../../lib/tabs/group-status.js';
 import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
 import type { TabGroup, TabStatus } from '../../lib/tabs/tab-groups.js';
-import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { cn, errorMessage } from '../../lib/utils.js';
@@ -58,7 +58,6 @@ function HomeBody({
   const { tabOverflow } = useDesktopPrefs();
   const { tab } = face;
   const active = tab.id === tabs.activeId;
-  const { label } = tabPresentation(tab, face.item, face.machineLabel);
   const hover = useHoverPrewarm(() => (active ? null : tab), true);
   return (
     <div
@@ -99,7 +98,12 @@ function HomeBody({
           tabMenu
         ).catch((err: unknown) => toast.error(errorMessage(err)));
       }}
-      title={label}
+      title={[
+        name,
+        `Orchestrator: ${face.taskTitle ?? (face.harness ? harnessLabel(face.harness) : 'Agent')}`,
+        tab.kind === 'item' ? `Repository: ${tab.repo}` : undefined,
+        tab.kind === 'terminal' ? `Directory: ${tab.cwd}` : undefined,
+      ].filter(Boolean).join('\n')}
       className={cn(CHIP_BODY, 'cursor-default')}
     >
       <HomeLabel face={face} name={name} />

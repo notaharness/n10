@@ -42,6 +42,7 @@ export interface TerminalLaunchRequest {
  */
 export interface TerminalSummary {
   agent?: string;
+  taskTitle?: string;
   /** Actual tmux target, when attached through tmux. Never a registry key. */
   tmuxName?: string;
   /** Opaque core registry key; displayPath supplies the tab label. */

@@ -5,7 +5,6 @@ import {
   type CutSide,
   type LabelPart,
 } from '../../lib/tabs/label-cut.js';
-import { repoDisplayName } from '../../lib/tabs/tab-presentation.js';
 import { cn } from '../../lib/utils.js';
 
 let canvas: CanvasRenderingContext2D | null = null;
@@ -68,17 +67,15 @@ const MEASURE_SLACK_PX = 0.5;
 
 /** How many characters the label loses from `side` to fit the box:
  *  none until it has been measured. */
-function cutFor(text: string, box: string, side: CutSide): number {
+function cutFor(text: string, box: string, side: CutSide, fixed = ''): number {
   if (!box) return 0;
   const [width = '0', font = ''] = box.split('\n');
-  const room = Number(width) + MEASURE_SLACK_PX;
+  const room = Number(width) + MEASURE_SLACK_PX - measurer(font)(fixed);
   return cutToFit(text, room, measurer(font), side);
 }
 
 /**
- * The tab's title, prefixed with its repository when that is not the
- * open one — the strip spans repos, and `main` alone says nothing about
- * which checkout it is. Too long for the tab, it loses `cut`'s end (a
+ * The tab's title. Too long for the tab, it loses `cut`'s end (a
  * branch its start, so its end stays in view) and shows the whole of
  * itself as a tooltip.
  *
@@ -89,36 +86,39 @@ function cutFor(text: string, box: string, side: CutSide): number {
 export const TabLabel = memo(function TabLabel({
   label,
   preview,
-  foreignRepo,
   cut,
+  task,
+  parts,
 }: {
   label: string;
   preview: boolean;
-  foreignRepo: string | null;
   cut: CutSide;
+  task?: boolean;
+  parts?: { prefix: string; base: string; suffix: string };
 }) {
   const [el, setEl] = useState<HTMLSpanElement | null>(null);
   const box = useTextBox(el);
-  const parts: LabelPart[] = foreignRepo
-    ? [
-        {
-          key: 'repo',
-          text: `${repoDisplayName(foreignRepo)}/`,
-          className: 'text-muted-foreground/70',
-        },
-        { key: 'label', text: label },
-      ]
-    : [{ key: 'label', text: label }];
-  const whole = parts.map((p) => p.text).join('');
-  const dropped = cutFor(whole, box, cut);
+  const segments = parts ?? { prefix: '', base: label, suffix: '' };
+  const whole = label;
+  const dropped = cutFor(
+    segments.base,
+    box,
+    cut,
+    segments.prefix + segments.suffix
+  );
+  const shown: LabelPart[] = [
+    { key: 'prefix', text: segments.prefix },
+    ...dropChars([{ key: 'base', text: segments.base }], dropped, cut),
+    { key: 'suffix', text: segments.suffix },
+  ];
   return (
     <span
       ref={setEl}
       data-tab-label
       data-cut={dropped > 0 ? cut : undefined}
-      title={dropped > 0 ? whole : undefined}
       className={cn(
-        'relative min-w-0 flex-1 overflow-hidden whitespace-nowrap',
+        'relative min-w-0 overflow-hidden whitespace-nowrap',
+        task ? 'w-36 shrink grow-0' : 'flex-1',
         preview && 'italic'
       )}
     >
@@ -128,7 +128,7 @@ export const TabLabel = memo(function TabLabel({
         {whole}
       </span>
       <span aria-hidden data-tab-label-shown className="absolute inset-0">
-        {dropChars(parts, dropped, cut).map((p) => (
+        {shown.map((p) => (
           <span key={p.key} className={p.className}>
             {p.text}
           </span>

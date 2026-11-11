@@ -203,6 +203,17 @@ export function tagTmuxSession(
   }
 }
 
+/** Change a fixture session's primary pane title without attaching a client. */
+export function setTmuxPaneTitle(
+  name: string,
+  title: string,
+  tmuxTmpdir: string
+): void {
+  execFileSync('tmux', ['-u', 'select-pane', '-t', `=${name}:`, '-T', title], {
+    env: socketEnv(tmuxTmpdir),
+  });
+}
+
 /** Unset tags on a session, one `set-option -u` each. */
 export function untagTmuxSession(
   name: string,

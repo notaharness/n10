@@ -8,6 +8,7 @@ import {
 import {
   isWorktreeSessionFor,
   LISTED_TAGS,
+  SESSION_KEY,
   registryNameOf,
   type TaggedSession,
 } from './session-identity.js';
@@ -38,7 +39,7 @@ function sessionsFromListing(
  *  for a caller that must not read a failed listing as no sessions. */
 export function readOurSessions(): TaggedSession[] | null {
   try {
-    const listed = tmuxListSessionsRead(LISTED_TAGS);
+    const listed = tmuxListSessionsRead(LISTED_TAGS, SESSION_KEY.pane);
     return listed && sessionsFromListing(listed);
   } catch {
     return null;
@@ -49,7 +50,9 @@ export function readOurSessions(): TaggedSession[] | null {
  *  listing order. */
 export function listOurSessions(): TaggedSession[] {
   try {
-    return sessionsFromListing(tmuxListSessionsDetailed(LISTED_TAGS));
+    return sessionsFromListing(
+      tmuxListSessionsDetailed(LISTED_TAGS, SESSION_KEY.pane)
+    );
   } catch {
     return [];
   }
@@ -95,7 +98,7 @@ export async function listOurSessionsWith(
 ): Promise<TaggedSession[]> {
   return sessionsFromListing(
     await withTimeout(
-      tmuxListSessionsDetailedWith(executor, LISTED_TAGS),
+      tmuxListSessionsDetailedWith(executor, LISTED_TAGS, SESSION_KEY.pane),
       LIST_SESSIONS_TIMEOUT_MS,
       `list-sessions on ${machine} timed out after ${LIST_SESSIONS_TIMEOUT_MS}ms`
     ),

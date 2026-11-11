@@ -535,6 +535,7 @@ it('stamps each row with its agent’s affiliation from discovery’s listing', 
     kind: 'parent',
     key: 'codex:thread',
     label: 'Codex · repo',
+    place: '/repo',
   });
   f.service.park();
 });

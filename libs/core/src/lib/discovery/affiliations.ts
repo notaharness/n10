@@ -122,21 +122,26 @@ function context(
   for (const [session, report] of reports) {
     if (!report || report.home || heads.has(session)) continue;
     const places = homeless.get(report.key) ?? [];
-    places.push(placeLabel(placePath(session)));
+    places.push(placePath(session));
     homeless.set(report.key, places);
   }
   return { reports, heads, placePath, homeless };
 }
 
 /** The group a home heads. */
-function headed(session: TaggedSession, report: Reporting | null): Parent {
+function headed(
+  session: TaggedSession,
+  report: Reporting | null,
+  place: string
+): Parent {
   const key = homeKey(session);
   const follows = report && report.key !== key ? report.key : undefined;
   return {
     kind: 'parent',
     key,
     label: session.name,
-    home: ref(session),
+    home: { ...ref(session), place },
+    place,
     ...(follows ? { follows } : {}),
   };
 }
@@ -149,11 +154,20 @@ function groupsOf(
   const groups = new Map<string, Parent>();
   for (const session of sessions) {
     if (!ctx.heads.has(session)) continue;
-    const group = headed(session, ctx.reports.get(session) ?? null);
+    const group = headed(
+      session,
+      ctx.reports.get(session) ?? null,
+      ctx.placePath(session)
+    );
     if (!groups.has(group.key)) groups.set(group.key, group);
   }
   for (const [key, places] of ctx.homeless)
-    groups.set(key, { kind: 'parent', key, label: homelessLabel(key, places) });
+    groups.set(key, {
+      kind: 'parent',
+      key,
+      label: homelessLabel(key, places.map(placeLabel)),
+      ...(new Set(places).size === 1 ? { place: places[0] } : {}),
+    });
   return groups;
 }
 

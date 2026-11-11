@@ -68,6 +68,14 @@ export interface Workspace {
   /** The panes following a group (`supervise.ts`): at most one pane
    *  per group. Not saved, so following ends with the run. */
   follows: Readonly<Record<PaneId, Following>>;
+  /** Session-only label allocations, independently held by each pane. */
+  labelState: Readonly<Record<PaneId, PaneLabels>>;
+}
+
+export interface PaneLabels {
+  openedIds: readonly string[];
+  collisionOrdinals: Readonly<Record<string, { base: string; ordinal: number }>>;
+  chipOrdinals: Readonly<Record<string, { label: string; ordinal: number; home?: boolean }>>;
 }
 
 /** What a follow pane follows: a group, by affiliation key, and the
@@ -92,6 +100,7 @@ export const EMPTY_WORKSPACE: Workspace = {
   unseen: [],
   lastActiveByRepo: {},
   follows: {},
+  labelState: {},
 };
 
 /** The pane that has focus, or the first one if the id names none. */
@@ -113,19 +122,23 @@ export function paneOf(ws: Workspace, id: string): PaneNode | undefined {
  */
 export type Strip = Omit<
   Workspace,
-  'tabs' | 'layout' | 'focusedPane' | 'follows'
+  'tabs' | 'layout' | 'focusedPane' | 'follows' | 'labelState'
 > & {
   tabs: Tab[];
   activeId: string | null;
   /** The tabs in the other panes, read only: an open must not take an
    *  id one of them already has. */
   others?: readonly Tab[];
+  openedIds?: readonly string[];
+  collisionOrdinals?: PaneLabels['collisionOrdinals'];
+  chipOrdinals?: PaneLabels['chipOrdinals'];
 };
 
 export const EMPTY_STRIP: Strip = stripOf(EMPTY_WORKSPACE, FIRST_PANE);
 
 export function stripOf(ws: Workspace, paneId: PaneId): Strip {
   const pane = panesOf(ws.layout).find((p) => p.id === paneId);
+  const labels = ws.labelState[paneId];
   return {
     pinned: ws.pinned,
     collapsed: ws.collapsed,
@@ -133,6 +146,9 @@ export function stripOf(ws: Workspace, paneId: PaneId): Strip {
     groupNames: ws.groupNames,
     unseen: ws.unseen,
     lastActiveByRepo: ws.lastActiveByRepo,
+    openedIds: labels?.openedIds ?? [],
+    collisionOrdinals: labels?.collisionOrdinals ?? {},
+    chipOrdinals: labels?.chipOrdinals ?? {},
     tabs: (pane?.order ?? []).flatMap((id) => ws.tabs[id] ?? []),
     activeId: pane?.activeId ?? null,
     others: panesOf(ws.layout)
@@ -152,7 +168,7 @@ export function withStrip(
   strip: Strip
 ): Workspace {
   const pane = panesOf(ws.layout).find((p) => p.id === paneId);
-  const { tabs: list, activeId, ...marks } = strip;
+  const { tabs: list, activeId, openedIds, collisionOrdinals, chipOrdinals, ...marks } = strip;
   const rest = { ...marks };
   delete rest.others;
   const left = new Set(pane?.order);
@@ -165,6 +181,14 @@ export function withStrip(
   return {
     ...ws,
     ...rest,
+    labelState: {
+      ...ws.labelState,
+      [paneId]: {
+        openedIds: openedIds ?? [],
+        collisionOrdinals: collisionOrdinals ?? {},
+        chipOrdinals: chipOrdinals ?? {},
+      },
+    },
     pinned: pinned.length === rest.pinned.length ? rest.pinned : pinned,
     tabs,
     layout: replacePane(ws.layout, paneId, {

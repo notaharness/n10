@@ -1,8 +1,8 @@
 import type { KeyboardEvent } from 'react';
+import { harnessLabel } from '@n10/core/ui';
 import { toast } from 'sonner';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
-import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { errorMessage } from '../../lib/utils.js';
@@ -18,12 +18,35 @@ import { useSortableTab } from './TabStrip.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
 
-/** The hover title: the full path, for telling two checkouts of the
- *  same repo apart — and a terminal's absolute directory, where its
- *  label shows it from home. */
-function tabTitle(tab: Tab, foreignRepo: string | null): string | undefined {
-  if (foreignRepo) return foreignRepo;
-  return tab.kind === 'terminal' ? tab.cwd : undefined;
+function kindLine(tab: Tab, kind: string, harness?: string): string {
+  if (kind === 'pr' && tab.kind === 'item')
+    return `PR #${tab.itemKey.replace(/^pr:/, '')}`;
+  if (tab.kind === 'terminal')
+    return tab.terminalKind === 'agent'
+      ? ['Agent', harness ? harnessLabel(harness) : '']
+          .filter(Boolean)
+          .join(' · ')
+      : 'Shell';
+  if (harness) return ['Agent', harnessLabel(harness)].join(' · ');
+  return kind === 'branch' ? 'Branch' : 'Settings';
+}
+
+function detailLines(face: TabFace): string[] {
+  const { tab, label, labelKind: kind, machineLabel: machine } = face;
+  if (tab.kind === 'settings') return ['Settings'];
+  const lines = [label, kindLine(tab, kind, face.harness)];
+  if (tab.kind === 'item') {
+    lines.push(`Repository: ${tab.repo}`);
+    if (tab.branch && face.labelSource !== 'branch')
+      lines.push(`Branch: ${tab.branch}`);
+    if (tab.worktree && tab.worktree !== tab.repo)
+      lines.push(`Directory: ${tab.worktree}`);
+  }
+  if (tab.kind === 'terminal' && !label.includes(tab.cwd))
+    lines.push(`Directory: ${tab.cwd}`);
+  if (machine && !label.startsWith(`${machine} · `))
+    lines.push(`Machine: ${machine}`);
+  return lines.filter(Boolean);
 }
 
 export function TabButton({
@@ -55,11 +78,11 @@ export function TabButton({
    *  group's roster). */
   onKeyDown?: (e: KeyboardEvent<HTMLElement>) => void;
 }) {
-  const { tab, item, snapshot, foreignRepo, machineLabel } = face;
+  const { tab, snapshot } = face;
   const tabs = useTabs();
   const { tabMenu } = usePaneMenus();
   const { tabOverflow } = useDesktopPrefs();
-  const { label, face: kind } = tabPresentation(tab, item, machineLabel);
+  const { label, labelKind: kind } = face;
   // Resting on a tab renders its pane ahead of the press, another
   // repository's against what the app holds for that one.
   const hover = useHoverPrewarm(() => (active ? null : tab), true);
@@ -106,7 +129,7 @@ export function TabButton({
           (err: unknown) => toast.error(errorMessage(err))
         );
       }}
-      title={tabTitle(tab, foreignRepo)}
+      title={detailLines(face).join('\n')}
       data-face={kind}
       data-tab-id={tab.id}
       data-unseen={face.unseen || undefined}

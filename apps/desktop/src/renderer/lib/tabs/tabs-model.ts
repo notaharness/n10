@@ -38,6 +38,7 @@ import {
 import { dismissClosed, pruneDismissed, undismiss } from './tab-dismissed.js';
 import { openForeign, type ForeignSessionEntry } from './tab-foreign.js';
 import { openItem, openRunning, openSettings } from './tab-open.js';
+import { assignOrdinals, presentationOrder } from './tab-label-state.js';
 import { pinLive, rekey } from './tab-sync.js';
 import {
   arrangeTabs,
@@ -123,6 +124,8 @@ export type TabsAction =
   /** Name a group, by affiliation key; `null` (or a blank name) gives it
    *  back its derived label. */
   | { type: 'rename-group'; key: string; name: string | null }
+  | { type: 'assign-collision-ordinals'; values: Readonly<Record<string, { base: string; ordinal: number }>> }
+  | { type: 'assign-chip-ordinals'; values: Readonly<Record<string, { label: string; ordinal: number; home?: boolean }>> }
   /** The one reconciliation dispatched from Workspace's effect: the
    *  repo's sidebar items *and* the host's terminal listing, applied as
    *  one pure step. Terminals ride along on every sync rather than
@@ -252,7 +255,7 @@ export function reduce(ws: Workspace, action: WorkspaceAction): Workspace {
 
 /** One pane's strip after `action`: every transition the reducer has. */
 export function reduceStrip(state: Strip, action: TabsAction): Strip {
-  return remember(markSeen(apply(state, action)));
+  return presentationOrder(state, remember(markSeen(apply(state, action))));
 }
 
 /**
@@ -432,6 +435,8 @@ function applyMark(state: Strip, action: MarkAction): Strip {
 }
 
 function applyStrip(state: Strip, action: StripAction): Strip {
+  if (action.type === 'assign-collision-ordinals' || action.type === 'assign-chip-ordinals')
+    return assignOrdinals(state, action);
   if (MARK_ACTIONS.has(action.type)) {
     return applyMark(state, action as MarkAction);
   }
