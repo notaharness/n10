@@ -19,7 +19,7 @@ import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
 import { RepoBand } from './tab-marks.js';
 import { pressWithoutFocus } from './tab-keyboard.js';
 import { TabEnd } from './TabButton.js';
-import { FACE_ICON, TabIcon } from './TabIcon.js';
+import { TabIcon } from './TabIcon.js';
 import { runGroupMenu, runTabMenu, type GroupMenu } from './tab-menu.js';
 import { TabLabel } from './TabLabel.js';
 import type { useSortableTab } from './TabStrip.js';
@@ -109,12 +109,6 @@ function HomeBody({
       title={label}
       className={cn(BODY, 'cursor-default')}
     >
-      <TabIcon
-        Icon={FACE_ICON[kind]}
-        running={face.item ? itemRunning(face.item) : face.running}
-        snapshot={face.snapshot}
-        active={active}
-      />
       <span className="flex max-w-40 min-w-16">
         <TabLabel
           label={label}
@@ -255,7 +249,18 @@ export function GroupChip({
           onKeyDown={onKeyDown}
           className="flex h-full w-6 shrink-0 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
-          <Folder aria-hidden className="size-3.5" />
+          {head ? (
+            // One icon per chip: the home's activity hangs off it.
+            <TabIcon
+              Icon={Folder}
+              iconClassName="size-3.5"
+              running={head.item ? itemRunning(head.item) : head.running}
+              snapshot={head.snapshot}
+              active={containsActive}
+            />
+          ) : (
+            <Folder aria-hidden className="size-3.5" />
+          )}
         </button>
         {head ? (
           <HomeBody
