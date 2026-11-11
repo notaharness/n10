@@ -1,6 +1,6 @@
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { clickAppMenuItem } from './menu.js';
 import { terminalSessionTags } from '@n10/core/testing/session-tags';
@@ -123,9 +123,10 @@ export function startSurvivingTerminal(
 
 /**
  * Shell tabs that stand alone on the strip: each runs in a directory of
- * its own (`<name>-XXXXXX` under the fixture HOME, which teardown
+ * its own (`places/<name>` under the fixture HOME, which teardown
  * removes), so no place gathers two of them behind a chip. Their labels
- * start with `name`. For specs of the strip's own mechanics, which need
+ * start with `name` and are the same on every run, so visual specs can
+ * shoot them. For specs of the strip's own mechanics, which need
  * tabs on the strip rather than in a group's roster.
  */
 export function startLoneShells(
@@ -135,9 +136,11 @@ export function startLoneShells(
   const root = join(homeDir, 'places');
   mkdirSync(root, { recursive: true });
   for (const name of names) {
+    const cwd = join(root, name);
+    mkdirSync(cwd);
     startSurvivingTerminal({
       name: `${name}-shell`,
-      cwd: mkdtempSync(join(root, `${name}-`)),
+      cwd,
       command: 'sleep 600',
       homeDir,
     });
