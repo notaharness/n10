@@ -828,8 +828,9 @@ each group's first tab, members in their relative order, the home's tab
 first. Contiguity is derived, never an invariant: nothing re-sorts the tabs
 on sync and no move is refused. Every parent group shows a chip, and a place
 group of two or more; a lone place tab is an ordinary tab. The chip is three
-sibling controls: a disclosure, a body (the home's own tab, or a label that
-opens the roster for a stand-in parent or a place) and the roster button
+sibling controls: its one icon, a folder closed or open, which collapses and
+expands it; a body (the home's own tab, or a label that opens the roster for
+a stand-in parent or a place); and the roster button
 with the group's tab count and the count of each state present. Status comes
 from the activity snapshot only: `flashing` is new output, `active` working.
 Nothing yet says blocked, failed or done, and none is inferred from silence,

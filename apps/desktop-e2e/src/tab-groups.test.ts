@@ -209,9 +209,14 @@ test.describe('Tab groups', () => {
     // Collapsing keeps what is on screen, the count and the home.
     await tab(page, new RegExp(first)).click();
     await expect(shownTerminal(page)).toContainText(ready(first));
+    // The chip's one icon is the disclosure: an open folder, then closed.
     const disclosure = chipOf(page, CLAUDE).locator('[data-group-disclosure]');
+    await expect(disclosure).toHaveAccessibleName(/^Collapse /);
+    await expect(disclosure.locator('svg.lucide-folder-open')).toBeVisible();
     await disclosure.click();
     await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    await expect(disclosure).toHaveAccessibleName(/^Expand /);
+    await expect(disclosure.locator('svg.lucide-folder-closed')).toBeVisible();
     await expect(tab(page, new RegExp(first))).toHaveCount(0);
     await expect(tab(page, new RegExp(second))).toHaveCount(0);
     await expect(countOf(page, CLAUDE)).toHaveText('3');

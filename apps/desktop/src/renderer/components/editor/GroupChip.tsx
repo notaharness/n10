@@ -1,9 +1,7 @@
 import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  FolderIcon,
+  FolderClosedIcon,
+  FolderOpenIcon,
   GripVerticalIcon,
-  LayersIcon,
 } from 'lucide-react';
 import type { KeyboardEvent, RefObject } from 'react';
 import { toast } from 'sonner';
@@ -19,7 +17,6 @@ import { PopoverAnchor } from '../ui/popover.js';
 import { StatusClusters } from './StatusClusters.js';
 import { RepoBand, UnseenDot } from './tab-marks.js';
 import { runGroupMenu, runTabMenu, type GroupMenu } from './tab-menu.js';
-import { FACE_ICON } from './TabIcon.js';
 import { TabLabel } from './TabLabel.js';
 import type { useSortableTab } from './TabStrip.js';
 import type { useRosterOpen } from './use-roster-open.js';
@@ -71,7 +68,6 @@ function HomeBody({
     face.item,
     face.machineLabel
   );
-  const Icon = FACE_ICON[kind];
   const hover = useHoverPrewarm(() => (active ? null : tab), true);
   return (
     <div
@@ -107,7 +103,6 @@ function HomeBody({
       title={label}
       className={cn(BODY, 'cursor-default')}
     >
-      <Icon aria-hidden className="size-3.5 shrink-0" />
       <span className="flex max-w-40 min-w-16">
         <TabLabel
           label={label}
@@ -126,7 +121,6 @@ function HomeBody({
  *  It opens the roster, and drags the group. */
 function LabelBody({
   label,
-  standIn,
   setHandle,
   handle,
   menu,
@@ -135,7 +129,6 @@ function LabelBody({
   justDropped,
 }: {
   label: string;
-  standIn: boolean;
   onPress: () => void;
   justDropped: () => boolean;
   setHandle: Sortable['setHandle'];
@@ -143,7 +136,6 @@ function LabelBody({
   menu: GroupMenu;
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
 }) {
-  const Icon = standIn ? LayersIcon : FolderIcon;
   return (
     <div
       ref={setHandle}
@@ -167,7 +159,6 @@ function LabelBody({
       title={label}
       className={cn(BODY, 'cursor-default')}
     >
-      <Icon aria-hidden className="size-3.5 shrink-0" />
       <span className="max-w-40 min-w-16 truncate">{label}</span>
       <Grip />
     </div>
@@ -215,7 +206,9 @@ export function GroupChip({
   /** Whether the group was just dropped: the click that follows is no press. */
   justDropped: () => boolean;
 }) {
-  const Chevron = collapsed ? ChevronRightIcon : ChevronDownIcon;
+  // The chip's one icon is its disclosure: a closed folder collapsed,
+  // an open one expanded, whatever the group belongs to.
+  const Folder = collapsed ? FolderClosedIcon : FolderOpenIcon;
   const body = { setHandle, handle, menu, onKeyDown, justDropped };
   return (
     <PopoverAnchor asChild>
@@ -246,7 +239,7 @@ export function GroupChip({
           onKeyDown={onKeyDown}
           className="flex h-full w-6 shrink-0 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
-          <Chevron aria-hidden className="size-3.5" />
+          <Folder aria-hidden className="size-3.5" />
         </button>
         {head ? (
           <HomeBody
@@ -256,12 +249,7 @@ export function GroupChip({
             {...body}
           />
         ) : (
-          <LabelBody
-            label={label}
-            standIn={group.affiliation?.kind === 'parent'}
-            onPress={roster.press}
-            {...body}
-          />
+          <LabelBody label={label} onPress={roster.press} {...body} />
         )}
         <button
           ref={rosterButton}
