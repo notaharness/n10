@@ -55,6 +55,9 @@ export interface MachineScanPorts {
   onChanged(delta: DiscoveryDelta): void;
   /** Handed the machine's whole listing. */
   listed?(machine: string, sessions: readonly TaggedSession[]): void;
+  /** Told once a listing of the machine succeeded and its terminals
+   *  are adopted. */
+  scanned?(machine: string): void;
 }
 
 const EMPTY_SCAN: DiscoveryScan = {
@@ -106,6 +109,7 @@ export function createMachineScans(ports: MachineScanPorts) {
       if (!ports.live()) return;
       if (await ports.adopt(terminal)) adopted += 1;
     }
+    if (ports.live()) ports.scanned?.(machine);
     if ((adopted > 0 || delta.endedTerminals.length > 0) && ports.live())
       ports.onChanged({ ...delta, changed: true });
   }

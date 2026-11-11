@@ -52,6 +52,8 @@ export interface SessionWatchPorts extends SessionLaunchPorts {
   adoptTerminal?(terminal: DiscoveredTerminal): void | Promise<void>;
   /** The connected machines whose terminals discovery lists too. */
   remoteMachines?(): readonly string[];
+  /** A machine's scan finished, its terminals adopted. */
+  scanned?(machine: string): void;
   changed?(delta: DiscoveryDelta): void;
 }
 export type SessionService = ReturnType<typeof createSessionService>;
@@ -251,6 +253,7 @@ export function createSessionService(options: {
         adopt: (wt) => adopt(wt, ports, live),
         adoptTerminal: ports.adoptTerminal,
         remoteMachines: ports.remoteMachines,
+        scanned: ports.scanned,
         listed: affiliations.observe,
         onChanged(delta) {
           void refresh();

@@ -86,6 +86,10 @@ export interface SessionDiscoveryOptions {
   onChanged: (delta: DiscoveryDelta) => void;
   /** Handed each machine's whole listing as a scan reads it. */
   listed?: (machine: string, sessions: readonly TaggedSession[]) => void;
+  /** Told each time a machine's scan has finished, the terminals it
+   *  found adopted: from then on, a terminal of that machine no listing
+   *  names is gone, not yet to be found. */
+  scanned?: (machine: string) => void;
   /** Abandon work between awaits when selection changes, before attaching a stale repo's sessions. */
   isCurrent?: () => boolean;
   /** What an earlier scanner of this repository last saw (`lastScan()`).
@@ -244,6 +248,7 @@ export function startSessionDiscovery(
     adopt: (terminal) => adoptOne(terminal, adoptTerminal ?? (() => undefined)),
     onChanged,
     listed: opts.listed,
+    scanned: opts.scanned,
   });
 
   async function runScan(): Promise<void> {
@@ -279,6 +284,7 @@ export function startSessionDiscovery(
     // re-reading the registry, and it must see the sessions this scan
     // just adopted rather than the state from before them.
     const adopted = await adoptAll(delta);
+    if (live()) opts.scanned?.(LOCAL_MACHINE);
     const announce = first || worthAnnouncing(delta, adopted + released);
     if (announce && !stopped && isCurrent()) onChanged(delta);
     ensureWatch();
