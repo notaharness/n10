@@ -1,4 +1,7 @@
 import type { Tab } from './tab-identity.js';
+import { panesOf, replacePane } from './layout.js';
+
+export { panesOf } from './layout.js';
 
 /**
  * The editor area's whole state: every tab, the panes that hold them,
@@ -7,8 +10,8 @@ import type { Tab } from './tab-identity.js';
  * (`workspace-file.ts`), less `unseen`.
  *
  * The layout is a tree of splits over panes, each pane with its own
- * order and active tab. Today it is always one pane; the shape is the
- * final one so that splitting needs no migration of a saved file.
+ * order and active tab (`layout.ts`). Every tab is in exactly one pane,
+ * and a pane with no tabs is only ever the sole one.
  */
 
 export type PaneId = string;
@@ -75,15 +78,15 @@ export const EMPTY_WORKSPACE: Workspace = {
   lastActiveByRepo: {},
 };
 
-/** Every pane in the layout, depth first. */
-export function panesOf(layout: LayoutNode): PaneNode[] {
-  return layout.kind === 'pane' ? [layout] : layout.children.flatMap(panesOf);
-}
-
 /** The pane that has focus, or the first one if the id names none. */
 export function focusedPaneOf(ws: Workspace): PaneNode {
   const panes = panesOf(ws.layout);
-  return panes.find((p) => p.id === ws.focusedPane) ?? panes[0];
+  return panes.find((p) => p.id === ws.focusedPane) ?? panes[0]!;
+}
+
+/** The pane that holds tab `id`, if any does. */
+export function paneOf(ws: Workspace, id: string): PaneNode | undefined {
+  return panesOf(ws.layout).find((p) => p.order.includes(id));
 }
 
 /**
@@ -95,6 +98,9 @@ export function focusedPaneOf(ws: Workspace): PaneNode {
 export type Strip = Omit<Workspace, 'tabs' | 'layout' | 'focusedPane'> & {
   tabs: Tab[];
   activeId: string | null;
+  /** The tabs in the other panes, read only: an open must not take an
+   *  id one of them already has. */
+  others?: readonly Tab[];
 };
 
 export const EMPTY_STRIP: Strip = stripOf(EMPTY_WORKSPACE, FIRST_PANE);
@@ -110,14 +116,9 @@ export function stripOf(ws: Workspace, paneId: PaneId): Strip {
     lastActiveByRepo: ws.lastActiveByRepo,
     tabs: (pane?.order ?? []).flatMap((id) => ws.tabs[id] ?? []),
     activeId: pane?.activeId ?? null,
-  };
-}
-
-function replacePane(node: LayoutNode, id: PaneId, next: PaneNode): LayoutNode {
-  if (node.kind === 'pane') return node.id === id ? next : node;
-  return {
-    ...node,
-    children: node.children.map((c) => replacePane(c, id, next)),
+    others: panesOf(ws.layout)
+      .filter((p) => p.id !== paneId)
+      .flatMap((p) => p.order.flatMap((id) => ws.tabs[id] ?? [])),
   };
 }
 
@@ -132,7 +133,9 @@ export function withStrip(
   strip: Strip
 ): Workspace {
   const pane = panesOf(ws.layout).find((p) => p.id === paneId);
-  const { tabs: list, activeId, ...rest } = strip;
+  const { tabs: list, activeId, ...marks } = strip;
+  const rest = { ...marks };
+  delete rest.others;
   const left = new Set(pane?.order);
   const tabs: Record<string, Tab> = Object.fromEntries(
     Object.entries(ws.tabs).filter(([id]) => !left.has(id))

@@ -6,11 +6,10 @@ import {
   type TerminalTab,
 } from './tab-identity.js';
 import { COLLAPSED_LIMIT } from './tab-order.js';
+import { makeSplit, panesOf, prunePanes } from './layout.js';
 import {
   EMPTY_WORKSPACE,
-  FIRST_PANE,
   type LayoutNode,
-  type PaneNode,
   type Workspace,
 } from './workspace.js';
 
@@ -25,8 +24,9 @@ import {
  * rather than trusted, so a hand-edited or half-understood file costs a
  * tab, never the window. Terminal tabs come back `restored`, waiting
  * for a listing to bind them (`tab-terminals.ts`); item tabs reconcile
- * on the first sync like any other. This build shows one pane: a saved
- * layout of several is read into one, in order.
+ * on the first sync like any other. The layout comes back as saved,
+ * less what no longer holds: a pane left without tabs goes (unless it is
+ * the only one), and a split left with one child gives way to it.
  */
 
 type Json = Record<string, unknown>;
@@ -159,32 +159,53 @@ function restoredTabs(
   );
 }
 
-/** Every pane a saved layout names, depth first; anything malformed is
- *  skipped. */
-function savedPanes(v: unknown, depth = 0): PaneNode[] {
-  if (!isRecord(v) || depth > 16) return [];
-  if (v.kind === 'split' && Array.isArray(v.children)) {
-    return v.children.flatMap((c) => savedPanes(c, depth + 1));
-  }
-  if (v.kind !== 'pane' || !str(v.id) || !Array.isArray(v.order)) return [];
-  const activeId = str(v.activeId) ? v.activeId : null;
-  return [{ kind: 'pane', id: v.id, order: v.order.filter(str), activeId }];
+/** A saved layout node, its tabs claimed from `free` as it goes so no
+ *  tab is in two panes; `null` for one with no tabs left, anything
+ *  malformed, or past depth 16. */
+function savedNode(
+  v: unknown,
+  free: Set<string>,
+  depth: number
+): LayoutNode | null {
+  if (!isRecord(v) || depth > 16) return null;
+  if (v.kind === 'split') return savedSplit(v, free, depth);
+  if (v.kind !== 'pane' || !str(v.id) || !Array.isArray(v.order)) return null;
+  const order = v.order.filter(str).filter((id) => free.delete(id));
+  // A pane left without tabs goes, and its share with it.
+  if (order.length === 0) return null;
+  const activeId =
+    str(v.activeId) && order.includes(v.activeId) ? v.activeId : null;
+  return { kind: 'pane', id: v.id, order, activeId };
 }
 
-/** One pane holding every saved pane's tabs, in order, each once; active
- *  where the focused saved pane was. */
-function onePane(
-  panes: PaneNode[],
-  focused: unknown,
-  tabs: Record<string, Tab>
-): PaneNode {
-  const order = [...new Set(panes.flatMap((p) => p.order))].filter((id) =>
-    has(tabs, id)
-  );
-  const from = panes.find((p) => p.id === focused) ?? panes[0];
-  const activeId =
-    from?.activeId && order.includes(from.activeId) ? from.activeId : null;
-  return { kind: 'pane', id: FIRST_PANE, order, activeId };
+function savedSplit(v: Json, free: Set<string>, depth: number) {
+  const { direction, children, sizes } = v;
+  if (direction !== 'row' && direction !== 'column') return null;
+  if (!Array.isArray(children)) return null;
+  const given = Array.isArray(sizes) ? sizes : [];
+  const kept: LayoutNode[] = [];
+  const keptSizes: number[] = [];
+  children.forEach((c, i) => {
+    const node = savedNode(c, free, depth + 1);
+    if (!node) return;
+    kept.push(node);
+    const size: unknown = given[i];
+    keptSizes.push(typeof size === 'number' ? size : 0);
+  });
+  return kept.length === 0 ? null : makeSplit(direction, kept, keptSizes);
+}
+
+/** The saved layout with every pane id once; one empty pane when
+ *  nothing usable was saved. */
+function restoredLayout(v: unknown, tabs: Record<string, Tab>): LayoutNode {
+  const node = savedNode(v, new Set(Object.keys(tabs)), 0);
+  if (!node) return EMPTY_WORKSPACE.layout;
+  const ids = new Set<string>();
+  return prunePanes(node, (p) => {
+    const fresh = !ids.has(p.id);
+    ids.add(p.id);
+    return fresh;
+  });
 }
 
 function strings(v: unknown, keep: (s: string) => boolean = () => true) {
@@ -211,13 +232,17 @@ export function restoreWorkspace(
 ): Workspace {
   if (!saved) return EMPTY_WORKSPACE;
   const all = restoredTabs(saved.tabs, new Set(goneRepos));
-  const pane = onePane(savedPanes(saved.layout), saved.focusedPane, all);
-  const tabs = Object.fromEntries(pane.order.map((id) => [id, all[id]]));
+  const layout = restoredLayout(saved.layout, all);
+  const panes = panesOf(layout);
+  const tabs = Object.fromEntries(
+    panes.flatMap((p) => p.order.map((id) => [id, all[id]!]))
+  );
+  const focused = panes.find((p) => p.id === saved.focusedPane) ?? panes[0]!;
   return {
     ...EMPTY_WORKSPACE,
     tabs,
-    layout: pane,
-    focusedPane: pane.id,
+    layout,
+    focusedPane: focused.id,
     pinned: strings(saved.pinned, (id) => has(tabs, id)),
     collapsed: Object.fromEntries(
       Object.entries(recordOf(saved.collapsed, bool)).slice(-COLLAPSED_LIMIT)

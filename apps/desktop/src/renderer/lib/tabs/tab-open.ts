@@ -37,7 +37,8 @@ export function openItem(
     const kept = preview ? state : keepTab(state, existing.id);
     return { ...kept, activeId: existing.id };
   }
-  const id = tabIdFor(state.tabs, repo, itemKey);
+  // Free in every pane, not this one alone: ids key the panes.
+  const id = tabIdFor([...state.tabs, ...(state.others ?? [])], repo, itemKey);
   const next: Tab = { id, kind: 'item', repo, itemKey, preview };
   // Replace this repo's preview tab (if any) instead of stacking.
   // Scoped to the repo: another repository's preview tab is a tab the
