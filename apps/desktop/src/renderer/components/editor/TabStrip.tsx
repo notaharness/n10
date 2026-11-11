@@ -295,10 +295,7 @@ export function useSortableTab({
     /** The element pressed to move it, which carries `handle`. */
     setHandle: setActivatorNodeRef,
     handle,
-    style: {
-      transform: CSS.Translate.toString(transform),
-      ...slot(isDragging, transition),
-    },
+    style: slot(isDragging, CSS.Translate.toString(transform), transition),
     isDragging,
   };
 }

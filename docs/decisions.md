@@ -962,7 +962,7 @@ Dragging onto a pane's content (`use-pane-drop.ts`): its sides split, its
 middle moves (`pane-drop.ts`), the half (or whole) it would take tinted
 strongly enough to read over a terminal in either theme. Inside its strip
 a dragged tab moves itself, held to the strip; out of it, a copy follows
-the pointer instead (`drag-preview.ts`, `CarriedBlock.tsx`), so pane
+the pointer instead (`drag-preview.ts`, `CarriedOverlay.tsx`), so pane
 overflow and the pane portals never clip it, and the zone is read from the
 pointer's own events. Keyboard drags stay on the strip. On a strip, a block
 dropped among its own pane's blocks arranges that pane as presented;

@@ -11,7 +11,6 @@ import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { setStripDragging } from '../../lib/tabs/tab-switching.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
-import { CarriedBlock } from './CarriedBlock.js';
 import { holdInStrip } from './drag-preview.js';
 import { stripAnnouncements } from './strip-announcements.js';
 import { StripBlocksReport } from './strip-blocks.js';
@@ -87,7 +86,7 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
       // editor column, wrapped), which auto-scroll then scrolls after
       // the pointer, carrying the tab further: the box grows for as long
       // as the pointer stays there. A block carried out of the strip
-      // leaves the tab in its place and shows a copy (`CarriedBlock`).
+      // leaves the tab in its place and shows a copy (`CarriedOverlay`).
       modifiers={[holdInStrip(wrap)]}
       accessibility={{
         announcements: stripAnnouncements,
@@ -105,7 +104,6 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
       }}
     >
       <PaneDropFollower follow={paneDrop.follow} />
-      <CarriedBlock />
       <StripBlocksReport.Provider value={reportBlocks}>
         {children}
       </StripBlocksReport.Provider>
@@ -120,9 +118,13 @@ function PaneDropFollower({
 }: {
   follow: ReturnType<typeof usePaneDrop>['follow'];
 }) {
-  const { active, over, activeNode } = useDndContext();
+  const { active, over, activeNode, activatorEvent } = useDndContext();
   useEffect(() => {
-    const strip = activeNode?.closest('[role="tablist"]');
+    // A keyboard drag stays on its strip: no box to be carried out of.
+    const strip =
+      activatorEvent instanceof KeyboardEvent
+        ? null
+        : activeNode?.closest('[role="tablist"]');
     follow(
       active ? { active, over } : null,
       strip?.getBoundingClientRect() ?? null

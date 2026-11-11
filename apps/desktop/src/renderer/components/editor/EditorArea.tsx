@@ -28,6 +28,7 @@ import { GroupBlock } from './GroupBlock.js';
 import { revealTab } from './reveal-tab.js';
 import { groupBlockId, stripRuns } from './strip-blocks.js';
 import { TabButton } from './TabButton.js';
+import { CarriedOverlay } from './CarriedOverlay.js';
 import { TabStrip } from './TabStrip.js';
 import { useEditorPanes } from './use-editor-panes.js';
 import { PaneDropZone } from './PaneDropZone.js';
@@ -305,6 +306,12 @@ export function EditorArea({
         {/* Beside the panes, not among them: tests and the reveal read
             `[data-editor-panes]`' children as the panes. */}
         <PaneDropZone />
+        <CarriedOverlay
+          groups={groups}
+          faceOf={faceOf}
+          labelOf={labelOf}
+          colorOf={colorOf}
+        />
       </div>
       {confirmDialog}
       {dialog}

@@ -11,7 +11,7 @@ import { dropMove, isStripDragData } from './strip-drag.js';
 
 /**
  * What a tab or group carried out of its strip shows: a copy of it under
- * the pointer (`CarriedBlock`), its own place left standing, faded, in
+ * the pointer (`CarriedOverlay`), its own place left standing, faded, in
  * its strip, and, over another pane's strip, the slot it would land in
  * there. Inside its own strip a drag is as it always was: the tab itself
  * moves, held inside the strip (a member inside its group), and its
@@ -158,17 +158,25 @@ const GAP_PX = 8;
 /**
  * What sortable place `id` adds to its style: a slot opened on the side
  * a cross-pane drop would land, sliding open as the strip's own reorder
- * does, and, for the place a block was carried out of, a faded tab.
+ * does, and, for the place a drag was carried out of, its tab faded and
+ * left where it is.
  */
 export function useSlotStyle(
   id: string
-): (dragging: boolean, transition: string | undefined) => CSSProperties {
+): (
+  dragging: boolean,
+  transform: string | undefined,
+  transition: string | undefined
+) => CSSProperties {
   const pane = useContext(PaneScopeContext) ?? '';
   const landing = useLanding(pane, id);
   const out = useCarriedOut();
   const still = usePrefersReducedMotion();
   const room = landing ? `${landing.width + GAP_PX}px` : undefined;
-  return (dragging, transition) => ({
+  return (dragging, transform, transition) => ({
+    // Carried out, the tab stays in its place: moved with the pointer
+    // before the copy is up, it would widen its strip.
+    transform: dragging && out ? undefined : transform,
     marginInlineStart: landing?.side === 'before' ? room : undefined,
     marginInlineEnd: landing?.side === 'after' ? room : undefined,
     opacity: dragging && out ? 0.4 : undefined,

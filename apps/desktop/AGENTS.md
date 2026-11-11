@@ -236,7 +236,7 @@ Every rule below has its reasoning in `docs/decisions.md`.
   dragged tab stays inside the strip (`holdInStrip`, `drag-preview.ts`):
   past its end it would widen a scrolling box that auto-scroll then
   chases. Carried out of the strip it stays in its place, faded, and a
-  `DragOverlay` copy portalled to the body (`CarriedBlock.tsx`, mounted
+  `DragOverlay` copy portalled to the body (`CarriedOverlay.tsx`, mounted
   only then: dnd-kit counts a mounted overlay as shown) follows the
   pointer; over another pane's strip, that strip opens a slot where it
   would land.
