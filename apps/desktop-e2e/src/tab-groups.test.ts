@@ -305,6 +305,9 @@ test.describe('Tab groups', () => {
     await chipOf(page, CLAUDE).locator('[data-group-disclosure]').click();
     await expect(tab(page, new RegExp(first))).toBeVisible();
     const home = chipOf(page, CLAUDE).getByRole('tab');
+    // The orchestrator's own tab, under its directory's name, before it
+    // is carried.
+    await expect(home).toHaveText(new RegExp(basename(folder)));
     const alpha = tab(page, /alpha/);
     // By the home's mark and each tab's whole label: a shown label is
     // cut to fit, and how far depends on the font.
