@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab } from './setup/app.js';
+import { createWorktree, tab, visibleText } from './setup/app.js';
+import {
+  confirmNewTerminal,
+  openNewTerminalDialog,
+  terminalTabs,
+} from './setup/terminals.js';
 import { tmuxAvailable } from './setup/external.js';
 import { tabNames } from './setup/tab-row.js';
 
@@ -68,6 +73,10 @@ test.describe('Split panes', () => {
     await expect(panes(page)).toHaveCount(2);
     await expect(pane(page, 1).getByRole('tab')).toHaveText([/^delta/]);
     await expect(pane(page, 1)).toHaveAttribute('data-pane-focused', 'true');
+    // Focus goes with it: the new pane's tab takes the keys.
+    await expect(
+      pane(page, 1).getByRole('tab', { selected: true })
+    ).toBeFocused();
     await expect(pane(page, 0).getByRole('tab')).toHaveCount(3);
 
     // Escape lets go of a drag over a pane's side with nothing moved.
@@ -211,5 +220,48 @@ test.describe('Split panes', () => {
         return !!a && !!b && a.y >= b.y && a.y + a.height <= b.y + b.height + 1;
       })
       .toBe(true);
+  });
+
+  test('a terminal split off keeps one view, takes the keys, and comes back when its pane closes', async ({
+    desktop,
+  }) => {
+    const { app, page } = desktop;
+    await createWorktree(page, 'alpha');
+    await openNewTerminalDialog(app, page);
+    await confirmNewTerminal(page, 'Shell');
+    const terminal = terminalTabs(page);
+    await expect(terminal).toHaveAttribute('aria-selected', 'true');
+    const grids = page.locator('[data-terminal-grid]');
+    const prompt = page
+      .locator('[data-terminal-pane] .xterm-rows')
+      .getByText(/\S/)
+      .first();
+    await expect(prompt).toBeVisible({ timeout: 15_000 });
+
+    await page.keyboard.press('Control+\\');
+    await expect(panes(page)).toHaveCount(2);
+    await expect(pane(page, 1).getByRole('tab')).toHaveCount(1);
+    await expect(pane(page, 1).locator(terminal)).toHaveCount(1);
+    // One session, one view: the pane it left shows the worktree, and
+    // keeps no copy of the terminal.
+    await expect(grids).toHaveCount(1);
+    await expect(pane(page, 1).locator('[data-terminal-grid]')).toHaveCount(1);
+    const keys = pane(page, 1).locator('.xterm-helper-textarea');
+    await expect(keys).toBeFocused();
+    await page.keyboard.type('echo n10-split-$((40+2))\n', { delay: 20 });
+    await expect(visibleText(page, 'n10-split-42')).toBeVisible({
+      timeout: 15_000,
+    });
+
+    // Closing its pane hands it back, still running, and it takes the
+    // keys again.
+    await page.keyboard.press('Control+Alt+w');
+    await expect(panes(page)).toHaveCount(1);
+    await expect(grids).toHaveCount(1);
+    await expect(visibleText(page, 'n10-split-42')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator('.xterm-helper-textarea')).toBeFocused();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 });
