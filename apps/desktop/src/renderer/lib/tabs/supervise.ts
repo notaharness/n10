@@ -97,9 +97,10 @@ export function followerOf(ws: Workspace, key: string): PaneId | undefined {
 /**
  * Follow group `key` from pane `pane`: `ids` go to a new pane on its
  * `edge`, or, with no edge, `pane` itself follows (every tab it holds
- * is the group's). The follow pane shows `show`. Focus stays where it
- * is, and so does whatever the focused pane shows. One pane follows a
- * group at most; a second request is refused.
+ * is the group's). The follow pane shows `show`, its group expanded so
+ * every tab it follows is in sight. Focus stays where it is, and so
+ * does whatever the focused pane shows. One pane follows a group at
+ * most; a second request is refused.
  */
 export function followGroup(
   ws: Workspace,
@@ -143,6 +144,7 @@ function registered(
     ...ws,
     layout: replacePane(ws.layout, pane, { ...node, activeId: show }),
     follows: { ...ws.follows, [pane]: key },
+    collapsed: chooseCollapsed(ws.collapsed, [key], false),
   };
 }
 

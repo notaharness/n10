@@ -147,6 +147,15 @@ describe('following a group', () => {
     expect(ws.focusedPane).toBe('pane-1');
   });
 
+  it('expands the group, so the tabs it follows show', () => {
+    const ws = then(
+      group(),
+      { type: 'set-collapsed', keys: [KEY], collapsed: true },
+      follow()
+    );
+    expect(ws.collapsed[KEY]).toBe(false);
+  });
+
   it('refuses in place where the pane holds a tab it does not follow', () => {
     const ws = group();
     expect(then(ws, follow({ edge: null }))).toBe(ws);
