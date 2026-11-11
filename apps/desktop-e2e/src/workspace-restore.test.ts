@@ -3,12 +3,12 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab } from './setup/app.js';
+import { createWorktree, tab, visibleText } from './setup/app.js';
 import { tmuxAvailable } from './setup/external.js';
 import { shownTerminal } from './setup/prewarm.js';
 import { liftRightOver, tabNames } from './setup/tab-row.js';
 import { startSurvivingTerminal } from './setup/terminals.js';
-import { killFixtureSessions } from './setup/tmux.js';
+import { killFixtureSessions, killTmuxSession } from './setup/tmux.js';
 
 /**
  * The tab workspace outlives the app: its order, its pins, the groups
@@ -21,6 +21,7 @@ test.skip(!tmuxAvailable(), 'tmux is not installed');
 
 const SHELL = 'restore-shell';
 const SHELL_READY = 'restore-shell-ready';
+const SHELL_AGAIN = 'restore-shell-again';
 
 const placeChip = (page: Page) => page.locator('[data-group-chip^="place:"]');
 const disclosure = (page: Page) =>
@@ -83,20 +84,18 @@ test.describe('Workspace restore', () => {
       .poll(() => tabNames(page))
       .toEqual(['gamma', folder, 'beta', 'alpha']);
 
-    // Collapse the repository's group, beta and alpha behind its chip.
+    // The host has written that down.
+    await expect
+      .poll(() => (saved(homeDir)?.pinned as string[] | undefined)?.length)
+      .toBe(1);
+
+    // Collapse the repository's group, beta and alpha behind its chip,
+    // and quit at once: the save is still waiting out its debounce, and
+    // only the host's shutdown writes it.
     await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'true');
     await disclosure(page).click();
     await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'false');
     await expect(tab(page, /^beta/)).toHaveCount(0);
-
-    // The host has written it all down.
-    await expect
-      .poll(() => (saved(homeDir)?.pinned as string[] | undefined)?.length)
-      .toBe(1);
-    await expect
-      .poll(() => Object.values(saved(homeDir)?.collapsed ?? {}))
-      .toEqual([true]);
-
     await desktop.relaunch();
     const next = desktop.page;
 
@@ -118,5 +117,48 @@ test.describe('Workspace restore', () => {
     await restored.click();
     await expect(next.locator('[data-terminal-reconnecting]')).toHaveCount(0);
     await expect(shownTerminal(next)).toContainText(SHELL_READY);
+  });
+
+  // tmux reuses a name once its session has gone: the tab saved for the
+  // old one is not the new one's, and does not take its pin or place.
+  test('gives a terminal tab up when its name now runs another session', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    const shell = tab(page, new RegExp(basename(folder)));
+    await expect(shell).toBeVisible({ timeout: 30_000 });
+    await shell.click();
+    await page.keyboard.press('Control+Alt+p');
+    await expect(shell).toHaveAttribute('data-pinned', 'true');
+    // Saved once discovery has dated its session.
+    await expect
+      .poll(() => JSON.stringify(saved(homeDir)?.tabs ?? {}))
+      .toContain('"created"');
+    await expect
+      .poll(() => (saved(homeDir)?.pinned as string[] | undefined)?.length)
+      .toBe(1);
+
+    await desktop.stop();
+    killTmuxSession(SHELL, homeDir);
+    // tmux dates a session to the second.
+    await new Promise((resolve) => setTimeout(resolve, 1_100));
+    startSurvivingTerminal({
+      name: SHELL,
+      cwd: folder,
+      command: `printf '%s\\n' ${SHELL_AGAIN}; sleep 300`,
+      homeDir,
+    });
+    await desktop.relaunch();
+    const next = desktop.page;
+
+    await expect(
+      visibleText(next, '1 session is no longer available')
+    ).toBeVisible({ timeout: 30_000 });
+    const again = tab(next, new RegExp(basename(folder)));
+    await expect(again).toHaveCount(1);
+    await expect(again).not.toHaveAttribute('data-pinned', 'true');
+    await again.click();
+    await expect(next.locator('[data-terminal-reconnecting]')).toHaveCount(0);
+    await expect(shownTerminal(next)).toContainText(SHELL_AGAIN);
   });
 });
