@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/desktop.js';
 import { createWorktree, tab, visibleText } from './setup/app.js';
 import { tmuxAvailable } from './setup/external.js';
 import { shownTerminal } from './setup/prewarm.js';
-import { liftRightOver, tabNames } from './setup/tab-row.js';
+import { LIFT, motion, tabNames } from './setup/tab-row.js';
 import { startSurvivingTerminal } from './setup/terminals.js';
 import { killFixtureSessions, killTmuxSession } from './setup/tmux.js';
 
@@ -26,6 +26,34 @@ const SHELL_AGAIN = 'restore-shell-again';
 const placeChip = (page: Page) => page.locator('[data-group-chip^="place:"]');
 const disclosure = (page: Page) =>
   placeChip(page).locator('[data-group-disclosure]');
+
+/**
+ * Lift `name`'s tab and step it right once, over `neighbour`. The
+ * sensor listens for arrows a task after the lift, so an early press
+ * can go unheard; each press is given a second to show before another
+ * is tried, so a slow render does not carry the tab a second step.
+ */
+async function stepRightOver(page: Page, name: RegExp, neighbour: RegExp) {
+  await tab(page, name).focus();
+  await page.keyboard.press(LIFT);
+  const moved = async () => {
+    try {
+      await expect
+        .poll(async () => (await motion(tab(page, neighbour))).transform, {
+          timeout: 1_000,
+        })
+        .toMatch(/^translate3d\(-\d/);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  for (let tries = 0; tries < 5; tries++) {
+    await page.keyboard.press('ArrowRight');
+    if (await moved()) return;
+  }
+  throw new Error(`${String(neighbour)} never slid aside`);
+}
 
 /** The saved file, once it says what `ready` asks of it. */
 function saved(homeDir: string): Record<string, unknown> | null {
@@ -69,8 +97,8 @@ test.describe('Workspace restore', () => {
       .poll(() => tabNames(page))
       .toEqual([folder, 'alpha', 'beta', 'gamma']);
 
-    // Reorder: alpha after beta.
-    await liftRightOver(page, /^alpha/, /^beta/);
+    // Reorder: alpha after beta, by keyboard.
+    await stepRightOver(page, /^alpha/, /^beta/);
     await page.keyboard.press('Space');
     await expect
       .poll(() => tabNames(page))
