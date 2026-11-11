@@ -953,9 +953,9 @@ detaches a removed subtree's refs before taking it out of the document and
 attaches the new slots in the same commit, so the container waits in a
 holder in between; the moves use `Element.moveBefore`, which keeps focus
 and scroll state (elsewhere, `appendChild` with focus restored).
-A wrapped strip takes at most three rows, or 40% of its pane if that is
+A wrapped strip takes at most ten rows, or 70% of its pane if that is
 less (the pane is a size container, `cqh`); past that it scrolls inside
-itself and keeps the active tab in view, so a short pane keeps its content.
+itself and keeps the active tab in view, so a short pane keeps some content.
 Scroll mode is one row as ever.
 
 Dragging onto a pane's content (`use-pane-drop.ts`): its sides split, its

@@ -175,10 +175,14 @@ test.describe('Split panes', () => {
       'refactor-host-restarts',
       'spike-front-truncation',
       'docs-tab-strip',
+      'feature-pane-drop-zones',
+      'fix-terminal-replay-keys',
+      'chore-regenerate-baselines',
+      'refactor-workspace-reducer',
     ];
     for (const branch of names) await createWorktree(page, branch);
     // Half the width, half the height, then half the width again: the
-    // top-left pane's long names wrap onto more rows than its strip has.
+    // top-left pane's long names wrap onto more rows than 70% of it.
     await tab(page, /^docs-tab-strip/).click();
     await page.keyboard.press('Control+\\');
     await tab(page, /^spike-front-truncation/).click();
@@ -202,15 +206,17 @@ test.describe('Split panes', () => {
       };
     });
     expect(fit.scrolls).toBe(true);
-    expect(fit.strip).toBeLessThanOrEqual(Math.min(125, 0.4 * fit.pane) + 1);
-    expect(fit.content).toBeGreaterThan(fit.pane / 2);
+    // Ten rows, or 70% of the pane if less: here the pane bites.
+    expect(fit.strip).toBeLessThanOrEqual(Math.min(433, 0.7 * fit.pane) + 1);
+    expect(fit.strip).toBeGreaterThan(0.6 * fit.pane);
+    expect(fit.content).toBeGreaterThan(0);
 
     // Ctrl+9 opens the pane's last tab, out of view below: the strip
     // scrolls it in.
     await tab(page, /^feature-tab-strip-wrap/).click();
     await page.keyboard.press('Control+9');
     const last = topLeft.getByRole('tab', { selected: true });
-    await expect(last).toHaveText(/refactor-host-restarts/);
+    await expect(last).toHaveText(/refactor-workspace-reducer/);
     await expect
       .poll(async () => {
         const [a, b] = await Promise.all([

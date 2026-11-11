@@ -86,11 +86,11 @@ export function TabStrip({
             'flex min-w-0 flex-1 items-stretch gap-2 bg-tab',
             wrap
               ? // Every row but the last is ruled off from the one below.
-                // At most three rows, or 40% of the pane if less: past
-                // that the strip scrolls and the pane keeps its content.
+                // At most ten rows, or 70% of the pane if less: past
+                // that the strip scrolls and the pane keeps some content.
                 // The last row's rule sits in the track's bottom pixel,
                 // laid over the strip's own, so one row never scrolls.
-                '-mb-px max-h-[min(calc(3*2.25rem+2*0.5rem+1px),40cqh)] flex-wrap overflow-y-auto pb-px [scrollbar-width:thin] [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
+                '-mb-px max-h-[min(calc(10*2.25rem+9*0.5rem+1px),70cqh)] flex-wrap overflow-y-auto pb-px [scrollbar-width:thin] [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
               : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           )}
           onScroll={update}
