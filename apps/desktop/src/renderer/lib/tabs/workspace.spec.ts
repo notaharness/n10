@@ -216,10 +216,21 @@ describe('a restored terminal tab', () => {
   });
 
   it('closes when its name now belongs to a later session, which gets a tab of its own', () => {
-    const ws = then(restored(1), sync([], [shell(2)]));
-    expect(view(ws).tabs).toHaveLength(1);
-    expect(tab(ws)).toMatchObject({ created: 2, listed: true });
-    expect(tab(ws)).not.toHaveProperty('restored');
+    // Saved ahead of an item tab: a bound tab keeps its place, a new one
+    // for the later session opens at the end.
+    const saved = run(sync([], [shell(1)]), open('branch:a'));
+    const file = JSON.parse(JSON.stringify(toSaved(saved))) as SavedWorkspace;
+    const ws = then(restoreWorkspace(file), sync([], [shell(2)]));
+    expect(ids(ws)).toEqual([id('branch:a'), terminalTabId('notes-shell')]);
+    expect(view(ws).tabs[1]).toMatchObject({ created: 2, listed: true });
+    expect(view(ws).tabs[1]).not.toHaveProperty('restored');
+  });
+
+  it('keeps its place when it binds', () => {
+    const saved = run(sync([], [shell(1)]), open('branch:a'));
+    const file = JSON.parse(JSON.stringify(toSaved(saved))) as SavedWorkspace;
+    const ws = then(restoreWorkspace(file), sync([], [shell(1)]));
+    expect(ids(ws)).toEqual([terminalTabId('notes-shell'), id('branch:a')]);
   });
 
   it('closes when a listing does not have it', () => {
