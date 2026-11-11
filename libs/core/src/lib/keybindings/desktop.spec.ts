@@ -30,8 +30,8 @@ describe('desktop default bindings', () => {
     ['PageUp', { ctrlKey: true }, 'desktop.tabs.previous'],
     ['Tab', { ctrlKey: true }, 'desktop.tabs.cycle-next'],
     ['Tab', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.cycle-previous'],
-    ['a', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.attention'],
-    ['j', { ctrlKey: true, shiftKey: true }, 'desktop.groups.collapse-others'],
+    ['A', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.attention'],
+    ['J', { ctrlKey: true, shiftKey: true }, 'desktop.groups.collapse-others'],
   ] as const)('%s with %o fires %s', (key, mods, action) => {
     expect(resolveDesktopAction(press(key, mods), defaults)).toBe(action);
   });
@@ -58,17 +58,26 @@ describe('desktop default bindings', () => {
       'Ctrl+Shift+j',
     ]);
   });
+
+  it('uses the descriptors recorded from browser Shift chords', () => {
+    expect(
+      descriptorFromDom(press('A', { ctrlKey: true, shiftKey: true }))
+    ).toEqual(DESKTOP_DEFAULT_BINDINGS['desktop.tabs.attention'][0]);
+    expect(
+      descriptorFromDom(press('J', { ctrlKey: true, shiftKey: true }))
+    ).toEqual(DESKTOP_DEFAULT_BINDINGS['desktop.groups.collapse-others'][0]);
+  });
 });
 
 describe('desktop overrides', () => {
   it('leaves a new default unassigned when a user override owns its chord', () => {
     const bindings = desktopBindings({
-      'desktop.tabs.next': [{ ctrl: true, shift: true, input: 'a' }],
+      'desktop.tabs.next': [{ ctrl: true, input: 'A' }],
     });
     expect(bindings['desktop.tabs.attention']).toEqual([]);
     expect(
       resolveDesktopAction(
-        press('a', { ctrlKey: true, shiftKey: true }),
+        press('A', { ctrlKey: true, shiftKey: true }),
         bindings
       )
     ).toBe('desktop.tabs.next');

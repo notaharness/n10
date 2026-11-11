@@ -64,8 +64,8 @@ export const DESKTOP_DEFAULT_BINDINGS: DesktopBindings = {
   'desktop.tabs.cycle-previous': [
     { ctrl: true, shift: true, flags: { tab: true } },
   ],
-  'desktop.tabs.attention': [{ ctrl: true, shift: true, input: 'a' }],
-  'desktop.groups.collapse-others': [{ ctrl: true, shift: true, input: 'j' }],
+  'desktop.tabs.attention': [{ ctrl: true, input: 'A' }],
+  'desktop.groups.collapse-others': [{ ctrl: true, input: 'J' }],
 };
 
 export function isDesktopActionId(id: string): id is DesktopActionId {
