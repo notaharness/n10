@@ -30,7 +30,7 @@ export type { ForeignSessionEntry } from './tab-foreign.js';
 import { closeRemovedWorktrees, closeTab } from './tab-close.js';
 import { openForeign, type ForeignSessionEntry } from './tab-foreign.js';
 import { pinLive, rekey } from './tab-sync.js';
-import { moveTabs, setCollapsed } from './tab-order.js';
+import { arrangeTabs, moveTabs, setCollapsed } from './tab-order.js';
 import {
   openTerminal,
   syncTerminals,
@@ -103,6 +103,7 @@ export type TabsAction =
   | { type: 'pin'; id: string }
   | { type: 'activate'; id: string }
   | { type: 'close'; id: string; repo?: string }
+  | { type: 'close-active' }
   | { type: 'close-others'; id: string }
   | { type: 'close-all' }
   /** Place `ids`, in their order, before or after `targetId`: one tab,
@@ -113,6 +114,9 @@ export type TabsAction =
       targetId: string;
       side: 'before' | 'after';
     }
+  /** Put the tabs `ids` name in that order, the rest after them: the
+   *  strip as presented, with a dragged block in its new place. */
+  | { type: 'arrange'; ids: readonly string[] }
   /** Collapse (or expand) these groups. */
   | { type: 'set-collapsed'; keys: readonly string[]; collapsed: boolean }
   /** The one reconciliation dispatched from Workspace's effect: the
@@ -253,6 +257,7 @@ type CloseAction = Extract<
       | 'close'
       | 'close-others'
       | 'close-all'
+      | 'close-active'
       | 'terminal-ended'
       | 'worktrees-removed';
   }
@@ -262,6 +267,7 @@ const CLOSE_ACTIONS: ReadonlySet<TabsAction['type']> = new Set<
   CloseAction['type']
 >([
   'close',
+  'close-active',
   'close-others',
   'close-all',
   'terminal-ended',
@@ -276,6 +282,10 @@ function applyClose(state: TabsState, action: CloseAction): TabsState {
   switch (action.type) {
     case 'close':
       return closeTab(state, action.id, action.repo);
+    case 'close-active':
+      return state.activeId
+        ? closeTab(state, state.activeId, undefined)
+        : state;
     case 'terminal-ended':
       return closeTab(state, terminalTabId(action.name), action.repo);
     case 'worktrees-removed':
@@ -332,6 +342,8 @@ function applyStrip(state: TabsState, action: StripAction): TabsState {
       return activateTab(state, action.id);
     case 'move':
       return moveTabs(state, action.ids, action.targetId, action.side);
+    case 'arrange':
+      return arrangeTabs(state, action.ids);
     case 'set-collapsed':
       return setCollapsed(state, action.keys, action.collapsed);
     case 'sync-items':

@@ -125,12 +125,37 @@ describe('present', () => {
     ]);
   });
 
+  it('follows its parent whichever of its tabs comes first', () => {
+    // Every member carries the group's `follows`; a player first.
+    const sub = parent('codex:sub', 'sub', 'claude:top');
+    const groups = strip([
+      ['leaf', sub],
+      ['other', place('/other')],
+      ['top', parent('claude:top', 'top')],
+      ['sub', sub],
+    ]);
+    expect(groups.map((g) => [g.key, g.behind])).toEqual([
+      ['place:/other', undefined],
+      ['claude:top', undefined],
+      ['codex:sub', 'claude:top'],
+    ]);
+  });
+
   it('breaks a cycle of parents at the group that comes first', () => {
     const groups = strip([
       ['x', parent('codex:x', 'x', 'codex:y')],
       ['y', parent('codex:y', 'y', 'codex:x')],
     ]);
     expect(groups.map((g) => g.key)).toEqual(['codex:x', 'codex:y']);
+  });
+
+  it('puts a follower of a cycle after the cycle’s first member', () => {
+    const groups = strip([
+      ['c', parent('codex:c', 'c', 'codex:a')],
+      ['a', parent('codex:a', 'a', 'codex:b')],
+      ['b', parent('codex:b', 'b', 'codex:a')],
+    ]);
+    expect(groups.map((g) => g.key)).toEqual(['codex:a', 'codex:c', 'codex:b']);
   });
 });
 
@@ -182,30 +207,66 @@ describe('status', () => {
 
 describe('present (properties)', () => {
   const KEYS = ['codex:a', 'codex:b', 'codex:c', 'place:/p'];
+  const PARENTS = KEYS.filter((k) => !k.startsWith('place:'));
+  /** Tabs in some order, each in one of `KEYS`; each parent group may
+   *  follow another, as all its members say. */
+  const strips = fc
+    .record({
+      keys: fc.array(fc.constantFrom(...KEYS), { maxLength: 10 }),
+      follows: fc.tuple(
+        ...PARENTS.map(() =>
+          fc.option(fc.constantFrom(...PARENTS), { nil: undefined })
+        )
+      ),
+    })
+    .map(({ keys, follows }) => {
+      const parentOf = new Map(
+        PARENTS.map((k, i) => [k, follows[i] === k ? undefined : follows[i]])
+      );
+      const groups = strip(
+        keys.map((key, i) => [
+          `t${i}`,
+          key.startsWith('place:')
+            ? place('/p')
+            : parent(key, undefined, parentOf.get(key)),
+        ])
+      );
+      return { keys, parentOf, groups };
+    });
+
   it('presents every tab exactly once, whatever the parents follow', () => {
     fc.assert(
-      fc.property(
-        fc.array(
-          fc.record({
-            key: fc.constantFrom(...KEYS),
-            follows: fc.option(fc.constantFrom(...KEYS), { nil: undefined }),
-          }),
-          { maxLength: 10 }
-        ),
-        (specs) => {
-          const groups = strip(
-            specs.map(({ key, follows }, i) => [
-              `t${i}`,
-              key.startsWith('place:')
-                ? place('/p')
-                : parent(key, undefined, follows === key ? undefined : follows),
-            ])
-          );
-          expect([...presentedIds(groups)].sort()).toEqual(
-            specs.map((_, i) => terminalTabId(`t${i}`)).sort()
-          );
-        }
-      )
+      fc.property(strips, ({ keys, groups }) => {
+        expect([...presentedIds(groups)].sort()).toEqual(
+          keys.map((_, i) => terminalTabId(`t${i}`)).sort()
+        );
+      })
+    );
+  });
+
+  it('shows a follower after its parent, unless both are in one cycle', () => {
+    fc.assert(
+      fc.property(strips, ({ parentOf, groups }) => {
+        const at = new Map(groups.map((g, i) => [g.key, i]));
+        const reaches = (from: string, to: string) => {
+          const seen = new Set<string>();
+          for (
+            let k = parentOf.get(from);
+            k && !seen.has(k);
+            k = parentOf.get(k)
+          ) {
+            if (k === to) return true;
+            seen.add(k);
+          }
+          return false;
+        };
+        const misplaced = groups.filter((g) => {
+          const up = parentOf.get(g.key);
+          if (!up || !at.has(up) || reaches(up, g.key)) return false;
+          return at.get(up)! > at.get(g.key)!;
+        });
+        expect(misplaced.map((g) => g.key)).toEqual([]);
+      })
     );
   });
 });

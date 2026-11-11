@@ -53,13 +53,15 @@ interface TabsApi extends TabsState {
   closeOthers: (id: string) => void;
   closeAll: () => void;
   closeActive: () => void;
-  /** Drag-reorder: place `ids` (a tab, or a group's tabs) before or
-   *  after `targetId`. */
+  /** Drag-reorder within a group: place `ids` before or after
+   *  `targetId`. */
   moveTabs: (
     ids: readonly string[],
     targetId: string,
     side: 'before' | 'after'
   ) => void;
+  /** Drag-reorder among blocks: the strip's tabs in this order. */
+  arrangeTabs: (ids: readonly string[]) => void;
   /** Collapse or expand the groups `keys` name. */
   setCollapsed: (keys: readonly string[], collapsed: boolean) => void;
   /**
@@ -96,14 +98,13 @@ interface TabsApi extends TabsState {
 
 export const TabsContext = createContext<TabsApi | null>(null);
 
-/** The strip's actions over its reducer's `dispatch`: stable for as
- *  long as `dispatch` is. `closeActive` reads the state it is given. */
-export function tabsApi(
-  state: TabsState,
-  dispatch: Dispatch<TabsAction>
-): TabsApi {
+export type TabsActions = Omit<TabsApi, keyof TabsState>;
+
+/** The strip's actions over its reducer's `dispatch`, none reading
+ *  state: made once, they keep their identity for as long as `dispatch`
+ *  does, whatever the state does. */
+export function tabsActions(dispatch: Dispatch<TabsAction>): TabsActions {
   return {
-    ...state,
     openItem: (repo, itemKey, opts) =>
       dispatch({
         type: 'open-item',
@@ -117,11 +118,10 @@ export function tabsApi(
     close: (id, repo) => dispatch({ type: 'close', id, repo }),
     closeOthers: (id) => dispatch({ type: 'close-others', id }),
     closeAll: () => dispatch({ type: 'close-all' }),
-    closeActive: () => {
-      if (state.activeId) dispatch({ type: 'close', id: state.activeId });
-    },
+    closeActive: () => dispatch({ type: 'close-active' }),
     moveTabs: (ids, targetId, side) =>
       dispatch({ type: 'move', ids, targetId, side }),
+    arrangeTabs: (ids) => dispatch({ type: 'arrange', ids }),
     setCollapsed: (keys, collapsed) =>
       dispatch({ type: 'set-collapsed', keys, collapsed }),
     syncItems: (repo, entries, terminals, foreign) =>

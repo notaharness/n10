@@ -25,6 +25,23 @@ export function moveTabs(
   };
 }
 
+/** Put the tabs `ids` name first, in that order, and the rest after
+ *  them as they were: a block dropped among the strip's blocks, which
+ *  the strip hands over as its whole presented order. Unknown ids are
+ *  ignored; unchanged state when the order is. */
+export function arrangeTabs(
+  state: TabsState,
+  ids: readonly string[]
+): TabsState {
+  const rank = new Map(ids.map((id, i) => [id, i]));
+  const placed = state.tabs
+    .filter((t) => rank.has(t.id))
+    .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
+  const tabs = [...placed, ...state.tabs.filter((t) => !rank.has(t.id))];
+  if (tabs.every((t, i) => t === state.tabs[i])) return state;
+  return { ...state, tabs };
+}
+
 /** Collapse or expand the groups `keys` name. Unchanged state when
  *  nothing changes. */
 export function setCollapsed(

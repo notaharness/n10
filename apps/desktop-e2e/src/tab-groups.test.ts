@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { createWorktree, tab } from './setup/app.js';
 import {
@@ -14,6 +14,7 @@ import {
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 import { shownTerminal } from './setup/prewarm.js';
 import { orchestraTags } from '@n10/core/testing/session-tags';
+import { tabNames } from './setup/tab-row.js';
 import { startSurvivingTerminal } from './setup/terminals.js';
 import { killFixtureSessions, tagTmuxSession } from './setup/tmux.js';
 
@@ -48,6 +49,16 @@ const countOf = (page: Page, key: string) =>
 const roster = (page: Page) => page.locator('[data-group-roster]');
 const rosterRows = (page: Page) => roster(page).locator('[data-roster-row]');
 const ready = (branch: string) => `player-${branch}-ready`;
+
+/** Press `from`, carry it in pointer steps to `x, y`, and let go. */
+async function drag(page: Page, from: Locator, x: number, y: number) {
+  const a = await from.boundingBox();
+  if (!a) throw new Error('not laid out');
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(x, y, { steps: 15 });
+  await page.mouse.up();
+}
 
 test.describe('Tab groups', () => {
   let folder = '';
@@ -241,6 +252,42 @@ test.describe('Tab groups', () => {
     await expect(
       group(page, CLAUDE).getByRole('tab', { selected: true })
     ).toHaveCount(1);
+  });
+
+  test('a chip carries its whole group, and drops where the strip opened room', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    await createWorktree(page, 'alpha');
+    const first = spawnAgent(repoPath, homeDir);
+    branches.push(first);
+    markOrchestrator(homeDir);
+    await expect(countOf(page, CLAUDE)).toHaveText('2', { timeout: 30_000 });
+    await chipOf(page, CLAUDE).locator('[data-group-disclosure]').click();
+    await expect(tab(page, new RegExp(first))).toBeVisible();
+    const home = chipOf(page, CLAUDE).getByRole('tab');
+    const alpha = tab(page, /alpha/);
+    const order = async () => {
+      const names = await tabNames(page);
+      return {
+        alpha: names.findIndex((n) => n.includes('alpha')),
+        home: names.findIndex((n) => n.includes(basename(folder))),
+        player: names.findIndex((n) => n.includes(first)),
+      };
+    };
+    await expect.poll(order).toMatchObject({ alpha: 0 });
+
+    // The chip, dropped on alpha's near half, takes the group in front.
+    const target = await alpha.boundingBox();
+    await drag(page, home, target!.x + 8, target!.y + target!.height / 2);
+    await expect.poll(order).toEqual({ home: 0, player: 1, alpha: 2 });
+
+    // Carried into the room after the last tab, it goes to the end.
+    const strip = await page
+      .getByRole('tablist', { name: 'Open tabs' })
+      .boundingBox();
+    await drag(page, home, strip!.x + strip!.width - 20, strip!.y + 18);
+    await expect.poll(order).toEqual({ home: 1, player: 2, alpha: 0 });
   });
 
   test('opens the roster on a rest, not on focus', async ({ desktop }) => {

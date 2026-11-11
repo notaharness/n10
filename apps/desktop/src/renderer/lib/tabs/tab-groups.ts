@@ -31,6 +31,9 @@ export interface TabGroup {
   /** Shown behind a chip: every parent group, and a place group of more
    *  than one tab. */
   chipped: boolean;
+  /** On a group shown right after the parent group its home reports to
+   *  (`Affiliation.follows`): that group's key. It moves with it. */
+  behind?: string;
 }
 
 /** Whether `tab` is the tab of a parent's home session. */
@@ -56,11 +59,12 @@ function headOf(group: Tab[], facts: (tab: Tab) => TabFacts, a: Affiliation) {
 
 /**
  * Groups whose head reports to another parent come right after that
- * parent's group, in their own first-tab order; groups do not nest, and
- * a cycle of parents is broken at the group whose first tab comes first.
+ * parent's group, in their own first-tab order; groups do not nest. A
+ * cycle of parents is broken at its member that comes first.
  */
 function orderFollowers(groups: TabGroup[]): TabGroup[] {
   const byKey = new Map(groups.map((g) => [g.key, g]));
+  const rank = new Map(groups.map((g, i) => [g, i]));
   const parentOf = (g: TabGroup): TabGroup | undefined => {
     const follows =
       g.affiliation?.kind === 'parent' ? g.affiliation.follows : undefined;
@@ -73,26 +77,32 @@ function orderFollowers(groups: TabGroup[]): TabGroup[] {
   }
   const out: TabGroup[] = [];
   const done = new Set<TabGroup>();
-  const emit = (g: TabGroup) => {
+  const emit = (g: TabGroup, behind?: string) => {
     if (done.has(g)) return;
     done.add(g);
-    out.push(g);
-    for (const child of children.get(g) ?? []) emit(child);
+    out.push(behind ? { ...g, behind } : g);
+    for (const child of children.get(g) ?? []) emit(child, g.key);
   };
-  /** The furthest ancestor not yet shown, or `g` itself on a cycle:
-   *  a follower waits for it, and comes out right behind it. */
+  /** The furthest ancestor of `g`: a follower waits for it, and comes
+   *  out behind it. On a cycle, the cycle's member that comes first. */
   const topOf = (g: TabGroup): TabGroup => {
-    const seen = new Set([g]);
-    let at = g;
-    for (let up = parentOf(at); up && !done.has(up); up = parentOf(at)) {
-      if (seen.has(up)) return g;
-      seen.add(up);
-      at = up;
+    const path = [g];
+    for (let up = parentOf(g); up; up = parentOf(up)) {
+      const at = path.indexOf(up);
+      if (at >= 0) return firstOf(path.slice(at), rank);
+      path.push(up);
     }
-    return at;
+    return path[path.length - 1]!;
   };
-  for (const g of groups) if (!done.has(g) && topOf(g) === g) emit(g);
+  for (const g of groups) if (topOf(g) === g) emit(g);
   return out;
+}
+
+function firstOf(
+  cycle: readonly TabGroup[],
+  rank: ReadonlyMap<TabGroup, number>
+): TabGroup {
+  return cycle.reduce((a, b) => (rank.get(b)! < rank.get(a)! ? b : a));
 }
 
 export function present(

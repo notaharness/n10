@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, type ReactNode } from 'react';
-import { TabsContext, tabsApi } from './tabs.js';
+import { TabsContext, tabsActions } from './tabs.js';
 import { EMPTY_TABS, reduce } from './tabs-model.js';
 
 /** The strip's state, above the repository gate: it spans repositories. */
@@ -23,6 +23,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const api = useMemo(() => tabsApi(state, dispatch), [state]);
+  const actions = useMemo(() => tabsActions(dispatch), []);
+  const api = useMemo(() => ({ ...state, ...actions }), [state, actions]);
   return <TabsContext.Provider value={api}>{children}</TabsContext.Provider>;
 }

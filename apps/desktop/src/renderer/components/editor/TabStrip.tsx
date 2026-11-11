@@ -1,7 +1,5 @@
 import {
-  closestCenter,
   DndContext,
-  pointerWithin,
   PointerSensor,
   useDndContext,
   useDroppable,
@@ -9,7 +7,6 @@ import {
   useSensors,
   type Active,
   type Announcements,
-  type CollisionDetection,
   type DragEndEvent,
   type Over,
 } from '@dnd-kit/core';
@@ -25,12 +22,23 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
+import { collisionsEndingAt, END_ID, groupEndId } from './strip-collisions.js';
 import {
   acceptsDrop,
   dropMove,
   isStripDragData,
+  type StripBlocks,
   type StripDragData,
 } from './strip-drag.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
@@ -46,28 +54,6 @@ import {
 /** How far the pointer travels before a press becomes a drag, so
  *  clicks and double clicks on a tab stay clicks. */
 const DRAG_THRESHOLD_PX = 5;
-
-/** The room after the last tab: over it, a drag is over the last tab. */
-const END_ID = 'tab-strip-end';
-
-/**
- * What the pointer is over, or, where it is over no legal place (a
- * keyboard drag, a border, another group), the legal place nearest the
- * dragged one: a member dragged out of its group opens the slot at that
- * end of its group. Only legal places are enabled droppables
- * (`strip-drag.ts`), so nothing else is ever a candidate. The room after
- * the last block counts as the last block.
- */
-const collisionsEndingAt: CollisionDetection = (args) => {
-  const places = args.droppableContainers.filter((c) => c.id !== END_ID);
-  const within = pointerWithin(args);
-  if (within[0]?.id === END_ID) {
-    const last = places.at(-1);
-    return last ? [{ id: last.id }] : [];
-  }
-  if (within.length > 0) return within;
-  return closestCenter({ ...args, droppableContainers: places });
-};
 
 /** A tab as a screen reader hears it: its label, not its id. */
 function spoken(target: Active | Over): string {
@@ -87,6 +73,11 @@ const announcements: Announcements = {
       : `${spoken(active)} was dropped.`,
   onDragCancel: ({ active }) => `Moving ${spoken(active)} was cancelled.`,
 };
+
+/** Where the strip tells the drag what its blocks are, as presented. */
+const StripBlocksReport = createContext<(blocks: StripBlocks) => void>(
+  () => undefined
+);
 
 /**
  * The drag and drop the tab strip sorts in, by pointer and by keyboard
@@ -112,12 +103,25 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+  // The strip's blocks as last rendered: a block's drop arranges them.
+  const blocks = useRef<StripBlocks>([]);
+  const reportBlocks = useCallback((next: StripBlocks) => {
+    blocks.current = next;
+  }, []);
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     const dragged = active.data.current;
     const target = over?.data.current;
     if (!over || !isStripDragData(dragged) || !isStripDragData(target)) return;
-    const move = dropMove(String(active.id), dragged, String(over.id), target);
-    if (move) tabs.moveTabs(move.ids, move.targetId, move.side);
+    const drop = dropMove(
+      String(active.id),
+      dragged,
+      String(over.id),
+      target,
+      blocks.current
+    );
+    if (drop?.kind === 'move')
+      tabs.moveTabs(drop.ids, drop.targetId, drop.side);
+    else if (drop) tabs.arrangeTabs(drop.ids);
   };
 
   return (
@@ -137,7 +141,9 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
       accessibility={{ announcements, screenReaderInstructions }}
       onDragEnd={onDragEnd}
     >
-      {children}
+      <StripBlocksReport.Provider value={reportBlocks}>
+        {children}
+      </StripBlocksReport.Provider>
     </DndContext>
   );
 }
@@ -153,16 +159,19 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
  * members, and dnd-kit sorts by rectangles; in one row, a horizontal list.
  */
 export function TabStrip({
-  blockIds,
+  blocks,
   children,
 }: {
-  blockIds: readonly string[];
+  /** Each block's sortable id and its tabs, in strip order. */
+  blocks: readonly { id: string; ids: readonly string[] }[];
   children: ReactNode;
 }) {
   const wrap = useDesktopPrefs().tabOverflow === 'wrap';
+  const report = useContext(StripBlocksReport);
+  useLayoutEffect(() => report(blocks.map((b) => b.ids)), [report, blocks]);
   return (
     <SortableContext
-      items={[...blockIds]}
+      items={blocks.map((b) => b.id)}
       strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
     >
       <div
@@ -207,18 +216,35 @@ export function GroupMembers({
  * The room after the last tab. Its growth outweighs the tabs', so it
  * takes the last row's room while each full row above is shared out
  * among its tabs. A drop target only for its rect, and only under the
- * pointer: collisions resolve it to the last tab, and a keyboard drag,
- * which steps from droppable to droppable, skips it.
+ * pointer: collisions resolve it to the last place the drag may land
+ * (`strip-collisions.ts`), and a keyboard drag, which steps from
+ * droppable to droppable, skips it.
  */
 function StripEnd() {
   const { active, activatorEvent } = useDndContext();
-  const dragged = active?.data.current;
   const { setNodeRef } = useDroppable({
     id: END_ID,
     disabled:
       activatorEvent instanceof KeyboardEvent ||
+      !isStripDragData(active?.data.current),
+  });
+  return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
+}
+
+/**
+ * The room after a wrapped group's last tab: the place its last member
+ * goes for a drag of one of its members (the strip's end, for a block's).
+ */
+export function GroupEnd({ group }: { group: string }) {
+  const { active, activatorEvent } = useDndContext();
+  const dragged = active?.data.current;
+  const { setNodeRef } = useDroppable({
+    id: groupEndId(group),
+    disabled:
+      activatorEvent instanceof KeyboardEvent ||
       !isStripDragData(dragged) ||
-      dragged.kind !== 'block',
+      dragged.kind !== 'member' ||
+      dragged.group !== group,
   });
   return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
 }
@@ -254,12 +280,16 @@ export function useSortableTab({
   actions,
   selectOnPress = true,
   role = 'tab',
+  fixed = false,
 }: {
   id: string;
   data: StripDragData;
   tabStop: boolean;
   actions: TabKeyActions;
   selectOnPress?: boolean;
+  /** Neither dragged nor dropped on: a group shown behind the one it
+   *  follows, which carries it. */
+  fixed?: boolean;
   /** `button` for a chip body that is no tab (a stand-in, a place):
    *  Enter and Space press it, and the tab keys are not its. */
   role?: 'tab' | 'button';
@@ -279,10 +309,10 @@ export function useSortableTab({
     id,
     data,
     disabled: {
-      droppable: !acceptsDrop(
-        data,
-        isStripDragData(dragging) ? dragging : undefined
-      ),
+      draggable: fixed,
+      droppable:
+        fixed ||
+        !acceptsDrop(data, isStripDragData(dragging) ? dragging : undefined),
     },
     attributes: {
       role,

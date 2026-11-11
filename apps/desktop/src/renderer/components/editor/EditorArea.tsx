@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
 import {
@@ -13,7 +13,7 @@ import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { EditorPane } from './EditorPane.js';
 import { EmptyState } from './EmptyState.js';
 import { GroupBlock } from './GroupBlock.js';
-import { groupBlockId } from './strip-blocks.js';
+import { groupBlockId, stripRuns } from './strip-blocks.js';
 import { TabButton } from './TabButton.js';
 import { TabStrip } from './TabStrip.js';
 import { useEditorPanes } from './use-editor-panes.js';
@@ -93,6 +93,38 @@ export function EditorArea({
     announce(activeGroup ? 'Other groups collapsed' : 'Groups collapsed');
   };
 
+  const runs = stripRuns(groups);
+  const blocks = runs.map((run) => ({
+    id: groupBlockId(run.lead),
+    ids: run.ids,
+  }));
+  /** A group on the strip; `ids` null for one carried by another's. */
+  const groupBlock = (
+    group: TabGroup,
+    at: number,
+    ids: string[] | null,
+    followers?: ReactNode
+  ) => (
+    <GroupBlock
+      key={groupBlockId(group)}
+      group={group}
+      index={at}
+      ids={ids}
+      followers={followers}
+      label={groupLabel(group, faceOf)}
+      faceOf={faceOf}
+      color={colorOf(group)}
+      collapsed={isCollapsed(group, tabs.collapsed)}
+      closer={closer}
+      tabStopId={tabStopId}
+      menu={{
+        canCollapseOthers,
+        collapseOthers,
+        setCollapsed: (collapsed) => tabs.setCollapsed([group.key], collapsed),
+      }}
+    />
+  );
+
   // No blanket overlay while a pane mounts: the virtualized diff and
   // the rail each show their own skeletons, and the terminal renders
   // in the first frame.
@@ -111,38 +143,25 @@ export function EditorArea({
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-background">
-      <TabStrip blockIds={groups.map(groupBlockId)}>
-        {groups.map((group, at) =>
-          group.chipped ? (
-            <GroupBlock
-              key={groupBlockId(group)}
-              group={group}
-              index={at}
-              label={groupLabel(group, faceOf)}
-              faceOf={faceOf}
-              color={colorOf(group)}
-              collapsed={isCollapsed(group, tabs.collapsed)}
-              closer={closer}
-              tabStopId={tabStopId}
-              menu={{
-                canCollapseOthers,
-                collapseOthers,
-                setCollapsed: (collapsed) =>
-                  tabs.setCollapsed([group.key], collapsed),
-              }}
-            />
-          ) : (
-            group.tabs.map((tab) => (
-              <TabButton
-                key={groupBlockId(group)}
-                face={faceOf(tab)}
-                data={{ kind: 'block', ids: [tab.id], index: at }}
-                active={tab.id === tabs.activeId}
-                closer={closer}
-                tabStop={tab.id === tabStopId}
-              />
-            ))
-          )
+      <TabStrip blocks={blocks}>
+        {runs.map((run, at) =>
+          run.lead.chipped
+            ? groupBlock(
+                run.lead,
+                at,
+                run.ids,
+                run.followers.map((g) => groupBlock(g, at, null))
+              )
+            : run.lead.tabs.map((tab) => (
+                <TabButton
+                  key={groupBlockId(run.lead)}
+                  face={faceOf(tab)}
+                  data={{ kind: 'block', ids: [tab.id], index: at }}
+                  active={tab.id === tabs.activeId}
+                  closer={closer}
+                  tabStop={tab.id === tabStopId}
+                />
+              ))
         )}
       </TabStrip>
       <div aria-live="polite" className="sr-only">
