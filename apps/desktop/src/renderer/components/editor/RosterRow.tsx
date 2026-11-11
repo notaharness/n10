@@ -139,20 +139,23 @@ function RowText({
   );
 }
 
+/** One level's indent, in px: wide enough that a player hangs under
+ *  its orchestrator, with a 10px elbow into its icon. */
+const STEP = 20;
 /** How far in a row of `depth` starts: a step per level. */
-const indent = (depth: number) => `${0.5 + depth}rem`;
+const indent = (depth: number) => `${8 + STEP * depth}px`;
 /** The centre of a row's icon at `depth`, in px: its start plus half
  *  the 16px icon. */
-const iconCentre = (depth: number) => 8 + 16 * depth + 8;
+const iconCentre = (depth: number) => 8 + STEP * depth + 8;
 
 type Tree = NonNullable<RosterEntry<TabFace>['tree']>;
 
-/** One guide line, in the border colour. */
+/** One guide line, in a muted ink: a tree to read, not a border. */
 function Guide({ style }: { style: CSSProperties }) {
   return (
     <span
       aria-hidden
-      className="pointer-events-none absolute w-px bg-border"
+      className="pointer-events-none absolute w-px bg-muted-foreground/40"
       style={style}
     />
   );
@@ -190,7 +193,7 @@ function RowGuides({ depth, tree }: { depth: number; tree: Tree }) {
   }
   // Down from this row's icon to the rows under it.
   if (tree.branches)
-    lines.push(['branch', { left: iconCentre(depth), top: 34, bottom: 0 }]);
+    lines.push(['branch', { left: iconCentre(depth), top: 32, bottom: 0 }]);
   return (
     <>
       {lines.map(([key, style]) => (
