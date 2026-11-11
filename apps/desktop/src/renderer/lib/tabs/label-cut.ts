@@ -46,6 +46,56 @@ export interface LabelPart {
   className?: string;
 }
 
+/** Fit contextual text without letting a place consume the primary label. */
+export function fitContextLabel(
+  prefix: string,
+  base: string,
+  suffix: string,
+  machineLabel: string | null,
+  width: number,
+  measure: (s: string) => number,
+  side: CutSide
+): { parts: LabelPart[]; cut?: CutSide } {
+  const machine =
+    machineLabel && prefix.startsWith(`${machineLabel} · `)
+      ? `${machineLabel} · `
+      : '';
+  const place = prefix.slice(machine.length).replace(/ · $/, '');
+  const fixed = machine + suffix;
+  const room = width - measure(fixed);
+  const baseCut = cutToFit(base, room, measure, side);
+  const baseParts = dropChars([{ key: 'base', text: base }], baseCut, side);
+  if (baseCut || !place) {
+    return {
+      parts: [
+        { key: 'machine', text: machine },
+        ...baseParts,
+        { key: 'suffix', text: suffix },
+      ],
+      cut: baseCut ? side : undefined,
+    };
+  }
+  const placeRoom = room - measure(base) - measure(' · ');
+  const placeCut = cutToFit(place, placeRoom, measure, 'end');
+  const placeParts = dropChars(
+    [{ key: 'place', text: place }],
+    placeCut,
+    'end'
+  );
+  const shownPlace = placeParts.map((part) => part.text).join('');
+  const usePlace =
+    shownPlace && measure(shownPlace + ' · ') <= room - measure(base);
+  return {
+    parts: [
+      { key: 'machine', text: machine },
+      { key: 'place', text: usePlace ? `${shownPlace} · ` : '' },
+      ...baseParts,
+      { key: 'suffix', text: suffix },
+    ],
+    cut: usePlace && placeCut ? 'end' : undefined,
+  };
+}
+
 /** `parts` without `cut` characters from `side`, the ellipsis where
  *  they were. */
 export function dropChars(

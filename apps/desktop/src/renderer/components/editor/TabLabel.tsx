@@ -2,6 +2,7 @@ import { memo, useCallback, useState, useSyncExternalStore } from 'react';
 import {
   cutToFit,
   dropChars,
+  fitContextLabel,
   type CutSide,
   type LabelPart,
 } from '../../lib/tabs/label-cut.js';
@@ -74,6 +75,34 @@ function cutFor(text: string, box: string, side: CutSide, fixed = ''): number {
   return cutToFit(text, room, measurer(font), side);
 }
 
+function visibleLabel(
+  segments: { prefix: string; base: string; suffix: string },
+  box: string,
+  side: CutSide,
+  machineLabel: string | null
+): { parts: LabelPart[]; cut?: CutSide } {
+  if (box && segments.prefix) {
+    const [width = '0', font = ''] = box.split('\n');
+    return fitContextLabel(
+      segments.prefix,
+      segments.base,
+      segments.suffix,
+      machineLabel,
+      Number(width) + MEASURE_SLACK_PX,
+      measurer(font),
+      side
+    );
+  }
+  const dropped = cutFor(segments.base, box, side, segments.suffix);
+  return {
+    parts: [
+      ...dropChars([{ key: 'base', text: segments.base }], dropped, side),
+      { key: 'suffix', text: segments.suffix },
+    ],
+    cut: dropped ? side : undefined,
+  };
+}
+
 /**
  * The tab's title. Too long for the tab, it loses `cut`'s end (a
  * branch its start, so its end stays in view) and shows the whole of
@@ -89,33 +118,25 @@ export const TabLabel = memo(function TabLabel({
   cut,
   task,
   parts,
+  machineLabel,
 }: {
   label: string;
   preview: boolean;
   cut: CutSide;
   task?: boolean;
   parts?: { prefix: string; base: string; suffix: string };
+  machineLabel?: string | null;
 }) {
   const [el, setEl] = useState<HTMLSpanElement | null>(null);
   const box = useTextBox(el);
   const segments = parts ?? { prefix: '', base: label, suffix: '' };
   const whole = label;
-  const dropped = cutFor(
-    segments.base,
-    box,
-    cut,
-    segments.prefix + segments.suffix
-  );
-  const shown: LabelPart[] = [
-    { key: 'prefix', text: segments.prefix },
-    ...dropChars([{ key: 'base', text: segments.base }], dropped, cut),
-    { key: 'suffix', text: segments.suffix },
-  ];
+  const fitted = visibleLabel(segments, box, cut, machineLabel ?? null);
   return (
     <span
       ref={setEl}
       data-tab-label
-      data-cut={dropped > 0 ? cut : undefined}
+      data-cut={fitted.cut}
       className={cn(
         'relative min-w-0 overflow-hidden whitespace-nowrap',
         task ? 'w-36 shrink grow-0' : 'flex-1',
@@ -128,7 +149,7 @@ export const TabLabel = memo(function TabLabel({
         {whole}
       </span>
       <span aria-hidden data-tab-label-shown className="absolute inset-0">
-        {shown.map((p) => (
+        {fitted.parts.map((p) => (
           <span key={p.key} className={p.className}>
             {p.text}
           </span>

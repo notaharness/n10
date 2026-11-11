@@ -70,7 +70,7 @@ export function TabLook({
   pinned?: boolean;
   onClose?: () => void;
 }) {
-  const { tab, item, snapshot, repoColor } = face;
+  const { tab, item, snapshot, machineLabel, repoColor } = face;
   const { label, labelKind: kind } = face;
   return (
     <>
@@ -83,6 +83,7 @@ export function TabLook({
       <TabLabel
         label={label}
         parts={face.labelParts}
+        machineLabel={machineLabel}
         preview={tab.preview}
         task={face.agentTab && kind !== 'pr'}
         cut={face.labelSource === 'task' ? 'end' : cutSide(kind)}

@@ -6,7 +6,7 @@ import {
   rosterSummary,
   tabCount,
 } from '../../lib/tabs/group-status.js';
-import { repoDisplayName, cutSide } from '../../lib/tabs/tab-presentation.js';
+import { cutSide } from '../../lib/tabs/tab-presentation.js';
 import type { Tab } from '../../lib/tabs/tabs.js';
 import { cn } from '../../lib/utils.js';
 import { PopoverContent } from '../ui/popover.js';
@@ -18,40 +18,7 @@ import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
 import type { useRosterOpen } from './use-roster-open.js';
 import { walkRows } from './roster-keys.js';
-
-/** Where a row's tab lives, under its label: its repository and branch,
- *  a terminal's directory, its machine when it has one. */
-function distinctWorktree(tab: Extract<Tab, { kind: 'item' }>): string {
-  if (!tab.worktree) return '';
-  const directory = repoDisplayName(tab.worktree);
-  const branch = tab.branch ?? '';
-  return directory === branch.replaceAll('/', '-') ||
-    directory === branch.split('/').at(-1)
-    ? ''
-    : directory;
-}
-
-function secondary(face: TabFace): string {
-  const { tab } = face;
-  if (tab.kind === 'terminal')
-    return [
-      repoDisplayName(tab.repo ?? tab.cwd),
-      repoDisplayName(tab.cwd),
-      face.branch,
-    ]
-      .filter((part, at, parts) => parts.indexOf(part) === at)
-      .join(' · ');
-  if (tab.kind === 'item')
-    return [
-      repoDisplayName(tab.repo),
-      face.labelKind === 'pr' ? tab.itemKey.replace(/^pr:/, '#') : '',
-      tab.branch,
-      distinctWorktree(tab),
-    ]
-      .filter((part, at, parts) => part && parts.indexOf(part) === at)
-      .join(' · ');
-  return '';
-}
+import { rosterSecondary } from './roster-text.js';
 
 /** The row's state, at its end: active first, then the state. */
 function RowStatus({
@@ -123,7 +90,7 @@ export function RosterRow({
     exited: face.snapshot?.exited ?? false,
     unseen: face.unseen,
   });
-  const where = secondary(face);
+  const where = rosterSecondary(face);
   return (
     <li className="relative">
       <button
@@ -143,6 +110,7 @@ export function RosterRow({
             <TabLabel
               label={label}
               parts={home ? undefined : face.labelParts}
+              machineLabel={face.machineLabel}
               preview={face.tab.preview}
               cut={face.labelSource === 'task' ? 'end' : cutSide(kind)}
             />
