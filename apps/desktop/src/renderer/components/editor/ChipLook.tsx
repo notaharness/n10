@@ -49,8 +49,8 @@ function ChipIcon({
 /**
  * The chip's name. With the pane's active tab among its members it reads
  * "group / member", as wide as a tab may be: the group's part is cut
- * first, and the member's label is capped short of the whole width, so
- * a few letters of the group always show.
+ * first, and the member's label stops 3.5rem short of the whole width,
+ * so a few letters of the group always show.
  */
 function ChipLabel({
   label,
@@ -76,7 +76,10 @@ function ChipLabel({
       <span aria-hidden className="shrink-0 text-muted-foreground">
         /
       </span>
-      <span data-group-active-label className="max-w-36 min-w-0 truncate">
+      <span
+        data-group-active-label
+        className="max-w-[min(9rem,calc(100%-3.5rem))] min-w-0 truncate"
+      >
         {active.label}
       </span>
     </span>
