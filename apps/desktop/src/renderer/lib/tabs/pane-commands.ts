@@ -1,5 +1,6 @@
 import type { DesktopActionId } from '@n10/core/ui';
 import type { Edge } from './layout.js';
+import { canSplit } from './layout-geometry.js';
 import type { PanesApi } from './use-panes.js';
 import type { PaneId } from './workspace.js';
 
@@ -28,6 +29,7 @@ const NONE_TOWARD: Record<Edge, string> = {
 
 export const SPLIT_NEEDS_TABS = 'Open another tab to split this pane';
 export const ONE_PANE = 'Only one pane is open';
+export const NO_ROOM = 'Not enough room to split';
 
 export type PaneCommand = Extract<DesktopActionId, `desktop.panes.${string}`>;
 
@@ -42,6 +44,14 @@ export interface PaneTarget {
   order: readonly string[];
   /** The tab: the pane's active one, or a menu's. */
   tabId: string | null;
+  /** The pane's size on screen, when it is laid out: a split must leave
+   *  both halves their minimum (`canSplit`). */
+  frame?: { width: number; height: number } | null;
+}
+
+/** Whether `target` can split toward `edge`: room for both halves. */
+export function roomToSplit(target: PaneTarget, edge: Edge): boolean {
+  return !target.frame || canSplit(target.frame, edge);
 }
 
 /** Split `target.pane` toward `edge`, moving its tab into the new half.
@@ -52,6 +62,7 @@ export function splitTab(
   edge: Edge
 ): string | null {
   if (target.tabId === null || target.order.length < 2) return SPLIT_NEEDS_TABS;
+  if (!roomToSplit(target, edge)) return NO_ROOM;
   panes.split([target.tabId], target.pane, edge, target.tabId);
   return null;
 }

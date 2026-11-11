@@ -1,5 +1,7 @@
 import type { Edge } from '../../lib/tabs/layout.js';
-import { MIN_PANE, SEPARATOR_PX } from '../../lib/tabs/layout-geometry.js';
+import { canSplit } from '../../lib/tabs/layout-geometry.js';
+
+export { canSplit };
 
 /**
  * Where a tab dragged over a pane's content lands: on one of its sides,
@@ -39,17 +41,6 @@ export function zoneAt(box: Box, x: number, y: number): DropZone {
     if (!best || at < best.at) best = { edge, at };
   }
   return best?.edge ?? 'centre';
-}
-
-/** Whether a pane of `frame`'s size has room for two panes side by side
- *  across `edge`'s axis. */
-export function canSplit(
-  frame: { width: number; height: number },
-  edge: Edge
-): boolean {
-  return edge === 'left' || edge === 'right'
-    ? frame.width >= 2 * MIN_PANE.width + SEPARATOR_PX
-    : frame.height >= 2 * MIN_PANE.height + SEPARATOR_PX;
 }
 
 /** The half of the content a split on `edge` would give the dropped

@@ -27,6 +27,7 @@ import {
 } from '../../lib/tabs/workspace.js';
 import { cn } from '../../lib/utils.js';
 import { EditorArea } from './EditorArea.js';
+import { paneFrame } from './reveal-tab.js';
 import { sayPane } from './use-pane-menus.js';
 
 interface Shared {
@@ -60,7 +61,12 @@ export function EditorLayout({
   useEffect(() => {
     setPaneCommands((command) => {
       const pane = focusedPaneOf(workspace);
-      const target = { pane: pane.id, order: pane.order, tabId: pane.activeId };
+      const target = {
+        pane: pane.id,
+        order: pane.order,
+        tabId: pane.activeId,
+        frame: paneFrame(pane.id),
+      };
       sayPane(runPaneShortcut(command, panes, target, panes.toward));
     });
     return () => setPaneCommands(null);

@@ -11,7 +11,9 @@ import {
   type PaneId,
   type Workspace,
 } from '../../lib/tabs/workspace.js';
+import { NO_ROOM } from '../../lib/tabs/pane-commands.js';
 import { canSplit, zoneAt } from './pane-drop.js';
+import { paneFrame, revealFocusedPane } from './reveal-tab.js';
 import { draggedIds, isStripDragData } from './strip-drag.js';
 
 /**
@@ -59,15 +61,6 @@ function show(at: DropAt) {
   document.body.style.cursor = at && !at.allowed ? 'no-drop' : '';
 }
 
-/** The pane frame on screen, strip included, by its `data-pane-id`. */
-function frameOf(pane: PaneId): DOMRect | null {
-  return (
-    document
-      .querySelector(`[data-pane-id="${CSS.escape(pane)}"]`)
-      ?.getBoundingClientRect() ?? null
-  );
-}
-
 /** The zone a drag is over, if it is over a pane's content, and whether
  *  dropping there would do anything: the middle of the pane it came
  *  from would not, nor a side where the pane has no room for two, nor a
@@ -83,12 +76,12 @@ function dropAt({ over, active }: Drag, ws: Workspace): DropAt {
   if (zone === 'centre') return { pane, zone, ids, allowed: from !== pane };
   const order = panesOf(ws.layout).find((p) => p.id === pane)?.order ?? [];
   const emptied = from === pane && order.every((id) => ids.includes(id));
-  const frame = frameOf(pane);
+  const frame = paneFrame(pane);
   const roomy = frame !== null && canSplit(frame, zone);
   if (emptied) return { pane, zone, ids, allowed: false };
   return roomy
     ? { pane, zone, ids, allowed: true }
-    : { pane, zone, ids, allowed: false, hint: 'Not enough room to split' };
+    : { pane, zone, ids, allowed: false, hint: NO_ROOM };
 }
 
 /** The drag provider's side of pane drops: following the drag and the
@@ -120,6 +113,7 @@ export function usePaneDrop() {
       const shown = at.ids[0];
       if (at.zone === 'centre') panes.moveToPane(at.ids, at.pane, shown);
       else panes.split(at.ids, at.pane, at.zone, shown);
+      revealFocusedPane();
       return true;
     },
     clear() {

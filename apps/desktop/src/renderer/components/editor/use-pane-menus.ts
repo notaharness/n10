@@ -4,6 +4,7 @@ import {
   closePane,
   EDGE_OF,
   moveTab,
+  roomToSplit,
   splitTab,
   type PaneDirection,
   type PaneTarget,
@@ -11,11 +12,14 @@ import {
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import { usePanes } from '../../lib/tabs/use-panes.js';
 import { errorMessage } from '../../lib/utils.js';
+import { paneFrame, revealFocusedPane } from './reveal-tab.js';
 import type { PaneMenu } from './tab-menu.js';
 
-/** What a pane command says when it has nothing to do. */
+/** A pane command's outcome: what it says when it has nothing to do,
+ *  else focus to the focused pane, its active tab revealed. */
 export function sayPane(message: string | null): void {
   if (message) toast(message, { id: 'pane-feedback', duration: 2000 });
+  else revealFocusedPane();
 }
 
 const DIRECTIONS: readonly { dir: PaneDirection; label: string }[] = [
@@ -41,8 +45,10 @@ export function usePaneMenus() {
     pane: tabs.paneId,
     order: tabs.tabs.map((t) => t.id),
     tabId,
+    frame: paneFrame(tabs.paneId),
   });
   const items = (tabId: string | null): ContextMenuItem[] => {
+    const at = target(tabId);
     const splits = tabId !== null && tabs.tabs.length > 1;
     const ways = DIRECTIONS.map(({ dir, label }) => ({
       id: `pane-move-${dir}`,
@@ -50,8 +56,16 @@ export function usePaneMenus() {
       enabled: panes.toward(tabs.paneId, EDGE_OF[dir]) !== null,
     }));
     return [
-      { id: 'pane-split-right', label: 'Split right', enabled: splits },
-      { id: 'pane-split-down', label: 'Split down', enabled: splits },
+      {
+        id: 'pane-split-right',
+        label: 'Split right',
+        enabled: splits && roomToSplit(at, 'right'),
+      },
+      {
+        id: 'pane-split-down',
+        label: 'Split down',
+        enabled: splits && roomToSplit(at, 'bottom'),
+      },
       {
         id: 'pane-move',
         label: 'Move tab',

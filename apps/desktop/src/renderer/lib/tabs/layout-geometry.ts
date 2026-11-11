@@ -186,3 +186,14 @@ export function minExtent(node: LayoutNode, axis: 'width' | 'height'): number {
     ? each.reduce((a, b) => a + b, 0) + SEPARATOR_PX * (each.length - 1)
     : Math.max(...each);
 }
+
+/** Whether a pane of `frame`'s size has room for two panes side by side
+ *  across `edge`'s axis. */
+export function canSplit(
+  frame: { width: number; height: number },
+  edge: Edge
+): boolean {
+  return edge === 'left' || edge === 'right'
+    ? frame.width >= 2 * MIN_PANE.width + SEPARATOR_PX
+    : frame.height >= 2 * MIN_PANE.height + SEPARATOR_PX;
+}
