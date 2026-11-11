@@ -8,7 +8,8 @@ import {
   type LayoutChangedMeta,
 } from 'react-resizable-panels';
 import type { SidebarItem } from '../../../host/contract.js';
-import { firstPane, minExtent, splitKey } from '../../lib/tabs/layout.js';
+import { nodeId, splitKey } from '../../lib/tabs/layout.js';
+import { minExtent } from '../../lib/tabs/layout-geometry.js';
 import { PaneFocusedContext } from '../../lib/tabs/pane-shown.js';
 import { usePrewarm } from '../../lib/tabs/prewarm.js';
 import {
@@ -102,14 +103,15 @@ function LayoutView({ node, shared }: { node: LayoutNode; shared: Shared }) {
 /** The layout a split's sizes describe, by panel id, in percent. */
 function layoutOf(split: SplitNode): Layout {
   return Object.fromEntries(
-    split.children.map((c, i) => [firstPane(c), split.sizes[i]! * 100])
+    split.children.map((c, i) => [nodeId(c), split.sizes[i]! * 100])
   );
 }
 
 /**
  * One split: a `Group` of its children, a separator between each two.
- * A child's panel is named by its first pane, so it keeps its place
- * while its own content splits or merges. When the children change, the
+ * A child's panel is named by its node's id (`nodeId`), which it keeps
+ * while its siblings come and go, so content that did not move is not
+ * remounted. When the children change, the
  * group is told the reducer's sizes; only a resize the user made is
  * reported back.
  */
@@ -119,7 +121,7 @@ function SplitView({ split, shared }: { split: SplitNode; shared: Shared }) {
   const group = useRef<GroupImperativeHandle | null>(null);
   const horizontal = split.direction === 'row';
   const axis = horizontal ? 'width' : 'height';
-  const ids = split.children.map(firstPane);
+  const ids = split.children.map(nodeId);
   const sizes = split.sizes.join(',');
   useEffect(() => {
     group.current?.setLayout(layoutOf(split));
@@ -135,7 +137,11 @@ function SplitView({ split, shared }: { split: SplitNode; shared: Shared }) {
   };
   return (
     <Group
-      id={`split:${key}`}
+      // The library keeps a layout per group id, by panel id: a new set
+      // of panels is a new group to it, laid out afresh from
+      // `defaultLayout`. React keys stay the nodes' own, so panels whose
+      // node stayed keep their content.
+      id={`split:${ids.join('|')}`}
       groupRef={group}
       orientation={horizontal ? 'horizontal' : 'vertical'}
       defaultLayout={layoutOf(split)}

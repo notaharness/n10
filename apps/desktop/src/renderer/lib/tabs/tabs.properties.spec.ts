@@ -1063,6 +1063,16 @@ describe('the workspace', () => {
         const panes = panesOf(ws.layout);
         expect(wellFormed(ws.layout)).toBe(true);
         expect(new Set(panes.map((p) => p.id)).size).toBe(panes.length);
+        // Every split named, each name once: React keys panes by them.
+        const splits: (string | undefined)[] = [];
+        const walk = (n: LayoutNode) => {
+          if (n.kind === 'pane') return;
+          splits.push(n.id);
+          n.children.forEach(walk);
+        };
+        walk(ws.layout);
+        expect(splits.every((id) => id !== undefined)).toBe(true);
+        expect(new Set(splits).size).toBe(splits.length);
         expect(panes.some((p) => p.id === ws.focusedPane)).toBe(true);
         const empties = panes.filter((p) => p.order.length === 0);
         expect(empties.length === 0 || panes.length === 1).toBe(true);

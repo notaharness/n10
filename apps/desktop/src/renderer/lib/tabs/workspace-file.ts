@@ -6,7 +6,7 @@ import {
   type TerminalTab,
 } from './tab-identity.js';
 import { COLLAPSED_LIMIT } from './tab-order.js';
-import { makeSplit, panesOf, prunePanes } from './layout.js';
+import { makeSplit, panesOf } from './layout.js';
 import {
   EMPTY_WORKSPACE,
   type LayoutNode,
@@ -192,20 +192,48 @@ function savedSplit(v: Json, free: Set<string>, depth: number) {
     const size: unknown = given[i];
     keptSizes.push(typeof size === 'number' ? size : 0);
   });
-  return kept.length === 0 ? null : makeSplit(direction, kept, keptSizes);
+  if (kept.length === 0) return null;
+  return makeSplit(direction, kept, keptSizes, str(v.id) ? v.id : undefined);
 }
 
-/** The saved layout with every pane id once; one empty pane when
- *  nothing usable was saved. */
+/** The saved layout; one empty pane when nothing usable was saved. */
 function restoredLayout(v: unknown, tabs: Record<string, Tab>): LayoutNode {
   const node = savedNode(v, new Set(Object.keys(tabs)), 0);
-  if (!node) return EMPTY_WORKSPACE.layout;
-  const ids = new Set<string>();
-  return prunePanes(node, (p) => {
-    const fresh = !ids.has(p.id);
-    ids.add(p.id);
-    return fresh;
-  });
+  return node ? named(node) : EMPTY_WORKSPACE.layout;
+}
+
+/** `node` with every pane named `pane-N` and every split `split-N`,
+ *  each name once: a name malformed or already taken is given the next
+ *  free number, so no pane loses its tabs to a clash. */
+function named(node: LayoutNode): LayoutNode {
+  const taken = { pane: new Set<number>(), split: new Set<number>() };
+  const claim = (kind: 'pane' | 'split', id: string | undefined) => {
+    const n = Number(new RegExp(`^${kind}-(\\d+)$`).exec(id ?? '')?.[1]);
+    if (!Number.isInteger(n) || n < 1 || taken[kind].has(n)) return null;
+    taken[kind].add(n);
+    return id!;
+  };
+  const fresh = (kind: 'pane' | 'split') => {
+    let n = 1;
+    while (taken[kind].has(n)) n++;
+    taken[kind].add(n);
+    return `${kind}-${n}`;
+  };
+  // Valid names first, in reading order, so they keep theirs.
+  const visit = (n: LayoutNode): (() => LayoutNode) => {
+    if (n.kind === 'pane') {
+      const id = claim('pane', n.id);
+      return () => (id === null ? { ...n, id: fresh('pane') } : n);
+    }
+    const id = claim('split', n.id);
+    const children = n.children.map(visit);
+    return () => ({
+      ...n,
+      id: id ?? fresh('split'),
+      children: children.map((c) => c()),
+    });
+  };
+  return visit(node)();
 }
 
 function strings(v: unknown, keep: (s: string) => boolean = () => true) {

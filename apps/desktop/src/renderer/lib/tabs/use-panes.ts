@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { paneToward, panesOf, type Edge } from './layout.js';
+import { panesOf, type Edge } from './layout.js';
+import { paneToward } from './layout-geometry.js';
 import { useWorkspace } from './tabs.js';
 import type { LayoutNode, PaneId } from './workspace.js';
 import { paneOf } from './workspace.js';

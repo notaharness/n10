@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { SavedWorkspace } from '../../../host/contract.js';
 import { itemTabId } from './tab-identity.js';
-import {
-  closeNeighbour,
-  paneRects,
-  paneToward,
-  splitKey,
-  type Edge,
-} from './layout.js';
+import { splitKey, type Edge } from './layout.js';
+import { closeNeighbour, paneRects, paneToward } from './layout-geometry.js';
 import {
   EMPTY_WORKSPACE,
   reduce,
@@ -439,6 +434,8 @@ describe('resizing', () => {
     const back = restoreWorkspace({ ...saved, layout });
     expect(back.layout).toEqual({
       kind: 'split',
+      // Saved without an id: it is given one.
+      id: 'split-1',
       direction: 'row',
       sizes: [0.25, 0.75],
       children: [
@@ -446,6 +443,63 @@ describe('resizing', () => {
         pane('pane-3', [id('branch:c')]),
       ],
     });
+  });
+});
+
+describe('names', () => {
+  it('keeps a split’s id while its first pane goes, and names a new one afresh', () => {
+    const four = then(
+      run(
+        open('branch:a'),
+        open('branch:b'),
+        open('branch:c'),
+        open('branch:d')
+      ),
+      split([id('branch:b')], 'pane-1', 'right'),
+      split([id('branch:c')], 'pane-2', 'bottom'),
+      split([id('branch:d')], 'pane-3', 'bottom')
+    );
+    const column = (ws: Workspace) =>
+      ws.layout.kind === 'split' ? ws.layout.children[1]! : null;
+    expect(four.layout.kind === 'split' && four.layout.id).toBe('split-1');
+    expect(column(four)).toMatchObject({ kind: 'split', id: 'split-2' });
+    expect(panesOf(column(four)!).map((p) => p.id)).toEqual([
+      'pane-2',
+      'pane-3',
+      'pane-4',
+    ]);
+    const less = then(four, { type: 'close-pane', pane: 'pane-2' });
+    expect(column(less)).toMatchObject({ kind: 'split', id: 'split-2' });
+  });
+
+  it('renames a restored pane whose id is taken or malformed, keeping its tabs', () => {
+    const saved = JSON.parse(
+      JSON.stringify(toSaved(threeTabs()))
+    ) as SavedWorkspace;
+    const pane = (paneId: string, order: string[]): PaneNode => ({
+      kind: 'pane',
+      id: paneId,
+      order,
+      activeId: order[0]!,
+    });
+    const layout = {
+      kind: 'split',
+      id: 'split-4',
+      direction: 'column',
+      sizes: [1, 1, 1],
+      children: [
+        pane('pane-1', [id('branch:a')]),
+        pane('pane-1', [id('branch:b')]),
+        pane('left:pane', [id('branch:c')]),
+      ],
+    };
+    const back = restoreWorkspace({ ...saved, layout });
+    expect(panesOf(back.layout).map((p) => [p.id, p.order.length])).toEqual([
+      ['pane-1', 1],
+      ['pane-2', 1],
+      ['pane-3', 1],
+    ]);
+    expect(back.layout.kind === 'split' && back.layout.id).toBe('split-4');
   });
 });
 

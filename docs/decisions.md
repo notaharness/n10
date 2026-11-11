@@ -933,7 +933,8 @@ going left, right, up, down. Focus and move toward a side take the pane past
 that side and level with it, nearest first. Sizes persist per split by
 `splitKey`, its children's first panes; only a resize the user made is saved,
 so a window that clamps panes does not overwrite their ratios. Restore reads
-the saved tree as it is, less panes left without tabs.
+the saved tree as it is, less panes left without tabs; a pane or split whose
+id is malformed or taken is given the next free one, keeping its tabs.
 
 The editor draws the tree with nested `react-resizable-panels` groups
 (`EditorLayout.tsx`), each leaf an `EditorArea` under `PaneScopeContext`,
@@ -941,8 +942,12 @@ which `useTabs` reads to give that pane's strip. Every pane shows its active
 tab and marks its output seen; only the focused one takes the keyboard
 (`usePaneTakesKeys`) and its terminal focuses itself. The window keeps one
 spare (`ownsSpare`): the focused pane's, or the pane whose strip tab the
-pointer rests on, and never a tab another pane holds. A structural change
-remounts the panes under it; a resize or focus change does not.
+pointer rests on, and never a tab another pane holds. A split keeps its id
+(`split-N`) for as long as it stands, and React keys panels by pane and
+split ids, so panes beside a change keep their content. A pane's content
+remounts only when the pane changes level in the tree: the sole pane or a
+pane inside a split becoming a split of its own, or the survivor of a split
+that collapses moving up. A resize or focus change remounts nothing.
 A wrapped strip takes at most three rows, or 40% of its pane if that is
 less (the pane is a size container, `cqh`); past that it scrolls inside
 itself and keeps the active tab in view, so a short pane keeps its content.

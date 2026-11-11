@@ -1,4 +1,5 @@
-import { MIN_PANE, SEPARATOR_PX, type Edge } from '../../lib/tabs/layout.js';
+import type { Edge } from '../../lib/tabs/layout.js';
+import { MIN_PANE, SEPARATOR_PX } from '../../lib/tabs/layout-geometry.js';
 
 /**
  * Where a tab dragged over a pane's content lands: on one of its sides,

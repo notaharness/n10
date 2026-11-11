@@ -1,14 +1,13 @@
 import {
-  closeNeighbour,
   insertBeside,
   nextPaneId,
-  paneToward,
   panesOf,
   prunePanes,
   removePane,
   replacePane,
   type Edge,
 } from './layout.js';
+import { closeNeighbour, paneToward } from './layout-geometry.js';
 import {
   focusedPaneOf,
   type PaneId,
