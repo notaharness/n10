@@ -273,34 +273,38 @@ export function EditorArea({
       <div aria-live="polite" className="sr-only">
         {announced}
       </div>
-      <div className="relative min-h-0 flex-1" data-editor-panes>
-        <PaneDropZone />
-        {/* Another repository's tab renders against that repository
+      <div className="relative min-h-0 flex-1">
+        <div className="absolute inset-0" data-editor-panes>
+          {/* Another repository's tab renders against that repository
             (EditorPane), so it can be held ready like any other. */}
-        {panes.map((tab) => (
-          <EditorPane
-            key={tab.id}
-            tab={tab}
-            items={items}
-            index={index}
-            shown={tab.id === activePane?.id}
-            menuActive={
-              tabs.focused &&
-              tab.id === activePane?.id &&
-              tab.id === tabs.activeId
-            }
-            onKeep={() => tabs.keep(tab.id)}
-          />
-        ))}
-        {paneActiveId === null && (
-          // Tabs on the strip, none of them active.
-          <div className="absolute inset-0 flex min-h-0 flex-col">
-            <EmptyState
-              onOpenPalette={onOpenPalette}
-              hasItems={items.length > 0}
+          {panes.map((tab) => (
+            <EditorPane
+              key={tab.id}
+              tab={tab}
+              items={items}
+              index={index}
+              shown={tab.id === activePane?.id}
+              menuActive={
+                tabs.focused &&
+                tab.id === activePane?.id &&
+                tab.id === tabs.activeId
+              }
+              onKeep={() => tabs.keep(tab.id)}
             />
-          </div>
-        )}
+          ))}
+          {paneActiveId === null && (
+            // Tabs on the strip, none of them active.
+            <div className="absolute inset-0 flex min-h-0 flex-col">
+              <EmptyState
+                onOpenPalette={onOpenPalette}
+                hasItems={items.length > 0}
+              />
+            </div>
+          )}
+        </div>
+        {/* Beside the panes, not among them: tests and the reveal read
+            `[data-editor-panes]`' children as the panes. */}
+        <PaneDropZone />
       </div>
       {confirmDialog}
       {dialog}

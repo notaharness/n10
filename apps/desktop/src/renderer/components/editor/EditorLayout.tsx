@@ -149,6 +149,14 @@ function SplitView({ split, shared }: { split: SplitNode; shared: Shared }) {
           {i > 0 && (
             <Separator
               data-pane-separator
+              // The library resets the panel to its default share on a
+              // double-click; the reducer hears the same, so it is saved.
+              onDoubleClick={() =>
+                panes.resize(
+                  key,
+                  ids.map(() => 1)
+                )
+              }
               // 4px of room with a 1px rule down its middle; the whole
               // of it turns primary while hovered, dragged or focused.
               className={cn(
