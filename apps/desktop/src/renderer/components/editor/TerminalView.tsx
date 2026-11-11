@@ -62,8 +62,27 @@ function ExitedAgentBar({ session }: { session: TerminalSummary }) {
  * what makes the pane re-fit when the process behind the name changes.
  */
 /** A restored tab until a listing finds its session: it attaches
- *  nothing, so it cannot reach a later session under its name. */
-function Reconnecting() {
+ *  nothing, so it cannot reach a later session under its name. On a
+ *  machine that is not connected, the remote terminal's own banner says
+ *  what it waits for; its listing closes the tab if the session is gone
+ *  once the machine answers. */
+function Reconnecting({ tab }: { tab: TerminalTab }) {
+  const machines = useMachines();
+  const machine = tab.machine ?? 'local';
+  const row = machines.data?.find((m) => m.peerId === machine);
+  if (machine !== 'local' && row?.state !== 'connected') {
+    return (
+      <div
+        data-terminal-reconnecting
+        className="relative flex min-h-0 flex-1 flex-col"
+      >
+        <ConnectionBanner
+          state="reconnecting"
+          machineLabel={resolveMachineLabel(machine, machines.data) ?? machine}
+        />
+      </div>
+    );
+  }
   return (
     <div
       data-terminal-reconnecting
@@ -76,7 +95,7 @@ function Reconnecting() {
 }
 
 export function TerminalView({ tab }: { tab: TerminalTab }) {
-  if (tab.restored) return <Reconnecting />;
+  if (tab.restored) return <Reconnecting tab={tab} />;
   return <AttachedTerminal tab={tab} />;
 }
 
