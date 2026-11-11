@@ -6,6 +6,7 @@ import {
   LOCAL_MACHINE,
   mainCheckoutOf,
   placeAffiliation,
+  registryNameOf,
   type Affiliation,
   type Affiliations,
   type PlaceOf,
@@ -37,13 +38,16 @@ const EMPTY: Affiliations = { sessions: new Map(), worktrees: new Map() };
  * event, so a change shows at the next scan. The fleet says which peerId
  * is this machine (a `tmux:` target qualified with it means here) and
  * which peers are gone (`observeFleet`); a peer that is only unreachable
- * keeps its last listing until it is listed again.
+ * keeps its last listing until it is listed again. The same listings say
+ * when each session was created (`created`), which is what tells a
+ * session from a later one that took its name.
  */
 export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
   const listings = new Map<string, readonly TaggedSession[]>();
   const places = new Map<string, string>();
   let self: string | undefined;
   let snapshot = EMPTY;
+  let created = new Map<string, number>();
   const listeners = new Set<() => void>();
 
   /** A local directory's repository main checkout, else itself; asked of
@@ -79,9 +83,9 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
   }
 
   function derive(): void {
-    const next = affiliations([...listings.values()].flat(), placeOf, {
-      self,
-    });
+    const all = [...listings.values()].flat();
+    created = new Map(all.map((s) => [registryNameOf(s), s.created]));
+    const next = affiliations(all, placeOf, { self });
     if (isDeepStrictEqual(next, snapshot)) return;
     snapshot = next;
     for (const listener of listeners) {
@@ -142,6 +146,11 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
         enclosingCheckout(snapshot.worktrees, dir, machine) ??
         placeAffiliation(launchPlaceOf(dir, machine), machine)
       );
+    },
+    /** When a session was created (`#{session_created}`, epoch
+     *  seconds), by registry key, once a listing has named it. */
+    createdOf(key: string): number | undefined {
+      return created.get(key);
     },
     /** The parent group of the agent working in a checkout, if any. */
     ofCheckout(path: string, machine = LOCAL_MACHINE): Affiliation | undefined {

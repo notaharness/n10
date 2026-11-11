@@ -17,7 +17,9 @@ export interface TerminalRecord {
 export function terminalFacts(
   name: string,
   record: TerminalRecord,
-  affiliationOf?: (machine: string) => Affiliation | undefined
+  affiliationOf?: (machine: string) => Affiliation | undefined,
+  /** When tmux created the session, once a listing has named it. */
+  created?: number
 ) {
   const session = getSession(name);
   const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
@@ -34,6 +36,8 @@ export function terminalFacts(
       ? { connectionState: session.pty.connectionState }
       : {}),
     ...(affiliation ? { affiliation } : {}),
+    ...(created !== undefined ? { created } : {}),
   };
 }
+
 export type TerminalFacts = ReturnType<typeof terminalFacts>;
