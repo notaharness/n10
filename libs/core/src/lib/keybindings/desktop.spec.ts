@@ -38,16 +38,21 @@ describe('desktop default bindings', () => {
     ['\\', { ctrlKey: true }, 'desktop.panes.split-right'],
     // Shift+\ is | as the key event reports it.
     ['|', { ctrlKey: true, shiftKey: true }, 'desktop.panes.split-down'],
-    ['ArrowLeft', { ctrlKey: true, altKey: true }, 'desktop.panes.focus-left'],
-    ['ArrowDown', { ctrlKey: true, altKey: true }, 'desktop.panes.focus-down'],
-    [
-      'ArrowRight',
-      { ctrlKey: true, altKey: true, shiftKey: true },
-      'desktop.panes.move-right',
-    ],
     ['w', { ctrlKey: true, altKey: true }, 'desktop.panes.close'],
   ] as const)('%s with %o fires %s', (key, mods, action) => {
     expect(resolveDesktopAction(press(key, mods), defaults)).toBe(action);
+  });
+
+  it('leaves focusing and moving to a pane unbound: desktops take Ctrl+Alt+arrows', () => {
+    for (const verb of ['focus', 'move'] as const)
+      for (const dir of ['left', 'right', 'up', 'down'] as const)
+        expect(defaults[`desktop.panes.${verb}-${dir}`]).toEqual([]);
+    expect(
+      resolveDesktopAction(
+        press('ArrowLeft', { ctrlKey: true, altKey: true }),
+        defaults
+      )
+    ).toBeNull();
   });
 
   it.each([
@@ -76,14 +81,8 @@ describe('desktop default bindings', () => {
       ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Ctrl+${n}`),
       'Ctrl+\\',
       'Ctrl+Shift+|',
-      'Ctrl+Alt+←',
-      'Ctrl+Alt+→',
-      'Ctrl+Alt+↑',
-      'Ctrl+Alt+↓',
-      'Ctrl+Shift+Alt+←',
-      'Ctrl+Shift+Alt+→',
-      'Ctrl+Shift+Alt+↑',
-      'Ctrl+Shift+Alt+↓',
+      // Focus and move to a pane, unbound.
+      ...Array<string>(8).fill(''),
       'Ctrl+Alt+w',
     ]);
   });

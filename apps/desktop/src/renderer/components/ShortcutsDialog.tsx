@@ -23,10 +23,9 @@ const ROWS: [string, string[]][] = APP_SHORTCUTS.map((s) => [
   [MOD, ...(s.shift ? ['⇧'] : []), s.key === 'Enter' ? '↵' : s.key],
 ]);
 
-const DIRS = ['left', 'right', 'up', 'down'] as const;
-
 /** Actions that read as one row while every one keeps its default: the
- *  nine tab positions, and each pane direction set. */
+ *  nine tab positions. Unbound actions (focusing and moving to a pane,
+ *  by default) have no row. */
 const FOLDS: readonly {
   label: string;
   ids: readonly DesktopActionId[];
@@ -38,16 +37,6 @@ const FOLDS: readonly {
       (n) => `desktop.tabs.select-${n}` as DesktopActionId
     ),
     keys: ['Ctrl', '1…9'],
-  },
-  {
-    label: 'Focus pane',
-    ids: DIRS.map((d) => `desktop.panes.focus-${d}` as DesktopActionId),
-    keys: ['Ctrl', 'Alt', '←→↑↓'],
-  },
-  {
-    label: 'Move tab to pane',
-    ids: DIRS.map((d) => `desktop.panes.move-${d}` as DesktopActionId),
-    keys: ['Ctrl', '⇧', 'Alt', '←→↑↓'],
   },
 ];
 

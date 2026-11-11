@@ -32,12 +32,11 @@ const ORDINALS: readonly TabOrdinal[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const DIRECTIONS: readonly {
   dir: PaneDirection;
   word: string;
-  flag: keyof KeyPress;
 }[] = [
-  { dir: 'left', word: 'left', flag: 'leftArrow' },
-  { dir: 'right', word: 'right', flag: 'rightArrow' },
-  { dir: 'up', word: 'up', flag: 'upArrow' },
-  { dir: 'down', word: 'down', flag: 'downArrow' },
+  { dir: 'left', word: 'left' },
+  { dir: 'right', word: 'right' },
+  { dir: 'up', word: 'up' },
+  { dir: 'down', word: 'down' },
 ];
 
 export const DESKTOP_ACTIONS: readonly {
@@ -139,16 +138,15 @@ export const DESKTOP_DEFAULT_BINDINGS: DesktopBindings = {
   // Shift+\ types | on the keyboards it is drawn on: the chord is what
   // the key event carries.
   'desktop.panes.split-down': [{ ctrl: true, shift: true, input: '|' }],
-  ...(Object.fromEntries([
-    ...DIRECTIONS.map(({ dir, flag }) => [
-      `desktop.panes.focus-${dir}`,
-      [{ ctrl: true, meta: true, flags: { [flag]: true } }],
-    ]),
-    ...DIRECTIONS.map(({ dir, flag }) => [
-      `desktop.panes.move-${dir}`,
-      [{ ctrl: true, meta: true, shift: true, flags: { [flag]: true } }],
-    ]),
-  ]) as Record<
+  // Unbound: GNOME and other desktops take Ctrl+Alt+arrows (with Shift)
+  // for workspaces before the app sees them. The palette and the strip's
+  // menus reach them, and Settings → Keyboard binds them.
+  ...(Object.fromEntries(
+    DIRECTIONS.flatMap(({ dir }) => [
+      [`desktop.panes.focus-${dir}`, [] as KeyDescriptor[]],
+      [`desktop.panes.move-${dir}`, [] as KeyDescriptor[]],
+    ])
+  ) as Record<
     `desktop.panes.${'focus' | 'move'}-${PaneDirection}`,
     KeyDescriptor[]
   >),

@@ -17,6 +17,7 @@ import { useAllBranches, useMachines } from '../lib/data/queries.js';
 import { useCreateWorktree, useRefreshRemote } from '../lib/data/mutations.js';
 import { isMachineSelectable } from '../lib/machines/machine-model.js';
 import { OpenTerminalOnMachineItems } from './machines/OpenTerminalOnMachineItems.js';
+import { PaneCommandItems } from './PaneCommandItems.js';
 import { StripCommandItems } from './StripCommandItems.js';
 import { useRepo } from '../lib/repo-context.js';
 import {
@@ -165,6 +166,7 @@ export function CommandPalette({
 
         <CommandGroup heading="Commands">
           <StripCommandItems close={close} />
+          <PaneCommandItems close={close} />
           <CommandItem
             value="command settings preferences"
             onSelect={() => {
