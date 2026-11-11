@@ -73,6 +73,9 @@ export type Tab =
        *  listing has said. A restored tab on another machine is not
        *  given up for being unlisted: that machine may be offline. */
       machine?: string;
+      /** That machine's name as the fleet last gave it, kept so a
+       *  restored tab can say what it waits for before the fleet answers. */
+      machineLabel?: string;
       /** Restored from the saved workspace and not yet matched against
        *  a listing. Its pane attaches nothing until it is. */
       restored?: true;

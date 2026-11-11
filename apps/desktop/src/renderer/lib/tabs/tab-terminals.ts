@@ -30,6 +30,8 @@ export interface TerminalEntry {
   created?: number;
   /** `'local'` or a beam peerId. */
   machine?: string;
+  /** Another machine's name, when the fleet knows it. */
+  machineLabel?: string;
 }
 
 /** Whether `dismissed` holds this listed terminal's session: by name
@@ -95,6 +97,7 @@ function terminalTab(entry: TerminalEntry, listed: boolean): TerminalTab {
     listed,
     ...(entry.created !== undefined ? { created: entry.created } : {}),
     ...(entry.machine !== undefined ? { machine: entry.machine } : {}),
+    ...(entry.machineLabel ? { machineLabel: entry.machineLabel } : {}),
   };
 }
 
@@ -266,9 +269,19 @@ function restamp(tab: TerminalTab, entry: TerminalEntry): TerminalTab {
   };
   const created = entry.created ?? tab.created;
   const machine = entry.machine ?? tab.machine;
+  const machineLabel = entry.machineLabel ?? tab.machineLabel;
   if (created !== undefined) next.created = created;
   if (machine !== undefined) next.machine = machine;
-  const fields = ['listed', 'repo', 'displayPath', 'cwd', 'created', 'machine'];
+  if (machineLabel !== undefined) next.machineLabel = machineLabel;
+  const fields = [
+    'listed',
+    'repo',
+    'displayPath',
+    'cwd',
+    'created',
+    'machine',
+    'machineLabel',
+  ];
   const same = fields.every(
     (k) => next[k as keyof TerminalTab] === tab[k as keyof TerminalTab]
   );

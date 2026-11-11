@@ -331,6 +331,17 @@ describe('a restored terminal tab', () => {
     expect(ids(ws)).toEqual([]);
   });
 
+  it('keeps the name its machine had, to say what it waits for', () => {
+    const named = { ...shell(1, 'peer'), machineLabel: 'workbox' };
+    const saved = run(sync([], [named], REPO, { scanned: ['local', 'peer'] }));
+    const file = JSON.parse(JSON.stringify(toSaved(saved))) as SavedWorkspace;
+    expect(tab(restoreWorkspace(file))).toMatchObject({
+      restored: true,
+      machine: 'peer',
+      machineLabel: 'workbox',
+    });
+  });
+
   it('waits on a listing taken before this machine’s first scan finished', () => {
     const ws = then(restored(1), sync([], [], REPO, { scanned: [] }));
     expect(tab(ws)).toMatchObject({ restored: true });

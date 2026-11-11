@@ -71,6 +71,9 @@ function Reconnecting({ tab }: { tab: TerminalTab }) {
   const machine = tab.machine ?? 'local';
   const row = machines.data?.find((m) => m.peerId === machine);
   if (machine !== 'local' && row?.state !== 'connected') {
+    // The fleet's name for it, else the one saved with the tab; never a
+    // peerId, nor "Unknown machine".
+    const name = row?.label ?? tab.machineLabel;
     return (
       <div
         data-terminal-reconnecting
@@ -78,7 +81,7 @@ function Reconnecting({ tab }: { tab: TerminalTab }) {
       >
         <ConnectionBanner
           state="reconnecting"
-          machineLabel={resolveMachineLabel(machine, machines.data) ?? machine}
+          machineLabel={name ?? 'the remote machine'}
         />
       </div>
     );

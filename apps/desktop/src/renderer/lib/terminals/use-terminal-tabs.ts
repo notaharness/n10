@@ -1,7 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type { TerminalKind, TerminalSummary } from '../../../host/contract.js';
-import { useTerminalListing } from '../data/queries.js';
+import type {
+  MachineView,
+  TerminalKind,
+  TerminalSummary,
+} from '../../../host/contract.js';
+import { useMachines, useTerminalListing } from '../data/queries.js';
 import { useLaunchTerminal } from '../data/mutations-terminals.js';
 import { useLaunchProgress } from '../machines/launch-progress.js';
 import { useTabs, type TerminalEntry } from '../tabs/tabs.js';
@@ -9,8 +13,15 @@ import { estimateTerminalGrid, paneTerminalGrid } from '../terminal-grid.js';
 import { terminalLaunchRequest } from './terminal-launch-request.js';
 import { errorMessage } from '../utils.js';
 
-/** The host's summary, as the tab model keeps it. */
-function toEntry(t: TerminalSummary): TerminalEntry {
+/** The host's summary, as the tab model keeps it, with its machine's
+ *  name when the fleet knows it. */
+function toEntry(
+  t: TerminalSummary,
+  machines?: readonly MachineView[]
+): TerminalEntry {
+  const label = machines?.find(
+    (m) => !m.isLocal && m.peerId === t.machine
+  )?.label;
   return {
     name: t.name,
     kind: t.kind,
@@ -20,6 +31,7 @@ function toEntry(t: TerminalSummary): TerminalEntry {
     ...(t.branch ? { branch: t.branch } : {}),
     ...(t.created !== undefined ? { created: t.created } : {}),
     machine: t.machine,
+    ...(label ? { machineLabel: label } : {}),
   };
 }
 
@@ -54,6 +66,7 @@ function estimatePane(): { cols?: number; rows?: number } {
 export function useTerminalTabs() {
   const tabs = useTabs();
   const listing = useTerminalListing();
+  const machines = useMachines().data;
   const launch = useLaunchTerminal();
   const progress = useLaunchProgress();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -67,8 +80,9 @@ export function useTerminalTabs() {
   const data = listing.data;
   const complete = data?.scanned.includes('local') ?? false;
   const entries = useMemo(
-    () => (complete ? data?.terminals.map(toEntry) : undefined),
-    [complete, data]
+    () =>
+      complete ? data?.terminals.map((t) => toEntry(t, machines)) : undefined,
+    [complete, data, machines]
   );
   const scanned = data?.scanned;
 

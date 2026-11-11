@@ -118,8 +118,16 @@ function terminalTab(v: Json): Tab | null {
     preview: false,
     listed: false,
     created,
-    ...(str(v.machine) ? { machine: v.machine } : {}),
+    ...machineOf(v),
     restored: true,
+  };
+}
+
+/** The machine a saved terminal tab was on, and its name then. */
+function machineOf(v: Json): Pick<TerminalTab, 'machine' | 'machineLabel'> {
+  return {
+    ...(str(v.machine) ? { machine: v.machine } : {}),
+    ...(str(v.machineLabel) ? { machineLabel: v.machineLabel } : {}),
   };
 }
 
