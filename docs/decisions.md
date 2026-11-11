@@ -943,6 +943,10 @@ tab and marks its output seen; only the focused one takes the keyboard
 spare (`ownsSpare`): the focused pane's, or the pane whose strip tab the
 pointer rests on, and never a tab another pane holds. A structural change
 remounts the panes under it; a resize or focus change does not.
+A wrapped strip takes at most three rows, or 40% of its pane if that is
+less (the pane is a size container, `cqh`); past that it scrolls inside
+itself and keeps the active tab in view, so a short pane keeps its content.
+Scroll mode is one row as ever.
 
 Dragging onto a pane's content (`use-pane-drop.ts`): its sides split, its
 middle moves (`pane-drop.ts`). The strip's modifiers keep the dragged tab

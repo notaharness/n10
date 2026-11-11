@@ -206,7 +206,7 @@ function PaneView({ pane, shared }: { pane: PaneNode; shared: Shared }) {
         aria-label="Editor pane"
         data-pane-id={pane.id}
         data-pane-focused={(shared.split && focused) || undefined}
-        className="relative flex h-full min-h-0 min-w-0 flex-col"
+        className="relative flex h-full min-h-0 min-w-0 flex-col [container-type:size]"
         onPointerDownCapture={take}
         onFocusCapture={take}
       >

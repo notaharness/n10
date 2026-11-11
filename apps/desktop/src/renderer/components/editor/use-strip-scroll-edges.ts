@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 
 /** Scroll position and overflow of the strip's one-row track. */
 export function useStripScrollEdges(blockKey: string, wrap: boolean) {
@@ -34,4 +40,36 @@ export function useStripScrollEdges(blockKey: string, wrap: boolean) {
     return () => observer.disconnect();
   }, [blockKey, wrap, update]);
   return { track, edges, update };
+}
+
+/** Wrapped, the strip scrolls past its row cap: keep the active tab (or
+ *  its collapsed group's home) in view when it changes, when the blocks
+ *  around it do (`blockKey`), and when the strip's room does (a split, a
+ *  resize). */
+export function useActiveTabInView(
+  track: RefObject<HTMLDivElement | null>,
+  wrap: boolean,
+  activeId: string | null,
+  blockKey: string
+) {
+  useEffect(() => {
+    const el = track.current;
+    if (!wrap || !el || activeId === null) return;
+    const reveal = () => {
+      const key = CSS.escape(activeId);
+      const tab = el.querySelector(
+        `[data-tab-id="${key}"], [data-home-tab="${key}"]`
+      );
+      if (!tab) return;
+      const row = tab.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      const above = Math.min(0, row.top - box.top);
+      const below = Math.max(0, row.bottom - box.bottom);
+      if (above || below) el.scrollBy({ top: above || below });
+    };
+    const observer = new ResizeObserver(reveal);
+    observer.observe(el);
+    reveal();
+    return () => observer.disconnect();
+  }, [track, wrap, activeId, blockKey]);
 }

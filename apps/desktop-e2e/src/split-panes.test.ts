@@ -153,4 +153,63 @@ test.describe('Split panes', () => {
       })
       .toBeCloseTo(sizes[0]!, 1);
   });
+
+  test('a wrapped strip keeps to a share of its pane, and scrolls to its active tab', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    const names = [
+      'feature-tab-strip-wrap',
+      'fix-login-redirect-loop',
+      'chore-bump-dependencies',
+      'feature-repo-colour-bands',
+      'refactor-host-restarts',
+      'spike-front-truncation',
+      'docs-tab-strip',
+    ];
+    for (const branch of names) await createWorktree(page, branch);
+    // Half the width, half the height, then half the width again: the
+    // top-left pane's long names wrap onto more rows than its strip has.
+    await tab(page, /^docs-tab-strip/).click();
+    await page.keyboard.press('Control+\\');
+    await tab(page, /^spike-front-truncation/).click();
+    await page.keyboard.press('Control+Shift+|');
+    await tab(page, /^chore-bump-dependencies/).click();
+    await page.keyboard.press('Control+\\');
+    await expect(panes(page)).toHaveCount(4);
+
+    const topLeft = page.locator('[data-pane-id]', {
+      has: tab(page, /^feature-tab-strip-wrap/),
+    });
+    const strip = topLeft.getByRole('tablist');
+    const fit = await topLeft.evaluate((el) => {
+      const list = el.querySelector<HTMLElement>('[role=tablist]')!;
+      const body = el.querySelector<HTMLElement>('[data-editor-panes]')!;
+      return {
+        pane: el.clientHeight,
+        strip: list.clientHeight,
+        scrolls: list.scrollHeight > list.clientHeight,
+        content: body.clientHeight,
+      };
+    });
+    expect(fit.scrolls).toBe(true);
+    expect(fit.strip).toBeLessThanOrEqual(Math.min(125, 0.4 * fit.pane) + 1);
+    expect(fit.content).toBeGreaterThan(fit.pane / 2);
+
+    // Ctrl+9 opens the pane's last tab, out of view below: the strip
+    // scrolls it in.
+    await tab(page, /^feature-tab-strip-wrap/).click();
+    await page.keyboard.press('Control+9');
+    const last = topLeft.getByRole('tab', { selected: true });
+    await expect(last).toHaveText(/refactor-host-restarts/);
+    await expect
+      .poll(async () => {
+        const [a, b] = await Promise.all([
+          last.boundingBox(),
+          strip.boundingBox(),
+        ]);
+        return !!a && !!b && a.y >= b.y && a.y + a.height <= b.y + b.height + 1;
+      })
+      .toBe(true);
+  });
 });

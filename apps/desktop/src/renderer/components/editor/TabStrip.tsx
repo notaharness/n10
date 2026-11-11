@@ -18,13 +18,16 @@ import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { groupEndId, stripEndId } from './strip-collisions.js';
 import { StripBlocksReport } from './strip-blocks.js';
 import { StripScrollArrows } from './StripScrollArrows.js';
-import { useStripScrollEdges } from './use-strip-scroll-edges.js';
+import {
+  useActiveTabInView,
+  useStripScrollEdges,
+} from './use-strip-scroll-edges.js';
 import {
   acceptsDrop,
   isStripDragData,
   type StripDragData,
 } from './strip-drag.js';
-import { PaneScopeContext } from '../../lib/tabs/tabs.js';
+import { PaneScopeContext, useTabs } from '../../lib/tabs/tabs.js';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
 import { cn } from '../../lib/utils.js';
 import { handleTabKey, type TabKeyActions } from './tab-keyboard.js';
@@ -67,6 +70,7 @@ export function TabStrip({
   const blockKey = blocks.map((block) => block.id).join('\n');
   const blockIds = useMemo(() => blockKey.split('\n'), [blockKey]);
   const { track, edges, update } = useStripScrollEdges(blockKey, wrap);
+  useActiveTabInView(track, wrap, useTabs().activeId, blockKey);
   return (
     <SortableContext
       items={blockIds}
@@ -82,7 +86,11 @@ export function TabStrip({
             'flex min-w-0 flex-1 items-stretch gap-2 bg-tab',
             wrap
               ? // Every row but the last is ruled off from the one below.
-                'flex-wrap [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
+                // At most three rows, or 40% of the pane if less: past
+                // that the strip scrolls and the pane keeps its content.
+                // The last row's rule sits in the track's bottom pixel,
+                // laid over the strip's own, so one row never scrolls.
+                '-mb-px max-h-[min(calc(3*2.25rem+2*0.5rem+1px),40cqh)] flex-wrap overflow-y-auto pb-px [scrollbar-width:thin] [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
               : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           )}
           onScroll={update}
