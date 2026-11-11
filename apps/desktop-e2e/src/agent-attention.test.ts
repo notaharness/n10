@@ -1,5 +1,15 @@
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
+import type { Page } from '@playwright/test';
 import { createWorktree, launchAgentFromRail, tab } from './setup/app.js';
+import { startLoneShells } from './setup/terminals.js';
+
+/** Show another tab: a shell alone in its directory, so the agent's
+ *  worktree stays a tab of its own on the strip, not a chip's member. */
+async function lookElsewhere(page: Page, homeDir: string): Promise<void> {
+  startLoneShells(homeDir, ['elsewhere']);
+  await tab(page, /elsewhere/).click({ timeout: 30_000 });
+  await expect(tab(page, /elsewhere/)).toHaveAttribute('aria-selected', 'true');
+}
 
 /**
  * How you find out an agent finished while you were looking elsewhere.
@@ -34,8 +44,7 @@ test.describe('An agent that finishes while you are elsewhere', () => {
 
     // Look away: while its terminal is on screen the session is marked
     // seen continuously, so it could never be flagged.
-    await createWorktree(page, 'elsewhere');
-    await expect(tab(page, /elsewhere/)).toBeVisible();
+    await lookElsewhere(page, desktop.homeDir);
 
     // The agent keeps working, then stops. Once it has been quiet for
     // the idle window, the tab we are not looking at asks for us.
@@ -70,7 +79,7 @@ test.describe('An agent that finishes while you are elsewhere', () => {
     await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
       timeout: 30_000,
     });
-    await createWorktree(page, 'elsewhere');
+    await lookElsewhere(page, desktop.homeDir);
     await expect(tab(page, /worker/)).toHaveClass(/tab-attention/, {
       timeout: 30_000,
     });
@@ -97,7 +106,7 @@ test.describe('An agent still working', () => {
       timeout: 30_000,
     });
 
-    await createWorktree(page, 'elsewhere');
+    await lookElsewhere(page, desktop.homeDir);
 
     // Busy and finished are different states and must look different:
     // a spinner while it works, the attention mark only once it stops.

@@ -1,5 +1,6 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab, tabs } from './setup/app.js';
+import { createWorktree, tab } from './setup/app.js';
 import {
   carryOver,
   expectNothingLifted,
@@ -9,14 +10,30 @@ import {
   motion,
   rightEdge,
   sidewaysScroll,
-  tabNames,
+  namedTabs,
 } from './setup/tab-row.js';
+import { startLoneShells } from './setup/terminals.js';
 
+const NAMES = ['alpha', 'beta', 'gamma'];
+const tabNames = (page: Page) => namedTabs(page, NAMES);
+
+/**
+ * The strip's own mechanics, over tabs that stand on it: a worktree
+ * alone in its repository, and shells each alone in a directory, so no
+ * two share a group's chip.
+ */
 test.describe('Reordering tabs', () => {
   test.beforeEach(async ({ desktop }) => {
     await createWorktree(desktop.page, 'alpha');
-    await createWorktree(desktop.page, 'beta');
-    await expect.poll(() => tabNames(desktop.page)).toEqual(['alpha', 'beta']);
+    startLoneShells(desktop.homeDir, ['beta']);
+    await expect
+      .poll(() => tabNames(desktop.page), { timeout: 30_000 })
+      .toEqual(['alpha', 'beta']);
+    await tab(desktop.page, /beta/).click();
+    await expect(tab(desktop.page, /beta/)).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 
   test('the others slide aside while a tab is dragged, and it drops into the gap', async ({
@@ -123,23 +140,23 @@ test.describe('Reordering tabs', () => {
     await expectNothingLifted(page);
   });
 
+  // On the worktree's tab: a terminal's asks before it kills.
   test('Delete closes the focused tab', async ({ desktop }) => {
     const { page } = desktop;
-    await tab(page, /beta/).focus();
+    await tab(page, /alpha/).focus();
     await page.keyboard.press('Delete');
-    await expect(tab(page, /beta/)).toHaveCount(0);
-    await expect(tabs(page)).toHaveCount(1);
-    await expect(tab(page, / · alpha/)).toHaveCount(1);
+    await expect(tab(page, /alpha/)).toHaveCount(0);
+    expect(await tabNames(page)).toEqual(['beta']);
   });
 
   test('keys on the close button never lift the tab', async ({ desktop }) => {
     const { page } = desktop;
-    const close = tab(page, /beta/).getByLabel('Close tab');
+    const close = tab(page, /alpha/).getByLabel('Close tab');
     await close.focus();
     await page.keyboard.press(LIFT);
     await expectNothingLifted(page);
     await page.keyboard.press('Enter');
-    await expect(tab(page, /beta/)).toHaveCount(0);
+    await expect(tab(page, /alpha/)).toHaveCount(0);
     await expectNothingLifted(page);
   });
 });
@@ -151,11 +168,11 @@ for (const tabOverflow of ['wrap', 'scroll'] as const) {
     test('the tab stops at the end, nothing scrolls, and it drops last', async ({
       desktop,
     }) => {
-      const { page } = desktop;
-      for (const branch of ['alpha', 'beta', 'gamma'])
-        await createWorktree(page, branch);
+      const { page, homeDir } = desktop;
+      await createWorktree(page, 'alpha');
+      startLoneShells(homeDir, ['beta', 'gamma']);
       await expect
-        .poll(() => tabNames(page))
+        .poll(() => tabNames(page), { timeout: 30_000 })
         .toEqual(['alpha', 'beta', 'gamma']);
       const before = await sidewaysScroll(page);
       const strip = page.getByRole('tablist', { name: 'Open tabs' });

@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
 import { createWorktree, tab } from './setup/app.js';
 import {
@@ -17,6 +18,13 @@ import {
  */
 test.skip(!tmuxAvailable(), 'tmux is not installed');
 
+const chip = (page: Page) => page.locator('[data-group-chip^="place:"]');
+const activeLabel = (page: Page) =>
+  chip(page).locator('[data-group-active-label]');
+/** A row of the chip's roster, once it is open. */
+const row = (page: Page, name: RegExp) =>
+  page.locator('[data-group-roster]').getByRole('button', { name });
+
 test.describe('Tabs for work created outside the app', () => {
   let branches: string[] = [];
 
@@ -35,11 +43,15 @@ test.describe('Tabs for work created outside the app', () => {
     await createWorktree(page, 'alpha');
     await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
 
-    // With another tab in front, the new one still takes focus.
+    // With another tab in front, the new one still takes focus; the two
+    // now share their repository's chip, which names it.
     await createWorktree(page, 'beta');
-    await expect(tab(page, /beta/)).toHaveAttribute('aria-selected', 'true');
-    await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'false');
-    await expect(tab(page, /beta/)).not.toHaveAttribute('data-unseen');
+    await expect(activeLabel(page)).toHaveText(/beta/);
+    await expect(chip(page)).toHaveAttribute('aria-selected', 'true');
+    await chip(page).click();
+    await expect(row(page, /beta/)).toHaveAttribute('aria-current', 'true');
+    await expect(row(page, /beta/)).not.toHaveAccessibleName(/Not yet opened/);
+    await expect(row(page, /alpha/)).not.toHaveAttribute('aria-current');
   });
 
   test('a worktree and session created from a shell open in the background', async ({
@@ -47,8 +59,7 @@ test.describe('Tabs for work created outside the app', () => {
   }) => {
     const { page, repoPath, homeDir } = desktop;
     await createWorktree(page, 'alpha');
-    const active = tab(page, /alpha/);
-    await expect(active).toHaveAttribute('aria-selected', 'true');
+    await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
 
     const branch = uniqueExternalBranch();
     branches.push(branch);
@@ -61,14 +72,21 @@ test.describe('Tabs for work created outside the app', () => {
       command: 'sleep 120',
     });
 
-    const background = tab(page, new RegExp(branch));
-    await expect(background).toBeVisible({ timeout: 30_000 });
-    await expect(background).toHaveAttribute('data-unseen', 'true');
-    await expect(background).toHaveAttribute('aria-selected', 'false');
-    await expect(active).toHaveAttribute('aria-selected', 'true');
+    // It joins alpha behind the repository's chip, unseen, and alpha
+    // stays in front.
+    await expect(chip(page).locator('[data-group-count]')).toHaveText('2', {
+      timeout: 30_000,
+    });
+    await expect(activeLabel(page)).toHaveText(/alpha/);
+    await chip(page).click();
+    const background = row(page, new RegExp(branch));
+    await expect(background).toHaveAccessibleName(/Not yet opened/);
+    await expect(background).not.toHaveAttribute('aria-current');
 
     await background.click();
-    await expect(background).toHaveAttribute('aria-selected', 'true');
-    await expect(background).not.toHaveAttribute('data-unseen');
+    await expect(activeLabel(page)).toHaveText(new RegExp(branch));
+    await chip(page).click();
+    await expect(background).toHaveAttribute('aria-current', 'true');
+    await expect(background).not.toHaveAccessibleName(/Not yet opened/);
   });
 });
