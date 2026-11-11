@@ -1,5 +1,11 @@
 import type { SavedWorkspace } from '../../../host/contract.js';
-import type { Tab, TerminalTab } from './tab-identity.js';
+import {
+  itemTabId,
+  terminalTabId,
+  type Tab,
+  type TerminalTab,
+} from './tab-identity.js';
+import { COLLAPSED_LIMIT } from './tab-order.js';
 import {
   EMPTY_WORKSPACE,
   FIRST_PANE,
@@ -31,6 +37,9 @@ function isRecord(v: unknown): v is Json {
 const str = (v: unknown): v is string => typeof v === 'string';
 const optStr = (v: unknown): boolean => v === undefined || str(v);
 const bool = (v: unknown): v is boolean => typeof v === 'boolean';
+/** Own keys only: an id such as `constructor` is no tab. */
+const has = (record: object, key: string): boolean =>
+  Object.hasOwn(record, key);
 
 function savedTab(tab: Tab): Tab | null {
   if (tab.kind !== 'terminal') return tab;
@@ -51,16 +60,16 @@ export function toSaved(ws: Workspace): SavedWorkspace {
     node.kind === 'pane'
       ? {
           ...node,
-          order: node.order.filter((id) => id in tabs),
+          order: node.order.filter((id) => has(tabs, id)),
           activeId:
-            node.activeId && node.activeId in tabs ? node.activeId : null,
+            node.activeId && has(tabs, node.activeId) ? node.activeId : null,
         }
       : { ...node, children: node.children.map(keep) };
   return {
     tabs,
     layout: keep(ws.layout),
     focusedPane: ws.focusedPane,
-    pinned: ws.pinned.filter((id) => id in tabs),
+    pinned: ws.pinned.filter((id) => has(tabs, id)),
     collapsed: ws.collapsed,
     dismissed: ws.dismissed,
     groupNames: ws.groupNames,
@@ -78,6 +87,8 @@ const ITEM_FIELDS = [
 
 function itemTab(v: Json): Tab | null {
   if (!str(v.id) || !str(v.repo) || !str(v.itemKey)) return null;
+  // Opened on an item of its repository; re-keying keeps that id.
+  if (!v.id.startsWith(itemTabId(v.repo, ''))) return null;
   if (!bool(v.preview) || !ITEM_FIELDS.every((f) => optStr(v[f]))) return null;
   const tab: Tab = {
     id: v.id,
@@ -93,6 +104,7 @@ function itemTab(v: Json): Tab | null {
 function terminalTab(v: Json): Tab | null {
   const { id, name, cwd, displayPath, repo, created, terminalKind } = v;
   if (!str(id) || !str(name) || !str(cwd) || !str(displayPath)) return null;
+  if (id !== terminalTabId(name)) return null;
   if (terminalKind !== 'shell' && terminalKind !== 'agent') return null;
   if (typeof created !== 'number' || (repo !== null && !str(repo))) return null;
   return {
@@ -151,8 +163,8 @@ function onePane(
   focused: unknown,
   tabs: Record<string, Tab>
 ): PaneNode {
-  const order = [...new Set(panes.flatMap((p) => p.order))].filter(
-    (id) => id in tabs
+  const order = [...new Set(panes.flatMap((p) => p.order))].filter((id) =>
+    has(tabs, id)
   );
   const from = panes.find((p) => p.id === focused) ?? panes[0];
   const activeId =
@@ -185,8 +197,10 @@ export function restoreWorkspace(saved: SavedWorkspace | null): Workspace {
     tabs,
     layout: pane,
     focusedPane: pane.id,
-    pinned: strings(saved.pinned, (id) => id in tabs),
-    collapsed: recordOf(saved.collapsed, bool),
+    pinned: strings(saved.pinned, (id) => has(tabs, id)),
+    collapsed: Object.fromEntries(
+      Object.entries(recordOf(saved.collapsed, bool)).slice(-COLLAPSED_LIMIT)
+    ),
     dismissed: strings(saved.dismissed),
     groupNames: recordOf(saved.groupNames, str),
     lastActiveByRepo: recordOf(saved.lastActiveByRepo, str),

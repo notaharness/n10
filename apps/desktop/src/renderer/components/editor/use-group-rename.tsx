@@ -48,7 +48,7 @@ export function useGroupRename(
       key,
       derived,
       current: tabs.groupNames[key] ?? derived,
-      named: key in tabs.groupNames,
+      named: Object.hasOwn(tabs.groupNames, key),
       returnFocus:
         document.activeElement instanceof HTMLElement
           ? document.activeElement

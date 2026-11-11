@@ -35,10 +35,7 @@ export function moveTabs(
  *  them as they were: a block dropped among the strip's blocks, which
  *  the strip hands over as its whole presented order. Unknown ids are
  *  ignored; unchanged state when the order is. */
-export function arrangeTabs(
-  state: Strip,
-  ids: readonly string[]
-): Strip {
+export function arrangeTabs(state: Strip, ids: readonly string[]): Strip {
   const rank = new Map(ids.map((id, i) => [id, i]));
   const placed = state.tabs
     .filter((t) => rank.has(t.id))
@@ -48,17 +45,25 @@ export function arrangeTabs(
   return { ...state, tabs };
 }
 
-/** Collapse or expand the groups `keys` name. Unchanged state when
- *  nothing changes. */
+/** How many collapse choices are kept. Parent groups are keyed by an
+ *  orchestrator run, so their keys keep coming; the oldest choices go. */
+export const COLLAPSED_LIMIT = 64;
+
+/** Collapse or expand the groups `keys` name, as the latest choices.
+ *  Unchanged state when nothing changes. */
 export function setCollapsed(
   state: Strip,
   keys: readonly string[],
   collapsed: boolean
 ): Strip {
   if (keys.every((key) => state.collapsed[key] === collapsed)) return state;
-  const next = { ...state.collapsed };
-  for (const key of keys) next[key] = collapsed;
-  return { ...state, collapsed: next };
+  const chosen = new Set(keys);
+  const kept = Object.entries(state.collapsed).filter(([k]) => !chosen.has(k));
+  const next = [...kept, ...keys.map((k) => [k, collapsed] as const)];
+  return {
+    ...state,
+    collapsed: Object.fromEntries(next.slice(-COLLAPSED_LIMIT)),
+  };
 }
 
 /** End `id`'s preview. Unchanged state when it is no preview. */

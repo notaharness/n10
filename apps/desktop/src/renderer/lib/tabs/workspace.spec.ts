@@ -14,6 +14,7 @@ import {
   type TerminalEntry,
   type Workspace,
 } from './tabs-model.js';
+import { COLLAPSED_LIMIT } from './tab-order.js';
 import { restoreWorkspace, toSaved } from './workspace-file.js';
 import { focusedPaneOf, stripOf } from './workspace.js';
 
@@ -257,5 +258,79 @@ describe('a restored terminal tab', () => {
     expect(tab(ws)).toMatchObject({ created: 5, listed: false });
     expect(tab(ws)).not.toHaveProperty('restored');
     expect(view(ws).activeId).toBe(terminalTabId('notes-shell'));
+  });
+});
+
+describe('restoring a file', () => {
+  const terminal = {
+    id: terminalTabId('notes-shell'),
+    kind: 'terminal',
+    name: 'notes-shell',
+    terminalKind: 'shell',
+    cwd: '/home/dev/notes',
+    displayPath: '~/notes',
+    repo: null,
+    created: 1,
+    preview: false,
+  };
+  const item = {
+    id: id('branch:a'),
+    kind: 'item',
+    repo: REPO,
+    itemKey: 'branch:a',
+    preview: false,
+  };
+  const file = (tabs: Record<string, unknown>, order: string[]) =>
+    ({
+      tabs,
+      layout: { kind: 'pane', id: 'pane-1', order, activeId: null },
+    } as SavedWorkspace);
+
+  it('takes no tab from a name every object has', () => {
+    const ws = restoreWorkspace(
+      JSON.parse(
+        '{"tabs":{},"layout":{"kind":"pane","id":"p","order":["constructor","toString"],"activeId":"constructor"},"pinned":["constructor"]}'
+      ) as SavedWorkspace
+    );
+    expect(ids(ws)).toEqual([]);
+    expect(ws.pinned).toEqual([]);
+  });
+
+  it('keeps tabs whose ids are their own', () => {
+    const ws = restoreWorkspace(
+      file({ [terminal.id]: terminal, [item.id]: item }, [terminal.id, item.id])
+    );
+    expect(ids(ws)).toEqual([terminal.id, item.id]);
+  });
+
+  it('drops a terminal tab whose id is not its session’s', () => {
+    const wrong = { ...terminal, id: terminalTabId('other') };
+    const ws = restoreWorkspace(file({ [wrong.id]: wrong }, [wrong.id]));
+    expect(ids(ws)).toEqual([]);
+  });
+
+  it('drops an item tab whose id is not of its repository', () => {
+    const wrong = { ...item, id: id('branch:a', OTHER) };
+    const ws = restoreWorkspace(file({ [wrong.id]: wrong }, [wrong.id]));
+    expect(ids(ws)).toEqual([]);
+  });
+});
+
+describe('collapse choices', () => {
+  it('keeps the latest, up to a limit', () => {
+    let ws = EMPTY_WORKSPACE;
+    for (let i = 0; i < COLLAPSED_LIMIT + 5; i++) {
+      ws = then(ws, {
+        type: 'set-collapsed',
+        keys: [`k${i}`],
+        collapsed: true,
+      });
+    }
+    ws = then(ws, { type: 'set-collapsed', keys: ['k5'], collapsed: false });
+    const keys = Object.keys(ws.collapsed);
+    expect(keys).toHaveLength(COLLAPSED_LIMIT);
+    expect(keys.at(-1)).toBe('k5');
+    expect(keys[0]).toBe('k6');
+    expect(Object.keys(restoreWorkspace(toSaved(ws)).collapsed)).toEqual(keys);
   });
 });
