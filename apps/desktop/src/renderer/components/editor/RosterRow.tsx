@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { BrainIcon, CheckIcon } from 'lucide-react';
-import { useContext, useRef } from 'react';
+import { useContext, useRef, type CSSProperties } from 'react';
 import { rowStatus } from '../../lib/tabs/group-status.js';
 import { cutSide } from '../../lib/tabs/tab-presentation.js';
 import { PaneScopeContext, type Tab } from '../../lib/tabs/tabs.js';
@@ -14,6 +14,7 @@ import { useSlotStyle } from './drag-preview.js';
 import { FACE_ICON, TabIcon } from './TabIcon.js';
 import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
+import type { RosterEntry } from './roster-order.js';
 import { rosterSecondary } from './roster-text.js';
 
 /**
@@ -140,6 +141,64 @@ function RowText({
 
 /** How far in a row of `depth` starts: a step per level. */
 const indent = (depth: number) => `${0.5 + depth}rem`;
+/** The centre of a row's icon at `depth`, in px: its start plus half
+ *  the 16px icon. */
+const iconCentre = (depth: number) => 8 + 16 * depth + 8;
+
+type Tree = NonNullable<RosterEntry<TabFace>['tree']>;
+
+/** One guide line, in the border colour. */
+function Guide({ style }: { style: CSSProperties }) {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute w-px bg-border"
+      style={style}
+    />
+  );
+}
+
+/**
+ * An orchestrator's roster drawn as a tree: from the home's icon down
+ * to its players, an elbow into each and a corner at the last, and the
+ * same a level deeper for a player's own tabs. The icons sit on the
+ * row's middle, 44px rows, 16px icons.
+ */
+function RowGuides({ depth, tree }: { depth: number; tree: Tree }) {
+  const lines: [string, CSSProperties][] = [];
+  tree.through.forEach((on, level) => {
+    if (on)
+      lines.push([
+        `through-${level}`,
+        { left: iconCentre(level), top: 0, bottom: 0 },
+      ]);
+  });
+  if (depth > 0) {
+    const x = iconCentre(depth - 1);
+    // Down from the row above, to the middle when this is the last.
+    lines.push([
+      'down',
+      tree.last
+        ? { left: x, top: 0, height: 22 }
+        : { left: x, top: 0, bottom: 0 },
+    ]);
+    // Across into this row's icon.
+    lines.push([
+      'across',
+      { left: x, top: 22, width: iconCentre(depth) - 10 - x, height: 1 },
+    ]);
+  }
+  // Down from this row's icon to the rows under it.
+  if (tree.branches)
+    lines.push(['branch', { left: iconCentre(depth), top: 34, bottom: 0 }]);
+  return (
+    <>
+      {lines.map(([key, style]) => (
+        <Guide key={key} style={style} />
+      ))}
+    </>
+  );
+}
 
 /** What a row says of its tab: its label (an orchestrator's home is
  *  named for it), whether it blinks, its state and where it is. */
@@ -168,6 +227,8 @@ export function RosterRow({
   home,
   depth = 0,
   drag,
+  tree,
+  band = true,
 }: {
   face: TabFace;
   active: boolean;
@@ -179,6 +240,11 @@ export function RosterRow({
   depth?: number;
   /** In a group's roster, where a row drags. */
   drag?: RowDrag;
+  /** An orchestrator's roster: the row's guides. */
+  tree?: Tree;
+  /** Its repository's band down its edge: none on a player, nor on a
+   *  player's tabs, which the orchestrator watches. */
+  band?: boolean;
 }) {
   const { label, flashing, status, where } = rowFacts(face, home, active);
   return (
@@ -211,7 +277,8 @@ export function RosterRow({
         <RowText face={face} label={label} home={home} where={where} />
         <RowStatus face={face} active={active} status={status} />
       </button>
-      <RowBand color={face.repoColor} />
+      {tree && <RowGuides depth={depth} tree={tree} />}
+      {band && <RowBand color={face.repoColor} />}
     </li>
   );
 }

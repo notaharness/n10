@@ -169,7 +169,7 @@ export function GroupRoster({
             onKeyDown={walkRows}
             className="flex flex-col"
           >
-            {entries.map(({ face, depth }, index) => (
+            {entries.map(({ face, depth, tree }, index) => (
               <SortableRow
                 key={face.tab.id}
                 group={groupKey}
@@ -180,6 +180,10 @@ export function GroupRoster({
                 onMenu={onMenu}
                 home={face.tab.id === homeId}
                 depth={depth}
+                {...(tree ? { tree } : {})}
+                // An orchestrator's players carry no band: only the
+                // home's shows.
+                band={!players || face.tab.id === homeId}
               />
             ))}
           </ul>

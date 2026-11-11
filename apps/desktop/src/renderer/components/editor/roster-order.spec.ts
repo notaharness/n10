@@ -67,3 +67,29 @@ describe('rosterEntries', () => {
     ]);
   });
 });
+
+describe('rosterEntries tree guides', () => {
+  const home = shell('conductor', '/r');
+  const a = player('a');
+  const b = player('b');
+  const aShell = shell('a-shell', '/r/.claude/worktrees/a/src');
+  const guides = (entries: ReturnType<typeof rosterEntries<{ tab: Tab }>>) =>
+    entries.map((e) => [e.face.tab.id, e.tree]);
+
+  it('turns a corner at the last of each level, and runs the home’s guide past a player with more below', () => {
+    expect(
+      guides(rosterEntries([a, aShell, b, home], home.tab.id, true))
+    ).toEqual([
+      ['terminal:conductor', { last: true, branches: true, through: [] }],
+      ['item:a', { last: false, branches: true, through: [] }],
+      ['terminal:a-shell', { last: true, branches: false, through: [true] }],
+      ['item:b', { last: true, branches: false, through: [] }],
+    ]);
+  });
+
+  it('draws none for a place group', () => {
+    expect(
+      rosterEntries([a, aShell], undefined, false).every((e) => !e.tree)
+    ).toBe(true);
+  });
+});
