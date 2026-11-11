@@ -336,12 +336,6 @@ const stripAction: fc.Arbitrary<TabsAction> = fc.oneof(
     targetId: fc.constantFrom(...IDS),
     side: fc.constantFrom<'before' | 'after'>('before', 'after'),
   }),
-  // Collapsing is presentation: it never touches a tab.
-  fc.record({
-    type: fc.constant('set-collapsed' as const),
-    keys: fc.subarray(['place:/repos/alpha', 'claude:x']),
-    collapsed: fc.boolean(),
-  }),
   // The interesting one: the sidebar re-keying items underneath, and
   // agents coming and going on them — `sync-items` opens a tab for a
   // newly running agent and pins previews that have one, so those run
@@ -1405,7 +1399,6 @@ describe('the workspace', () => {
         const focusKept = panes.some((p) => p.id === ws.focusedPane);
         expect(back.focusedPane === ws.focusedPane || !focusKept).toBe(true);
         expect(back.pinned).toEqual(ws.pinned.filter(saved));
-        expect(back.collapsed).toEqual(ws.collapsed);
         expect(back.groupNames).toEqual(ws.groupNames);
         expect(back.dismissed).toEqual(ws.dismissed);
         expect(back.lastActiveByRepo).toEqual(ws.lastActiveByRepo);

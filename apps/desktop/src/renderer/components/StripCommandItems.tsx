@@ -1,7 +1,6 @@
 import {
   BellIcon,
   Columns2Icon,
-  PanelsTopLeftIcon,
   PencilIcon,
   PinIcon,
   PinOffIcon,
@@ -39,16 +38,6 @@ export function StripCommandItems({ close }: { close: () => void }) {
         Next attention
         <CommandShortcut>
           {shortcutText(bindings['desktop.tabs.attention'])}
-        </CommandShortcut>
-      </CommandItem>
-      <CommandItem
-        value="command collapse other tab groups"
-        onSelect={run('desktop.groups.collapse-others')}
-      >
-        <PanelsTopLeftIcon />
-        Collapse others
-        <CommandShortcut>
-          {shortcutText(bindings['desktop.groups.collapse-others'])}
         </CommandShortcut>
       </CommandItem>
       {active !== null && active !== 'settings' && (

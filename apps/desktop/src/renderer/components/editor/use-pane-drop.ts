@@ -91,7 +91,7 @@ function dropAt({ over, active }: Drag, ws: Workspace): DropAt {
   if (!pointer) return null;
   const pane = String(over.id).slice(PREFIX.length);
   const zone = zoneAt(over.rect, pointer.x, pointer.y);
-  const ids = draggedIds(String(active.id), dragged);
+  const ids = draggedIds(dragged);
   const from = dragged.pane;
   if (zone === 'centre') return { pane, zone, ids, allowed: from !== pane };
   return { pane, zone, ids, ...edgeDrop(ws, pane, zone, ids, from) };

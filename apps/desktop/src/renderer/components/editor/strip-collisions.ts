@@ -15,17 +15,10 @@ export function stripEndId(pane: string): string {
   return `${END_PREFIX}${pane}`;
 }
 
-/** The room after a wrapped group's last tab in `pane`, which is its
- *  members' end as `stripEndId` is the strip's. */
-export function groupEndId(pane: string, key: string): string {
-  return `${END_PREFIX}${pane}:${key}`;
-}
-
 const isEnd = (id: unknown) => String(id).startsWith(END_PREFIX);
 
-/** The pane an end room belongs to: pane ids hold no colon. */
-const endPane = (id: unknown) =>
-  String(id).slice(END_PREFIX.length).split(':')[0];
+/** The pane an end room belongs to. */
+const endPane = (id: unknown) => String(id).slice(END_PREFIX.length);
 
 /** Keyboard coordinates name a row first. A far-left tab on the next
  * row must beat a horizontally nearby tab on the old row. */
@@ -52,19 +45,17 @@ function placeOf(container: { data?: { current?: unknown } }) {
 
 /**
  * What the pointer is over, or, where it is over no legal place (a
- * keyboard drag, a border, another group), the legal place nearest the
- * dragged one. A pointer carried out of its strip's row over nothing
+ * keyboard drag, a border, the pinned zone), the legal place nearest
+ * the dragged one. A pointer carried out of its strip's row over nothing
  * legal (the sidebar, the title or status bar) is over nothing: let go
  * there, the drag is abandoned, not dropped where it was nearest. Past
  * the strip's ends in its own row, nearest is its first or last place.
- * Keyboard drags choose the nearest row before a place in
- * it, so a row ending far left cannot lose to a tab on the old row.
- * A member dragged out of its group opens the slot at that end of its
- * group. Only legal places are enabled droppables (`strip-drag.ts`), so
- * nothing else is ever a candidate. The room after the last tab, a pane
- * strip's or a wrapped group's, counts as the last legal place in that
- * pane by index, not by when it registered: dnd-kit lists containers in
- * mount order. Over a pane's content the pane itself is the target
+ * Keyboard drags choose the nearest row before a place in it, so a row
+ * ending far left cannot lose to a tab on the old row. Only legal places
+ * are enabled droppables (`strip-drag.ts`), so nothing else is ever a
+ * candidate. The room after a pane strip's last tab counts as the last
+ * legal place in that pane by index, not by when it registered: dnd-kit
+ * lists containers in mount order. Over a pane's content the pane itself is the target
  * (`use-pane-drop.ts`); it is never the nearest place to anything.
  */
 export const collisionsEndingAt: CollisionDetection = (args) => {

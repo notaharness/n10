@@ -1241,17 +1241,4 @@ describe('moving a group and collapsing', () => {
       }).tabs
     ).toBe(s.tabs);
   });
-
-  it('remembers each group the user collapsed or expanded', () => {
-    let s = reduce(empty, {
-      type: 'set-collapsed',
-      keys: ['g1', 'g2'],
-      collapsed: true,
-    });
-    s = reduce(s, { type: 'set-collapsed', keys: ['g2'], collapsed: false });
-    expect(s.collapsed).toEqual({ g1: true, g2: false });
-    expect(
-      reduce(s, { type: 'set-collapsed', keys: ['g1'], collapsed: true })
-    ).toBe(s);
-  });
 });

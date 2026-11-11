@@ -67,6 +67,12 @@ export function useRosterOpen() {
       clear();
       setMode((now) => (now === null || now === 'hover' ? 'pinned' : null));
     },
+    /** Keep a hover-open roster open, as a press would (its row's menu
+     *  takes the pointer away). */
+    hold() {
+      clear();
+      setMode((now) => (now === 'hover' ? 'pinned' : now));
+    },
     openByKeyboard() {
       clear();
       setMode('keyboard');

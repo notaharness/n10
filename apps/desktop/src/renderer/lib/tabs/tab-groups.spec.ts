@@ -3,12 +3,10 @@ import { placeAffiliation } from '@n10/core/ui';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-  expandsOnShow,
-  initiallyCollapsed,
-  isCollapsed,
   present,
   presentedIds,
   statusCounts,
+  stopOf,
   statusFromActivity,
   tabStopOf,
   type TabFacts,
@@ -213,41 +211,24 @@ describe('present', () => {
   });
 });
 
-describe('collapse', () => {
-  const [group] = strip([
-    ['a1', place('/a')],
-    ['a2', place('/a')],
-  ]);
-  it('starts a parent group collapsed and a place group expanded', () => {
-    expect(initiallyCollapsed(parent('codex:x'))).toBe(true);
-    expect(initiallyCollapsed(place('/a'))).toBe(false);
-    expect(initiallyCollapsed(null)).toBe(false);
-    expect(isCollapsed(group!, {})).toBe(false);
-    const [players] = strip([
-      ['p1', parent('codex:x')],
-      ['p2', parent('codex:x')],
-    ]);
-    expect(isCollapsed(players!, {})).toBe(true);
-    expect(isCollapsed(players!, { 'codex:x': false })).toBe(false);
-  });
-  it('follows the user’s choice for a chipped group only', () => {
-    expect(isCollapsed(group!, { 'place:/a': true })).toBe(true);
-    const [single] = strip([['notes', place('/notes')]]);
-    expect(isCollapsed(single!, { 'place:/notes': true })).toBe(false);
-  });
-});
-
 describe('tabStopOf', () => {
-  const presented = ['a', 'h', 'p1', 'p2', 'p3', 'z'];
-  it('is the active tab when it shows', () => {
-    expect(tabStopOf(presented, presented, 'p2')).toBe('p2');
+  const groups = strip([
+    ['solo', place('/solo')],
+    ['h', parent('claude:x', 'h')],
+    ['p1', parent('claude:x')],
+    ['p2', parent('claude:x')],
+    ['z', place('/z')],
+  ]);
+  it('is the active tab when it stands alone', () => {
+    expect(tabStopOf(groups, terminalTabId('z'))).toBe(terminalTabId('z'));
   });
-  it('is the shown tab nearest an active one behind a collapsed chip', () => {
-    expect(tabStopOf(presented, ['a', 'h', 'z'], 'p1')).toBe('h');
-    expect(tabStopOf(presented, ['a', 'z'], 'p3')).toBe('z');
+  it('is its group’s chip for a member, home or player', () => {
+    expect(tabStopOf(groups, terminalTabId('p2'))).toBe('chip:claude:x');
+    expect(tabStopOf(groups, terminalTabId('h'))).toBe('chip:claude:x');
   });
-  it('is the first shown with no active tab', () => {
-    expect(tabStopOf(presented, ['h', 'z'], null)).toBe('h');
+  it('is the first block with no active tab', () => {
+    expect(tabStopOf(groups, null)).toBe(terminalTabId('solo'));
+    expect(stopOf(groups[0]!)).toBe(terminalTabId('solo'));
   });
 });
 
@@ -336,27 +317,5 @@ describe('present (properties)', () => {
         expect(misplaced.map((g) => g.key)).toEqual([]);
       })
     );
-  });
-});
-
-describe('expandsOnShow', () => {
-  const was = { id: 'a', group: 'g' };
-  const now = { id: 'b', group: 'h' };
-  const state = { collapsed: true, hidden: true, focused: true };
-
-  it('expands the collapsed group of a tab activated in the focused pane', () => {
-    expect(expandsOnShow(was, now, state)).toBe('h');
-    expect(expandsOnShow(was, now, { ...state, collapsed: false })).toBeNull();
-  });
-
-  it('expands nothing in a pane that changed in the background', () => {
-    expect(expandsOnShow(was, now, { ...state, focused: false })).toBeNull();
-  });
-
-  it('expands a collapsed group the active tab joined behind its chip', () => {
-    const joined = { id: 'a', group: 'h' };
-    expect(expandsOnShow(was, joined, state)).toBe('h');
-    expect(expandsOnShow(was, joined, { ...state, hidden: false })).toBeNull();
-    expect(expandsOnShow(was, was, state)).toBeNull();
   });
 });

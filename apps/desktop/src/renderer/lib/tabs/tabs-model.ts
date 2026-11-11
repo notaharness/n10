@@ -45,7 +45,6 @@ import {
   keepTab,
   moveTabs,
   renameGroup,
-  setCollapsed,
   setPinned,
 } from './tab-order.js';
 import {
@@ -119,8 +118,6 @@ export type TabsAction =
   /** Put the tabs `ids` name in that order, the rest after them: the
    *  strip as presented, with a dragged block in its new place. */
   | { type: 'arrange'; ids: readonly string[] }
-  /** Collapse (or expand) these groups. */
-  | { type: 'set-collapsed'; keys: readonly string[]; collapsed: boolean }
   /** Name a group, by affiliation key; `null` (or a blank name) gives it
    *  back its derived label. */
   | { type: 'rename-group'; key: string; name: string | null }
@@ -378,19 +375,13 @@ function apply(state: Strip, action: TabsAction): Strip {
 type MarkAction = Extract<
   TabsAction,
   {
-    type:
-      | 'keep'
-      | 'set-pinned'
-      | 'rename-group'
-      | 'move'
-      | 'arrange'
-      | 'set-collapsed';
+    type: 'keep' | 'set-pinned' | 'rename-group' | 'move' | 'arrange';
   }
 >;
 
 const MARK_ACTIONS: ReadonlySet<TabsAction['type']> = new Set<
   MarkAction['type']
->(['keep', 'set-pinned', 'rename-group', 'move', 'arrange', 'set-collapsed']);
+>(['keep', 'set-pinned', 'rename-group', 'move', 'arrange']);
 
 function applyMark(state: Strip, action: MarkAction): Strip {
   switch (action.type) {
@@ -404,8 +395,6 @@ function applyMark(state: Strip, action: MarkAction): Strip {
       return moveTabs(state, action.ids, action.targetId, action.side);
     case 'arrange':
       return arrangeTabs(state, action.ids);
-    case 'set-collapsed':
-      return setCollapsed(state, action.keys, action.collapsed);
   }
 }
 

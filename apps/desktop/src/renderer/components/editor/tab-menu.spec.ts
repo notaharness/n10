@@ -34,26 +34,21 @@ const tabs = {
   setPinned: vi.fn(),
 };
 const closer = { close: vi.fn(), closeOthers: vi.fn(), closeAll: vi.fn() };
-const group = (collapsed = false, canCollapseOthers = true): GroupMenu => ({
-  collapsed,
-  canCollapseOthers,
+const group = (): GroupMenu => ({
   showTabs: vi.fn(),
   rename: vi.fn(),
-  setCollapsed: vi.fn(),
-  collapseOthers: vi.fn(),
   canTile: true,
   tile: vi.fn(),
   canFollow: false,
   follow: vi.fn(),
 });
 
-function menu(g?: GroupMenu) {
+function menu() {
   return runTabMenu(
     home,
     tabs as unknown as Parameters<typeof runTabMenu>[1],
     closer as unknown as Parameters<typeof runTabMenu>[2],
-    'wrap',
-    g
+    'wrap'
   );
 }
 
@@ -80,48 +75,21 @@ const item = (label: string) =>
 
 const labels = () => shown.flatMap((i) => ('label' in i ? [i.label] : []));
 
-describe('a grouped tab’s menu', () => {
-  it('offers its group’s actions after its own', async () => {
-    await menu(group());
+describe('a tab’s menu', () => {
+  it('offers its own actions first, and no group actions', async () => {
+    await menu();
     expect(labels().slice(0, 3)).toEqual([
       'Close',
       'Close Others',
       'Close All',
     ]);
-    expect(labels()).toEqual(
-      expect.arrayContaining([
-        'Show tabs',
-        'Rename group…',
-        'Collapse group',
-        'Collapse others',
-      ])
-    );
-  });
-
-  it('offers Expand group on a collapsed group, and runs it', async () => {
-    const g = group(true);
-    choose = 'group-expand';
-    await menu(g);
-    expect(labels()).toContain('Expand group');
-    expect(g.setCollapsed).toHaveBeenCalledWith(false);
-    expect(closer.close).not.toHaveBeenCalled();
-  });
-
-  it('disables Collapse others when no other group would change', async () => {
-    await menu(group(false, false));
-    expect(
-      shown.find((i) => 'label' in i && i.label === 'Collapse others')
-    ).toEqual(expect.objectContaining({ enabled: false }));
-  });
-
-  it('has no group actions without a group', async () => {
-    await menu();
     expect(labels()).not.toContain('Show tabs');
+    expect(labels()).not.toContain('Tile group');
   });
 
   it('closes every other tab on Close Others', async () => {
     choose = 'close-others';
-    await menu(group());
+    await menu();
     expect(closer.closeOthers).toHaveBeenCalledWith(home.id);
   });
 });
@@ -134,8 +102,6 @@ describe('a chip’s own menu', () => {
     expect(labels()).toEqual([
       'Show tabs',
       'Rename group…',
-      'Collapse group',
-      'Collapse others',
       'Tile group',
       'Follow group',
     ]);
@@ -204,7 +170,6 @@ describe('pins in a tab’s menu', () => {
       tabs as unknown as Parameters<typeof runTabMenu>[1],
       closer as unknown as Parameters<typeof runTabMenu>[2],
       'wrap',
-      undefined,
       rename
     );
     expect(labels()).toContain('Rename group…');
@@ -213,21 +178,19 @@ describe('pins in a tab’s menu', () => {
 });
 
 describe('a tab’s pane entries', () => {
-  it('sit below its own items and run there, before any group choice', async () => {
+  it('sit below its own items and run there', async () => {
     const panes = {
       items: vi.fn((): ContextMenuItem[] => [
         { id: 'pane-split-right', label: 'Split right' },
       ]),
       run: vi.fn((chosen: string | null) => chosen === 'pane-split-right'),
     };
-    const g = group();
     choose = 'pane-split-right';
     await runTabMenu(
       home,
       tabs as unknown as Parameters<typeof runTabMenu>[1],
       closer as unknown as Parameters<typeof runTabMenu>[2],
       'wrap',
-      g,
       undefined,
       panes
     );
@@ -235,7 +198,7 @@ describe('a tab’s pane entries', () => {
       labels().indexOf('Pin tab')
     );
     expect(labels().indexOf('Split right')).toBeLessThan(
-      labels().indexOf('Show tabs')
+      labels().indexOf('Wrap Tabs onto More Rows')
     );
     expect(panes.run).toHaveBeenCalledWith('pane-split-right', home);
     expect(closer.close).not.toHaveBeenCalled();

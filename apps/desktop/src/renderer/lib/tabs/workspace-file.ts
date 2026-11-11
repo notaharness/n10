@@ -5,7 +5,6 @@ import {
   type Tab,
   type TerminalTab,
 } from './tab-identity.js';
-import { COLLAPSED_LIMIT } from './tab-order.js';
 import { makeSplit, panesOf } from './layout.js';
 import {
   EMPTY_WORKSPACE,
@@ -71,7 +70,6 @@ export function toSaved(ws: Workspace): SavedWorkspace {
     layout: keep(ws.layout),
     focusedPane: ws.focusedPane,
     pinned: ws.pinned.filter((id) => has(tabs, id)),
-    collapsed: ws.collapsed,
     dismissed: ws.dismissed,
     groupNames: ws.groupNames,
     lastActiveByRepo: ws.lastActiveByRepo,
@@ -274,9 +272,6 @@ export function restoreWorkspace(
     layout,
     focusedPane: focused.id,
     pinned: strings(saved.pinned, (id) => has(tabs, id)),
-    collapsed: Object.fromEntries(
-      Object.entries(recordOf(saved.collapsed, bool)).slice(-COLLAPSED_LIMIT)
-    ),
     dismissed: strings(saved.dismissed),
     groupNames: recordOf(saved.groupNames, str),
     lastActiveByRepo: recordOf(saved.lastActiveByRepo, str),

@@ -16,7 +16,7 @@ import {
 } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { useSlotStyle } from './drag-preview.js';
-import { groupEndId, stripEndId } from './strip-collisions.js';
+import { stripEndId } from './strip-collisions.js';
 import { StripBlocksReport } from './strip-blocks.js';
 import { StripScrollArrows } from './StripScrollArrows.js';
 import {
@@ -34,14 +34,13 @@ import { cn } from '../../lib/utils.js';
 import { handleTabKey, type TabKeyActions } from './tab-keyboard.js';
 
 /**
- * The tab row, sortable in `TabDragProvider`: its blocks (a group, or a
- * tab standing alone) in one sortable list, each group's members in a
- * list of their own.
+ * The tab row, sortable in `TabDragProvider`: its blocks (a group's
+ * chip, or a tab standing alone) in one sortable list.
  *
  * More tabs than fit wrap onto more rows, or, as the desktop prefs say
  * (`tabOverflow`, chosen from a tab's menu), scroll the one row
- * sideways. Wrapped, a group is a block that breaks only between its
- * members, and dnd-kit sorts by rectangles; in one row, a horizontal list.
+ * sideways. Wrapped, dnd-kit sorts by rectangles; in one row, a
+ * horizontal list.
  */
 export function TabStrip({
   blocks,
@@ -117,27 +116,6 @@ export function TabStrip({
   );
 }
 
-/** A group's members, sortable among themselves only. */
-export function GroupMembers({
-  ids,
-  children,
-}: {
-  ids: readonly string[];
-  children: ReactNode;
-}) {
-  const wrap = useDesktopPrefs().tabOverflow === 'wrap';
-  const itemsKey = ids.join('\n');
-  const items = useMemo(() => itemsKey.split('\n'), [itemsKey]);
-  return (
-    <SortableContext
-      items={items}
-      strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
-    >
-      {children}
-    </SortableContext>
-  );
-}
-
 /**
  * The room after the last tab. Its growth outweighs the tabs', so it
  * takes the last row's remaining room; plain flex-wrap keeps each tab
@@ -154,25 +132,6 @@ function StripEnd() {
     disabled:
       activatorEvent instanceof KeyboardEvent ||
       !isStripDragData(active?.data.current),
-  });
-  return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
-}
-
-/**
- * The room after a wrapped group's last tab: the place its last member
- * goes for a drag of one of its members (the strip's end, for a block's).
- */
-export function GroupEnd({ group }: { group: string }) {
-  const { active, activatorEvent } = useDndContext();
-  const pane = useContext(PaneScopeContext) ?? '';
-  const dragged = active?.data.current;
-  const { setNodeRef } = useDroppable({
-    id: groupEndId(pane, group),
-    disabled:
-      activatorEvent instanceof KeyboardEvent ||
-      !isStripDragData(dragged) ||
-      dragged.kind !== 'member' ||
-      dragged.group !== group,
   });
   return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
 }
@@ -199,7 +158,7 @@ const roleDescriptionOf = (data: StripDragData) =>
 
 /**
  * What a sortable place on the strip spreads onto its elements: a tab,
- * or a group's block with its chip body as the handle. `data` says what
+ * or a group's block with its chip as the handle. `data` says what
  * it is (`strip-drag.ts`); a place the drag under way may not land on is
  * no drop target. `tabStop` makes it the row's one Tab stop (the arrows
  * move focus within the row).
@@ -209,8 +168,8 @@ const roleDescriptionOf = (data: StripDragData) =>
  * It runs after the pointer sensor's own `onPointerDown`, which only
  * starts watching the pointer: the tab lifts once it has travelled
  * `DRAG_THRESHOLD_PX` (`TabDragProvider`), so a press that becomes a
- * drag has selected the tab it drags. A group's home tab, whose drag moves the whole group,
- * selects on click instead.
+ * drag has selected the tab it drags. A group's chip, which stands for
+ * no one tab, opens its roster on click instead.
  */
 export function useSortableTab({
   id,
@@ -218,7 +177,6 @@ export function useSortableTab({
   tabStop,
   actions,
   selectOnPress = true,
-  role = 'tab',
   fixed = false,
 }: {
   id: string;
@@ -229,9 +187,6 @@ export function useSortableTab({
   /** Neither dragged nor dropped on: a group shown behind the one it
    *  follows, which carries it. */
   fixed?: boolean;
-  /** `button` for a chip body that is no tab (a stand-in, a place):
-   *  Enter and Space press it, and the tab keys are not its. */
-  role?: 'tab' | 'button';
 }) {
   const reducedMotion = usePrefersReducedMotion();
   const pane = useContext(PaneScopeContext);
@@ -259,10 +214,10 @@ export function useSortableTab({
         ),
     },
     attributes: {
-      role,
+      role: 'tab',
       roleDescription: roleDescriptionOf(data),
-      // A button is always reachable with Tab; tabs share one stop.
-      tabIndex: role === 'button' || tabStop ? 0 : -1,
+      // The row's tabs share one Tab stop.
+      tabIndex: tabStop ? 0 : -1,
     },
     // `null` turns the slide off; the tabs then jump to their places.
     transition: reducedMotion ? null : undefined,
@@ -282,11 +237,7 @@ export function useSortableTab({
       // The sensor took it (the lift chord), a drag is under way, or
       // the key was meant for the close button inside the tab.
       if (e.defaultPrevented || active || e.target !== e.currentTarget) return;
-      if (role === 'tab') handleTabKey(e, actions);
-      else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        actions.activate();
-      }
+      handleTabKey(e, actions);
     },
   };
   return {

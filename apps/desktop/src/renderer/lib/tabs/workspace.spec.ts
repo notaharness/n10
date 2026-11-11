@@ -15,7 +15,6 @@ import {
   type TerminalEntry,
   type Workspace,
 } from './tabs-model.js';
-import { COLLAPSED_LIMIT } from './tab-order.js';
 import { restoreWorkspace, toSaved } from './workspace-file.js';
 import { focusedPaneOf, stripOf } from './workspace.js';
 
@@ -442,21 +441,11 @@ describe('restoring a file', () => {
   });
 });
 
-describe('collapse choices', () => {
-  it('keeps the latest, up to a limit', () => {
-    let ws = EMPTY_WORKSPACE;
-    for (let i = 0; i < COLLAPSED_LIMIT + 5; i++) {
-      ws = then(ws, {
-        type: 'set-collapsed',
-        keys: [`k${i}`],
-        collapsed: true,
-      });
-    }
-    ws = then(ws, { type: 'set-collapsed', keys: ['k5'], collapsed: false });
-    const keys = Object.keys(ws.collapsed);
-    expect(keys).toHaveLength(COLLAPSED_LIMIT);
-    expect(keys.at(-1)).toBe('k5');
-    expect(keys[0]).toBe('k6');
-    expect(Object.keys(restoreWorkspace(toSaved(ws)).collapsed)).toEqual(keys);
+describe('an older file’s collapse choices', () => {
+  it('are read past and never written back', () => {
+    const older = { ...toSaved(EMPTY_WORKSPACE), collapsed: { g1: true } };
+    const ws = restoreWorkspace(older);
+    expect(ws).toEqual(EMPTY_WORKSPACE);
+    expect(toSaved(ws)).not.toHaveProperty('collapsed');
   });
 });

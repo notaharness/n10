@@ -74,11 +74,14 @@ export function RosterRow({
   face,
   active,
   onJump,
+  onMenu,
   home,
 }: {
   face: TabFace;
   active: boolean;
   onJump: (tab: Tab) => void;
+  /** The tab's native menu, from its row. */
+  onMenu?: (tab: Tab) => void;
   home: boolean;
 }) {
   const { labelKind: kind } = face;
@@ -99,6 +102,13 @@ export function RosterRow({
         aria-current={active || undefined}
         aria-label={rowName(label, where, active, status)}
         onClick={() => onJump(face.tab)}
+        onContextMenu={
+          onMenu &&
+          ((e) => {
+            e.preventDefault();
+            onMenu(face.tab);
+          })
+        }
         className={cn(
           'flex h-11 w-full items-center gap-2 px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
           active ? 'bg-tab-active' : 'hover:bg-tab-hover'
@@ -143,6 +153,7 @@ export function GroupRoster({
   roster,
   returnFocus,
   onJump,
+  onMenu,
   homeId,
 }: {
   groupKey: string;
@@ -153,6 +164,7 @@ export function GroupRoster({
   /** Where focus goes when Escape closes it. */
   returnFocus: RefObject<HTMLElement | null>;
   onJump: (tab: Tab) => void;
+  onMenu: (tab: Tab) => void;
   homeId?: string;
 }) {
   const list = useRef<HTMLUListElement>(null);
@@ -243,6 +255,7 @@ export function GroupRoster({
               face={face}
               active={face.tab.id === activeId}
               onJump={jump}
+              onMenu={onMenu}
               home={face.tab.id === homeId}
             />
           ))}

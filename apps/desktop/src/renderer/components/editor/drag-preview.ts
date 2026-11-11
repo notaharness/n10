@@ -14,8 +14,7 @@ import { dropMove, isStripDragData } from './strip-drag.js';
  * the pointer (`CarriedOverlay`), its own place left standing, faded, in
  * its strip, and, over another pane's strip, the slot it would land in
  * there. Inside its own strip a drag is as it always was: the tab itself
- * moves, held inside the strip (a member inside its group), and its
- * neighbours make way.
+ * moves, held inside the strip, and its neighbours make way.
  */
 
 interface Point {
@@ -156,8 +155,8 @@ export function useLanding(pane: string, id: string): Landing | null {
 
 /**
  * The strip's modifier: a dragged tab is held inside its strip (past its
- * end it would widen a scrolling box that auto-scroll then chases), a
- * member inside its group, and to its row when the strip scrolls, until
+ * end it would widen a scrolling box that auto-scroll then chases), and
+ * to its row when the strip scrolls, until
  * it is carried out of the strip, when the copy under the pointer goes
  * where the pointer does. The same rule as `carriedOut`, from the
  * drag's own coordinates.

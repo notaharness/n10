@@ -1,8 +1,9 @@
 /**
- * What the strip drags, and where it may land. A member tab moves only
- * among its own group's members; a block (a group dragged by its chip, or
- * a tab standing alone) moves only between other blocks, a pinned tab
- * only among the pinned and anything else only outside them. Illegal places
+ * What the strip drags, and where it may land: a block (a group dragged
+ * by its chip, or a tab standing alone) moves between other blocks, a
+ * pinned tab only among the pinned and anything else only outside them.
+ * A group's members are never on the strip; they move through their
+ * roster rows' menus. Illegal places
  * are not drop targets at all (`useSortable`'s `disabled.droppable`), so
  * the pointer and the keyboard both meet only legal slots, and the slot
  * the strip opens is the one the drop takes: a block's drop arranges the
@@ -10,75 +11,45 @@
  * where it showed whatever order the tabs are stored in.
  */
 
-export type StripDragData = (
-  | {
-      kind: 'member';
-      label: string;
-      /** The group's key. */
-      group: string;
-      /** Its place among the group's members, as presented. */
-      index: number;
-    }
-  | {
-      kind: 'block';
-      label: string;
-      /** The tabs it carries, in their strip order (a group's followers
-       *  with it). */
-      ids: readonly string[];
-      /** Its place among the blocks, as presented. */
-      index: number;
-      /** A pinned tab: it moves only among the pinned ones, and nothing
-       *  else lands among them. */
-      pinned?: true;
-    }
-) & {
+export interface StripDragData {
+  kind: 'block';
+  label: string;
+  /** The tabs it carries, in their strip order (a group's followers
+   *  with it). */
+  ids: readonly string[];
+  /** Its place among the blocks, as presented. */
+  index: number;
+  /** A pinned tab: it moves only among the pinned ones, and nothing
+   *  else lands among them. */
+  pinned?: true;
   /** The pane whose strip it is on. */
   pane?: string;
-};
+}
 
 /** A place as its caller describes it; the strip adds the label. */
-export type StripPlace =
-  | Omit<Extract<StripDragData, { kind: 'member' }>, 'label' | 'pane'>
-  | Omit<Extract<StripDragData, { kind: 'block' }>, 'label' | 'pane'>;
+export type StripPlace = Omit<StripDragData, 'label' | 'pane'>;
 
-/** The tabs a drag carries: a member its own, a block its ids. */
-export function draggedIds(
-  activeId: string,
-  dragged: StripDragData
-): readonly string[] {
-  return dragged.kind === 'member' ? [activeId] : dragged.ids;
+/** The tabs a drag carries. */
+export function draggedIds(dragged: StripDragData): readonly string[] {
+  return dragged.ids;
 }
 
 export function isStripDragData(data: unknown): data is StripDragData {
-  const kind = (data as { kind?: unknown } | undefined)?.kind;
-  return kind === 'member' || kind === 'block';
+  return (data as { kind?: unknown } | undefined)?.kind === 'block';
 }
 
-const samePane = (a: StripDragData, b: StripDragData) =>
-  (a.pane ?? '') === (b.pane ?? '');
-
-const pinnedPlace = (data: StripDragData) =>
-  data.kind === 'block' && !!data.pinned;
-
-/** Whether `target` is a place `dragged` may land. In another pane's
- *  strip a member may land beside a block too (it moves there, and shows
- *  in its group there); a block never lands inside a group. */
+/** Whether `target` is a place `dragged` may land. */
 export function acceptsDrop(
   target: StripDragData,
   dragged: StripDragData | undefined
 ): boolean {
-  if (!dragged) return true;
-  if (target.kind === 'member') {
-    return dragged.kind === 'member' && target.group === dragged.group;
-  }
-  if (dragged.kind === 'member' && samePane(dragged, target)) return false;
-  return pinnedPlace(target) === pinnedPlace(dragged);
+  return !dragged || !target.pinned === !dragged.pinned;
 }
 
 /** The strip's blocks as presented, each one's tabs. */
 export type StripBlocks = readonly (readonly string[])[];
 
-/** What a drop does: a member placed among its group's members, or the
+/** What a drop does: a block's tabs beside another pane's block, or the
  *  strip's tabs in a new order. */
 export type StripDrop =
   | {
@@ -89,21 +60,18 @@ export type StripDrop =
     }
   | { kind: 'arrange'; ids: string[] };
 
-/** Into another pane's strip: beside the place it is over there, a
- *  block by its first or last tab, a member by itself. */
+const samePane = (a: StripDragData, b: StripDragData) =>
+  (a.pane ?? '') === (b.pane ?? '');
+
+/** A block dropped on another pane's block: its tabs go beside that
+ *  block there (the reducer moves them across, `workspace-reduce.ts`). */
 function beside(
-  ids: readonly string[],
-  overId: string,
+  dragged: StripDragData,
   over: StripDragData,
   side: 'before' | 'after' = 'before'
 ): StripDrop | null {
-  const targetId =
-    over.kind === 'member'
-      ? overId
-      : side === 'after'
-      ? over.ids.at(-1)
-      : over.ids[0];
-  return targetId ? { kind: 'move', ids, targetId, side } : null;
+  const targetId = side === 'after' ? over.ids.at(-1) : over.ids[0];
+  return targetId ? { kind: 'move', ids: dragged.ids, targetId, side } : null;
 }
 
 /** The move a drop makes. `null` for a drop on itself, nowhere legal, or
@@ -120,15 +88,7 @@ export function dropMove(
   pointerSide?: 'before' | 'after'
 ): StripDrop | null {
   if (activeId === overId || !acceptsDrop(over, dragged)) return null;
-  if (!samePane(dragged, over))
-    return beside(draggedIds(activeId, dragged), overId, over, pointerSide);
-  if (dragged.kind === 'member') {
-    // Members show in their stored relative order, so a stored neighbour
-    // is the presented one.
-    const side = dragged.index < over.index ? 'after' : 'before';
-    return { kind: 'move', ids: [activeId], targetId: overId, side };
-  }
-  if (over.kind !== 'block') return null;
+  if (!samePane(dragged, over)) return beside(dragged, over, pointerSide);
   const from = dragged.index;
   const to = over.index;
   if (from === to || !sameIds(blocks[from], dragged.ids) || !blocks[to])

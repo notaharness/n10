@@ -1,49 +1,39 @@
 import { useDndMonitor } from '@dnd-kit/core';
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import type { TabGroup } from '../../lib/tabs/tab-groups.js';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
-import { cn } from '../../lib/utils.js';
+import { cn, errorMessage } from '../../lib/utils.js';
 import { Popover } from '../ui/popover.js';
 import { GroupChip } from './GroupChip.js';
-import { GroupDragHint } from './GroupDragHint.js';
 import { GroupRoster } from './GroupRoster.js';
+import { revealTab } from './reveal-tab.js';
 import { chipBlockId } from './strip-blocks.js';
-import { GroupEnd, GroupMembers, useSortableTab } from './TabStrip.js';
-import type { GroupMenu } from './tab-menu.js';
-import { TabButton } from './TabButton.js';
+import { useSortableTab } from './TabStrip.js';
+import { runTabMenu, type GroupMenu } from './tab-menu.js';
+import { usePaneMenus } from './use-pane-menus.js';
 import { useRosterOpen } from './use-roster-open.js';
 import type { TabFace } from './use-strip-groups.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
 
-/** Alt+ArrowDown on a group's control or member opens its roster. */
+/** Alt+ArrowDown on a group's chip opens its roster. */
 function opensRoster(e: KeyboardEvent<HTMLElement>): boolean {
   return e.key === 'ArrowDown' && e.altKey && !e.ctrlKey && !e.metaKey;
 }
 
-function blockClassName(
-  wrap: boolean,
-  carried: boolean,
-  dragging: boolean
-): string {
-  return cn(
-    'flex items-stretch gap-px',
-    // Wrapped, the group breaks between its tabs, each row but its last
-    // ruled off and shared out among them (`TabButton`).
-    wrap && 'flex-wrap [&>*]:-mb-px [&>*]:border-b [&>*]:border-border',
-    wrap ? 'max-w-full' : 'shrink-0',
-    // Behind the group it follows, as far off as the strip's blocks.
-    carried && 'ml-[7px]',
-    dragging && 'z-10 opacity-90'
-  );
+/** Its followers sit as far off as the strip's blocks do. */
+function blockClassName(dragging: boolean): string {
+  return cn('flex shrink-0 items-stretch gap-2', dragging && 'z-10 opacity-90');
 }
 
 /**
- * A group on the strip: its chip, then its members unless it is
- * collapsed. The chip drags the group as one block; a member moves only
- * among the group's members. The roster hangs from the chip.
+ * A group on the strip: its chip alone, whose roster lists its tabs.
+ * The chip drags the group as one block, the groups shown behind it
+ * (`followers`) with it. Choosing a row shows that tab; the strip does
+ * not change.
  */
 export function GroupBlock({
   group,
@@ -53,9 +43,8 @@ export function GroupBlock({
   label,
   faceOf,
   color,
-  collapsed,
   closer,
-  tabStopId,
+  tabStop,
   menu,
 }: {
   group: TabGroup;
@@ -69,39 +58,30 @@ export function GroupBlock({
   label: string;
   faceOf: (tab: Tab) => TabFace;
   color: string | null;
-  collapsed: boolean;
   closer: Closer;
-  tabStopId: string | undefined;
-  menu: Omit<GroupMenu, 'showTabs' | 'collapsed'>;
+  /** The chip is the row's one Tab stop. */
+  tabStop: boolean;
+  menu: Omit<GroupMenu, 'showTabs'>;
 }) {
   const tabs = useTabs();
-  const wrap = useDesktopPrefs().tabOverflow === 'wrap';
+  const { tabMenu } = usePaneMenus();
+  const { tabOverflow } = useDesktopPrefs();
   const roster = useRosterOpen();
-  const rosterButton = useRef<HTMLButtonElement>(null);
-  const node = useRef<HTMLDivElement | null>(null);
+  const chip = useRef<HTMLDivElement>(null);
   const faces = group.tabs.map(faceOf);
   const head = group.head;
-  const members = head ? group.tabs.slice(1) : group.tabs;
-  const groupMenu: GroupMenu = {
-    ...menu,
-    collapsed,
-    showTabs: roster.openByKeyboard,
-  };
+  const groupMenu: GroupMenu = { ...menu, showTabs: roster.openByKeyboard };
   const id = chipBlockId(tabs.paneId, group.key);
   const { setNode, setHandle, handle, style, isDragging } = useSortableTab({
     id,
     data: { kind: 'block', label, ids: ids ?? [], index },
     fixed: ids === null,
-    role: head ? 'tab' : 'button',
-    tabStop: head !== null && head.id === tabStopId,
+    tabStop,
     selectOnPress: false,
-    actions: {
-      activate: () => (head ? tabs.activate(head.id) : roster.openByKeyboard()),
-      close: () => head && closer.close(head.id),
-    },
+    actions: { activate: roster.openByKeyboard, close: () => undefined },
   });
-  // A drop on the chip body ends in a click there, which is the drop's,
-  // not a press of the home: the flag lasts until that click has passed.
+  // A drop on the chip ends in a click there, which is the drop's, not
+  // a press of the chip: the flag lasts until that click has passed.
   const dropped = useRef(false);
   const noteDrop = ({ active }: { active: { id: unknown } }) => {
     if (active.id !== id) return;
@@ -114,8 +94,15 @@ export function GroupBlock({
   const justDropped = () => dropped.current;
   const jump = (tab: Tab) => {
     roster.close();
-    menu.setCollapsed(false);
     tabs.activate(tab.id);
+    revealTab(tabs.paneId, tab.id);
+  };
+  const rowMenu = (tab: Tab) => {
+    // Open while its menu is: a hover-open roster would close under it.
+    roster.hold();
+    runTabMenu(tab, tabs, closer, tabOverflow, undefined, tabMenu).catch(
+      (err: unknown) => toast.error(errorMessage(err))
+    );
   };
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (!opensRoster(e)) return;
@@ -125,15 +112,11 @@ export function GroupBlock({
 
   return (
     <div
-      ref={(el) => {
-        setNode(el);
-        node.current = el;
-      }}
+      ref={setNode}
       role="presentation"
       data-tab-group={group.key}
-      data-collapsed={collapsed || undefined}
       style={style}
-      className={blockClassName(wrap, ids === null, isDragging)}
+      className={blockClassName(isDragging)}
     >
       <Popover
         open={roster.open}
@@ -147,14 +130,12 @@ export function GroupBlock({
           head={head ? faceOf(head) : null}
           statuses={faces.map((f) => f.status)}
           color={color}
-          collapsed={collapsed}
-          containsActive={group.tabs.some((t) => t.id === tabs.activeId)}
+          active={faces.find((f) => f.tab.id === tabs.activeId) ?? null}
           setHandle={setHandle}
           handle={handle}
           roster={roster}
-          rosterButton={rosterButton}
+          chipRef={chip}
           menu={groupMenu}
-          closer={closer}
           onKeyDown={onKeyDown}
           justDropped={justDropped}
         />
@@ -164,31 +145,13 @@ export function GroupBlock({
           faces={faces}
           activeId={tabs.activeId}
           roster={roster}
-          returnFocus={rosterButton}
+          returnFocus={chip}
           onJump={jump}
+          onMenu={rowMenu}
           homeId={head?.id}
         />
       </Popover>
-      {!collapsed && (
-        <GroupMembers ids={members.map((t) => t.id)}>
-          {members.map((tab, at) => (
-            <TabButton
-              key={tab.id}
-              face={faceOf(tab)}
-              data={{ kind: 'member', group: group.key, index: at }}
-              active={tab.id === tabs.activeId}
-              closer={closer}
-              tabStop={tab.id === tabStopId}
-              menu={groupMenu}
-              onKeyDown={onKeyDown}
-            />
-          ))}
-        </GroupMembers>
-      )}
-      <GroupDragHint group={group.key} node={node} />
       {followers}
-      {/* Its last row's room, as the strip's end takes the strip's. */}
-      {wrap && ids !== null && <GroupEnd group={group.key} />}
     </div>
   );
 }

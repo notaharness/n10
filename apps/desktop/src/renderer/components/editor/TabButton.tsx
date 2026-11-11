@@ -1,4 +1,3 @@
-import type { KeyboardEvent } from 'react';
 import { harnessLabel } from '@n10/core/ui';
 import { toast } from 'sonner';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
@@ -8,8 +7,8 @@ import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { errorMessage } from '../../lib/utils.js';
 import { pressWithoutFocus } from './tab-keyboard.js';
 import { blockId } from './strip-blocks.js';
-import type { StripDragData, StripPlace } from './strip-drag.js';
-import { runTabMenu, type GroupMenu } from './tab-menu.js';
+import type { StripPlace } from './strip-drag.js';
+import { runTabMenu } from './tab-menu.js';
 import { usePaneMenus } from './use-pane-menus.js';
 import type { TabFace } from './use-strip-groups.js';
 import { tabClassName } from './tab-look-class.js';
@@ -55,28 +54,21 @@ export function TabButton({
   active,
   closer,
   tabStop,
-  menu,
   pinned = false,
   rename,
-  onKeyDown,
 }: {
   face: TabFace;
-  /** What the tab is to a drag: a group's member, or a block of its own. */
+  /** What the tab is to a drag: a block of its own. */
   data: StripPlace;
   active: boolean;
   closer: Closer;
   /** The row's one Tab stop: the active tab, or the first one while
    *  none on the row is active. */
   tabStop: boolean;
-  /** Group actions its native menu offers below the tab's own. */
-  menu?: GroupMenu;
   /** A pinned tab: narrower, marked, with no close button. */
   pinned?: boolean;
   /** For a tab alone in its place: name the place's group. */
   rename?: () => void;
-  /** Keys the tab does not handle itself (Alt+ArrowDown opens its
-   *  group's roster). */
-  onKeyDown?: (e: KeyboardEvent<HTMLElement>) => void;
 }) {
   const { tab, snapshot } = face;
   const tabs = useTabs();
@@ -87,8 +79,8 @@ export function TabButton({
   // repository's against what the app holds for that one.
   const hover = useHoverPrewarm(() => (active ? null : tab), true);
   const { setNode, setHandle, handle, style, isDragging } = useSortableTab({
-    id: data.kind === 'member' ? tab.id : blockId(tab.id),
-    data: { ...data, label } as StripDragData,
+    id: blockId(tab.id),
+    data: { ...data, label },
     tabStop,
     actions: {
       activate: () => {
@@ -110,10 +102,6 @@ export function TabButton({
       {...hover.handlers}
       style={style}
       aria-selected={active}
-      onKeyDown={(e) => {
-        handle.onKeyDown(e);
-        if (!e.defaultPrevented) onKeyDown?.(e);
-      }}
       onMouseDown={(e) => {
         pressWithoutFocus(e);
         if (e.button === 1) {
@@ -125,7 +113,7 @@ export function TabButton({
       onDoubleClick={() => tabs.keep(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
-        runTabMenu(tab, tabs, closer, tabOverflow, menu, rename, tabMenu).catch(
+        runTabMenu(tab, tabs, closer, tabOverflow, rename, tabMenu).catch(
           (err: unknown) => toast.error(errorMessage(err))
         );
       }}

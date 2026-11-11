@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import type {
   SessionActivitySnapshot,
   SidebarItem,
@@ -14,9 +14,6 @@ import { resolveMachineLabel } from '../../lib/machines/machine-model.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
 import {
-  expandsOnShow,
-  groupOf,
-  isCollapsed,
   present,
   presentedIds,
   statusFromActivity,
@@ -75,9 +72,7 @@ export interface StripGroups {
 /**
  * The strip's groups and every tab's face, from the open repository's
  * items, the host's session listings and the tabs. Notes the presented
- * order for positional switching, and expands a collapsed group when one
- * of its tabs becomes active from anywhere (the palette, Ctrl+Tab, a
- * roster row).
+ * order for positional switching.
  */
 export function useStripGroups(items: SidebarItem[]): StripGroups {
   const { repo } = useRepo();
@@ -204,33 +199,13 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
   };
 
   // Positional keyboard switching walks the order the strip presents,
-  // collapsed members included.
+  // the members behind chips included.
   // Only the focused pane's: the shortcuts walk the pane they act in.
   const presented = presentedIds(groups).join('\n');
   const focused = tabs.focused;
   useEffect(() => {
     if (focused) notePresentedOrder(presented ? presented.split('\n') : []);
   }, [presented, focused]);
-
-  // A tab activated from anywhere shows: its group expands
-  // (`expandsOnShow`). Only the focused pane's: a follow pane's switch
-  // must not reflow the strip the user is in.
-  const active = groupOf(groups, tabs.activeId);
-  const activeGroup = active?.key;
-  const collapsed = !!active && isCollapsed(active, tabs.collapsed);
-  const hidden = collapsed && active.head?.id !== tabs.activeId;
-  const { activeId, setCollapsed } = tabs;
-  const shownFor = useRef({ id: activeId, group: activeGroup });
-  useEffect(() => {
-    const now = { id: activeId, group: activeGroup };
-    const key = expandsOnShow(shownFor.current, now, {
-      collapsed,
-      hidden,
-      focused,
-    });
-    shownFor.current = now;
-    if (key) setCollapsed([key], false);
-  }, [activeId, activeGroup, collapsed, hidden, focused, setCollapsed]);
 
   return {
     groups,

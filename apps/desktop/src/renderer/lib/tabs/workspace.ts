@@ -5,8 +5,8 @@ export { panesOf } from './layout.js';
 
 /**
  * The editor area's whole state: every tab, the panes that hold them,
- * and what the user decided about them — pins, collapsed groups, agents
- * closed on purpose, group names. What is saved to `workspace.json`
+ * and what the user decided about them — pins, agents closed on
+ * purpose, group names. What is saved to `workspace.json`
  * (`workspace-file.ts`), less `unseen`.
  *
  * The layout is a tree of splits over panes, each pane with its own
@@ -45,10 +45,6 @@ export interface Workspace {
   /** Pinned tabs, a flag set: their order is their panes' order. A
    *  pinned tab sits at its pane's start, outside its group. */
   pinned: readonly string[];
-  /** Each group the user collapsed (`true`) or expanded (`false`), by
-   *  affiliation key; a group with no entry takes `initiallyCollapsed`
-   *  (`tab-groups.ts`). Global, not per pane. */
-  collapsed: Readonly<Record<string, boolean>>;
   /** Sessions whose tab was closed while they still ran
    *  (`dismissKeyOf`): every running agent has a tab unless it is here.
    *  A key is dropped once a listing no longer has the session alive,
@@ -74,8 +70,12 @@ export interface Workspace {
 
 export interface PaneLabels {
   openedIds: readonly string[];
-  collisionOrdinals: Readonly<Record<string, { base: string; ordinal: number }>>;
-  chipOrdinals: Readonly<Record<string, { label: string; ordinal: number; home?: boolean }>>;
+  collisionOrdinals: Readonly<
+    Record<string, { base: string; ordinal: number }>
+  >;
+  chipOrdinals: Readonly<
+    Record<string, { label: string; ordinal: number; home?: boolean }>
+  >;
 }
 
 /** What a follow pane follows: a group, by affiliation key, and the
@@ -94,7 +94,6 @@ export const EMPTY_WORKSPACE: Workspace = {
   layout: { kind: 'pane', id: FIRST_PANE, order: [], activeId: null },
   focusedPane: FIRST_PANE,
   pinned: [],
-  collapsed: {},
   dismissed: [],
   groupNames: {},
   unseen: [],
@@ -141,7 +140,6 @@ export function stripOf(ws: Workspace, paneId: PaneId): Strip {
   const labels = ws.labelState[paneId];
   return {
     pinned: ws.pinned,
-    collapsed: ws.collapsed,
     dismissed: ws.dismissed,
     groupNames: ws.groupNames,
     unseen: ws.unseen,
@@ -168,7 +166,14 @@ export function withStrip(
   strip: Strip
 ): Workspace {
   const pane = panesOf(ws.layout).find((p) => p.id === paneId);
-  const { tabs: list, activeId, openedIds, collisionOrdinals, chipOrdinals, ...marks } = strip;
+  const {
+    tabs: list,
+    activeId,
+    openedIds,
+    collisionOrdinals,
+    chipOrdinals,
+    ...marks
+  } = strip;
   const rest = { ...marks };
   delete rest.others;
   const left = new Set(pane?.order);

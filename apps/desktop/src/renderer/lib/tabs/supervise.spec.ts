@@ -75,15 +75,6 @@ describe('tiling a group', () => {
     expect(ws.layout.kind === 'split' && ws.layout.direction).toBe('column');
   });
 
-  it('expands the group everywhere', () => {
-    const ws = then(
-      group(),
-      { type: 'set-collapsed', keys: [KEY], collapsed: true },
-      tile()
-    );
-    expect(ws.collapsed[KEY]).toBe(false);
-  });
-
   it('keeps a pinned home pinned, where it is', () => {
     const ws = then(
       group(),
@@ -126,15 +117,6 @@ describe('following a group', () => {
     expect(ws.follows).toEqual({
       'pane-2': { key: KEY, ids: [id('p1'), id('p3')] },
     });
-  });
-
-  it('expands the group, so the tabs it follows show', () => {
-    const ws = then(
-      group(),
-      { type: 'set-collapsed', keys: [KEY], collapsed: true },
-      follow()
-    );
-    expect(ws.collapsed[KEY]).toBe(false);
   });
 
   it('follows a group in one pane at most', () => {

@@ -4,7 +4,6 @@ import type { DesktopActionId } from '@n10/core/ui';
  * call the same actions from outside its repository-scoped component. */
 export interface StripCommands {
   attention(): void;
-  collapseOthers(): void;
   /** Pin the active tab, or unpin it. */
   togglePin(): void;
   /** Rename the active tab's group (the dialog). */
@@ -18,7 +17,6 @@ export interface StripCommands {
  *  tile and follow. */
 export type StripCommand =
   | 'desktop.tabs.attention'
-  | 'desktop.groups.collapse-others'
   | 'desktop.tabs.toggle-pin'
   | 'rename-group'
   | 'tile-group'
@@ -26,7 +24,6 @@ export type StripCommand =
 
 const RUN: Record<StripCommand, (c: StripCommands) => void> = {
   'desktop.tabs.attention': (c) => c.attention(),
-  'desktop.groups.collapse-others': (c) => c.collapseOthers(),
   'desktop.tabs.toggle-pin': (c) => c.togglePin(),
   'rename-group': (c) => c.renameGroup(),
   'tile-group': (c) => c.tileGroup(),

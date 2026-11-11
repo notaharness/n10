@@ -29,8 +29,8 @@ export interface TabGroup {
   head: Tab | null;
   /** Every member, the head first, the rest in their strip order. */
   tabs: Tab[];
-  /** Shown behind a chip: every parent group, and a place group of more
-   *  than one tab. */
+  /** Shown as one chip whose roster lists its tabs: every parent group,
+   *  and a place group of more than one tab. */
   chipped: boolean;
   /** On a group shown right after the parent group its home reports to
    *  (`Affiliation.follows`): that group's key. It moves with it. */
@@ -166,85 +166,25 @@ export function groupName(
   return names[group.key] ?? derived;
 }
 
-/** Whether a group the user has not collapsed or expanded starts
- *  collapsed, by what it belongs to. */
-const STARTS_COLLAPSED: Record<Affiliation['kind'], boolean> = {
-  // Players wait behind their parent's chip until asked for.
-  parent: true,
-  place: false,
-};
-
-export function initiallyCollapsed(affiliation: Affiliation | null): boolean {
-  return affiliation !== null && STARTS_COLLAPSED[affiliation.kind];
-}
-
-/** Whether `group` shows behind its chip alone, given the user's
- *  choices (`TabsState.collapsed`). Only a chipped group collapses. */
-export function isCollapsed(
-  group: TabGroup,
-  choices: Readonly<Record<string, boolean>>
-): boolean {
-  return (
-    group.chipped &&
-    (choices[group.key] ?? initiallyCollapsed(group.affiliation))
-  );
-}
-
-/** Every tab in the order the strip presents them, collapsed groups
- *  included: what positional switching walks. */
+/** Every tab in the order the strip presents them, members behind
+ *  chips included: what positional switching walks. */
 export function presentedIds(groups: readonly TabGroup[]): string[] {
   return groups.flatMap((g) => g.tabs.map((t) => t.id));
 }
 
-/** The real tabs the strip shows: a group's home, and its members
- *  unless it is collapsed. */
-export function shownTabIds(
-  groups: readonly TabGroup[],
-  choices: Readonly<Record<string, boolean>>
-): string[] {
-  return groups.flatMap((g) => {
-    if (!g.chipped || !isCollapsed(g, choices)) return g.tabs.map((t) => t.id);
-    return g.head ? [g.head.id] : [];
-  });
+/** What stands for `group` on the row: its chip, else its one tab. */
+export function stopOf(group: TabGroup): string {
+  return group.chipped ? `chip:${group.key}` : group.tabs[0]?.id ?? group.key;
 }
 
-/** The row's one Tab stop: the active tab when it shows, else the
- *  shown tab nearest it in strip order (behind a collapsed chip, its
- *  home or a neighbour), else the first. */
+/** The row's one Tab stop: what stands for the active tab (its own tab,
+ *  or its group's chip), else the first. */
 export function tabStopOf(
-  presented: readonly string[],
-  shown: readonly string[],
+  groups: readonly TabGroup[],
   activeId: string | null
 ): string | undefined {
-  const at = activeId === null ? -1 : presented.indexOf(activeId);
-  if (at < 0) return shown[0];
-  const visible = new Set(shown);
-  for (let d = 0; d < presented.length; d++) {
-    const near = [presented[at - d], presented[at + d]].find(
-      (id) => id !== undefined && visible.has(id)
-    );
-    if (near) return near;
-  }
-  return shown[0];
-}
-
-/**
- * The collapsed group to expand now that `now` is the active tab and its
- * group, where it was `before`: a tab activated from anywhere shows, so
- * its collapsed group expands; and so does a collapsed group the active
- * tab joins behind its chip (`hidden`: its affiliation came with a later
- * scan, or it was unpinned). Collapsing the active tab's group leaves it
- * collapsed until either changes. Only in the focused pane: a pane that
- * changes in the background (a follow pane's switch) expands nothing.
- */
-export function expandsOnShow(
-  before: { id: string | null; group: string | undefined },
-  now: { id: string | null; group: string | undefined },
-  state: { collapsed: boolean; hidden: boolean; focused: boolean }
-): string | null {
-  if (before.id === now.id && before.group === now.group) return null;
-  const expands = before.id !== now.id ? state.collapsed : state.hidden;
-  return now.group && expands && state.focused ? now.group : null;
+  const active = groupOf(groups, activeId) ?? groups[0];
+  return active && stopOf(active);
 }
 
 /** The group `tabId` stands in, if any. */

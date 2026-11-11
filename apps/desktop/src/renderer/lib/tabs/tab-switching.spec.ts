@@ -103,7 +103,7 @@ afterEach(() => {
 describe('keyboard tab switching', () => {
   it.each([
     ['desktop.tabs.attention', 'A'],
-    ['desktop.groups.collapse-others', 'J'],
+    ['desktop.tabs.toggle-pin', 'P'],
   ] as const)(
     '%s consumes repeat events without running twice',
     (action, key) => {
@@ -115,7 +115,6 @@ describe('keyboard tab switching', () => {
       let delivered = 0;
       setStripCommands({
         attention: () => commands++,
-        collapseOthers: () => commands++,
         togglePin: () => commands++,
         renameGroup: () => commands++,
         tileGroup: () => commands++,
@@ -140,7 +139,6 @@ describe('keyboard tab switching', () => {
     let runs = 0;
     setStripCommands({
       attention: () => runs++,
-      collapseOthers: () => runs++,
       togglePin: () => runs++,
       renameGroup: () => runs++,
       tileGroup: () => runs++,

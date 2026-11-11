@@ -60,35 +60,6 @@ export function arrangeTabs(state: Strip, ids: readonly string[]): Strip {
   return { ...state, tabs };
 }
 
-/** How many collapse choices are kept. Parent groups are keyed by an
- *  orchestrator run, so their keys keep coming; the oldest choices go. */
-export const COLLAPSED_LIMIT = 64;
-
-/** Collapse or expand the groups `keys` name, as the latest choices.
- *  Unchanged state when nothing changes. */
-export function setCollapsed(
-  state: Strip,
-  keys: readonly string[],
-  collapsed: boolean
-): Strip {
-  const next = chooseCollapsed(state.collapsed, keys, collapsed);
-  return next === state.collapsed ? state : { ...state, collapsed: next };
-}
-
-/** `choices` with `keys` collapsed (or expanded), the latest choices
- *  kept; the same record when nothing changes. */
-export function chooseCollapsed(
-  choices: Readonly<Record<string, boolean>>,
-  keys: readonly string[],
-  collapsed: boolean
-): Readonly<Record<string, boolean>> {
-  if (keys.every((key) => choices[key] === collapsed)) return choices;
-  const chosen = new Set(keys);
-  const kept = Object.entries(choices).filter(([k]) => !chosen.has(k));
-  const next = [...kept, ...keys.map((k) => [k, collapsed] as const)];
-  return Object.fromEntries(next.slice(-COLLAPSED_LIMIT));
-}
-
 /** End `id`'s preview. Unchanged state when it is no preview. */
 export function keepTab(state: Strip, id: string): Strip {
   if (!state.tabs.some((t) => t.id === id && t.preview)) return state;
