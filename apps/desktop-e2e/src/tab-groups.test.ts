@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab } from './setup/app.js';
+import { createWorktree, focusTerminal, tab } from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -318,5 +318,89 @@ test.describe('Tab groups', () => {
     ).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(roster(page)).toHaveCount(0);
+  });
+
+  test('opens the group a shown tab joins once its parent is known', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    // Alpha is the active tab while the group forms behind its chip.
+    await createWorktree(page, 'alpha');
+    branches.push(spawnAgent(repoPath, homeDir));
+    markOrchestrator(homeDir);
+    await expect(countOf(page, CLAUDE)).toHaveText('2', { timeout: 30_000 });
+    const disclosure = chipOf(page, CLAUDE).locator('[data-group-disclosure]');
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+
+    const dir = mkdtempSync(join(tmpdir(), 'n10-late-'));
+    startSurvivingTerminal({
+      name: 'late-player',
+      kind: 'dir',
+      cwd: dir,
+      command: 'sleep 300',
+      homeDir,
+    });
+    const late = tab(page, new RegExp(basename(dir)));
+    await late.click({ timeout: 30_000 });
+    await expect(late).toHaveAttribute('aria-selected', 'true');
+    // Tagged after it is shown: it joins the collapsed group, which opens.
+    tagTmuxSession(
+      'late-player',
+      orchestraTags({ orchestrator: CLAUDE }),
+      homeDir
+    );
+    await expect(countOf(page, CLAUDE)).toHaveText('3', { timeout: 30_000 });
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    await expect(late).toHaveAttribute('aria-selected', 'true');
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('a press does not open the roster later, and Escape leaves the terminal its focus', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    branches.push(spawnAgent(repoPath, homeDir));
+    markOrchestrator(homeDir);
+    await expect(countOf(page, CLAUDE)).toHaveText('2', { timeout: 30_000 });
+    const home = chipOf(page, CLAUDE).getByRole('tab');
+    const button = chipOf(page, CLAUDE).locator('[data-group-roster-button]');
+
+    await page.clock.install();
+    await home.click();
+    await page.clock.runFor(450);
+    await expect(roster(page)).toHaveCount(0);
+    await page.clock.resume();
+    await expect(shownTerminal(page)).toContainText(CONDUCTOR_READY);
+
+    await focusTerminal(page);
+    await page.mouse.move(0, 600);
+    await page.clock.install();
+    await button.hover();
+    await page.clock.runFor(450);
+    await expect(roster(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(roster(page)).toHaveCount(0);
+    await page.clock.resume();
+    await expect(button).not.toBeFocused();
+    await expect(page.locator('.xterm-helper-textarea:focus')).toHaveCount(1);
+  });
+
+  test('pressing another group’s chip closes a roster pinned open', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    branches.push(
+      spawnAgent(repoPath, homeDir),
+      spawnAgent(repoPath, homeDir, CODEX)
+    );
+    markOrchestrator(homeDir);
+    await expect(countOf(page, CLAUDE)).toHaveText('2', { timeout: 30_000 });
+    await expect(countOf(page, CODEX)).toHaveText('1', { timeout: 30_000 });
+
+    await chipOf(page, CLAUDE).locator('[data-group-roster-button]').click();
+    await expect(roster(page)).toHaveCount(1);
+    await chipOf(page, CODEX).locator('[data-group-label]').click();
+    await expect(roster(page)).toHaveCount(1);
+    await expect(roster(page)).toHaveAttribute('aria-label', /Codex/);
   });
 });

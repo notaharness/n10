@@ -153,6 +153,7 @@ export function GroupBlock({
           justDropped={justDropped}
         />
         <GroupRoster
+          groupKey={group.key}
           label={label}
           faces={faces}
           activeId={tabs.activeId}

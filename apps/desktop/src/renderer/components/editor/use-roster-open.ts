@@ -1,4 +1,4 @@
-import { useDndContext } from '@dnd-kit/core';
+import { useDndContext, useDndMonitor } from '@dnd-kit/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Resting on a chip this long opens its roster. */
@@ -33,6 +33,14 @@ export function useRosterOpen() {
     clear();
     setMode(null);
   }, []);
+  // A drag is no rest: a pending open is dropped, and a hover-open
+  // roster closes.
+  useDndMonitor({
+    onDragStart() {
+      clear();
+      setMode((now) => (now === 'hover' ? null : now));
+    },
+  });
 
   return {
     mode,
@@ -48,6 +56,11 @@ export function useRosterOpen() {
       clear();
       suppressed.current = false;
       if (mode === 'hover') timer.current = setTimeout(close, HOVER_CLOSE_MS);
+    },
+    /** A press anywhere on the chip: the pointer is not resting, so a
+     *  pending hover-open is dropped. */
+    cancelHover() {
+      if (mode === null) clear();
     },
     /** A press on the roster button or a label that opens it. */
     press() {

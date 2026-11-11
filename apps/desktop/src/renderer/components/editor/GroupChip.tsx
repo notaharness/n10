@@ -217,6 +217,7 @@ export function GroupChip({
         data-group-chip={group.key}
         onPointerEnter={roster.enter}
         onPointerLeave={roster.leave}
+        onPointerDownCapture={roster.cancelHover}
         className={cn(
           'group/chip relative my-0.5 flex h-8 shrink-0 items-center self-center overflow-hidden rounded-md border border-border transition-colors',
           containsActive

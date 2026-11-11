@@ -140,20 +140,23 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     notePresentedOrder(presented ? presented.split('\n') : []);
   }, [presented]);
 
-  // A tab activated from anywhere shows: its group expands. Collapsing
-  // the group the active tab is in leaves it collapsed until another
-  // activation.
+  // A tab activated from anywhere shows: its group expands. So does a
+  // collapsed group the active tab joins behind its chip (its
+  // affiliation came with a later scan). Collapsing the active tab's
+  // group leaves it collapsed until either changes.
   const active = groupOf(groups, tabs.activeId);
-  const activeCollapsed = !!active && isCollapsed(active, tabs.collapsed);
   const activeGroup = active?.key;
+  const collapsed = !!active && isCollapsed(active, tabs.collapsed);
+  const hidden = collapsed && active.head?.id !== tabs.activeId;
   const { activeId, setCollapsed } = tabs;
-  const expandedFor = useRef(activeId);
+  const shownFor = useRef({ id: activeId, group: activeGroup });
   useEffect(() => {
-    // Only a change of the active tab expands; collapsing must not.
-    if (expandedFor.current === activeId) return;
-    expandedFor.current = activeId;
-    if (activeGroup && activeCollapsed) setCollapsed([activeGroup], false);
-  }, [activeId, activeGroup, activeCollapsed, setCollapsed]);
+    const before = shownFor.current;
+    if (before.id === activeId && before.group === activeGroup) return;
+    shownFor.current = { id: activeId, group: activeGroup };
+    const expands = before.id !== activeId ? collapsed : hidden;
+    if (activeGroup && expands) setCollapsed([activeGroup], false);
+  }, [activeId, activeGroup, collapsed, hidden, setCollapsed]);
 
   return { groups, faceOf, colorOf };
 }

@@ -1,5 +1,5 @@
 import { CheckIcon } from 'lucide-react';
-import { useRef, type KeyboardEvent, type RefObject } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type RefObject } from 'react';
 import {
   groupSummary,
   rowStatus,
@@ -171,6 +171,7 @@ function walkRows(e: KeyboardEvent<HTMLUListElement>): void {
  * active row, else the first.
  */
 export function GroupRoster({
+  groupKey,
   label,
   faces,
   activeId,
@@ -178,6 +179,7 @@ export function GroupRoster({
   returnFocus,
   onJump,
 }: {
+  groupKey: string;
   label: string;
   faces: readonly TabFace[];
   activeId: string | null;
@@ -188,6 +190,25 @@ export function GroupRoster({
 }) {
   const list = useRef<HTMLUListElement>(null);
   const escaped = useRef(false);
+  // Opened from the keyboard, or already open when Alt+ArrowDown asked
+  // for it: focus goes to the active row, else the first. The content
+  // mounts a render after it opens, so a fresh open focuses on mount.
+  const keyboard = roster.mode === 'keyboard';
+  const focusRows = () => {
+    const rows =
+      list.current?.querySelectorAll<HTMLElement>('[data-roster-row]');
+    const current = list.current?.querySelector<HTMLElement>('[aria-current]');
+    (current ?? rows?.[0])?.focus();
+  };
+  useEffect(() => {
+    if (keyboard) focusRows();
+  }, [keyboard]);
+  const jump = (tab: Tab) => {
+    // Choosing the tab already shown changes nothing to take focus: it
+    // goes back to the chip, not to the page.
+    if (tab.id === activeId) escaped.current = true;
+    onJump(tab);
+  };
   const statuses = faces.map((f) => f.status);
   const summary = rosterSummary(statuses);
   return (
@@ -199,17 +220,17 @@ export function GroupRoster({
       className="flex w-[360px] max-w-[calc(100vw-16px)] flex-col overflow-hidden max-h-[min(480px,calc(var(--radix-popover-content-available-height)-16px))]"
       onPointerEnter={roster.enter}
       onPointerLeave={roster.leave}
+      // Focus moves in only from the keyboard.
       onOpenAutoFocus={(e) => {
         e.preventDefault();
-        if (roster.mode !== 'keyboard') return;
-        const rows =
-          list.current?.querySelectorAll<HTMLElement>('[data-roster-row]');
-        const current =
-          list.current?.querySelector<HTMLElement>('[aria-current]');
-        (current ?? rows?.[0])?.focus();
+        if (keyboard) focusRows();
       }}
       onEscapeKeyDown={() => {
-        escaped.current = true;
+        // A roster resting open over a terminal leaves focus there: only
+        // focus taken into it, or opened by a press, goes back.
+        escaped.current =
+          roster.mode !== 'hover' ||
+          !!document.activeElement?.closest('[data-group-roster]');
         roster.escaped();
       }}
       onCloseAutoFocus={(e) => {
@@ -218,9 +239,12 @@ export function GroupRoster({
         escaped.current = false;
       }}
       onInteractOutside={(e) => {
-        // The chip's own controls open and close it themselves.
+        // This chip's own controls open and close it themselves; any
+        // other chip is outside.
         const target = e.target as Element | null;
-        if (target?.closest?.('[data-group-chip]')) e.preventDefault();
+        const chip = target?.closest?.('[data-group-chip]');
+        if (chip?.getAttribute('data-group-chip') === groupKey)
+          e.preventDefault();
       }}
     >
       <div className="flex min-h-12 shrink-0 flex-col justify-center gap-0.5 border-b border-border px-3 py-2">
@@ -251,7 +275,7 @@ export function GroupRoster({
               key={face.tab.id}
               face={face}
               active={face.tab.id === activeId}
-              onJump={onJump}
+              onJump={jump}
             />
           ))}
         </ul>
