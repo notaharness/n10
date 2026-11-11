@@ -18,6 +18,7 @@ import {
   stopFollowing,
   tileGroup,
 } from './supervise.js';
+import { arrangeTabs } from './tab-order.js';
 import { placeFor } from './tab-placement.js';
 import { prunePaneLabels, reconciledPaneLabels } from './tab-label-state.js';
 import type { TabsAction } from './tabs-model.js';
@@ -126,10 +127,18 @@ function crossPaneMove(
     (id) => Object.hasOwn(ws.tabs, id) && !dest?.order.includes(id)
   );
   if (!dest || !elsewhere) return null;
-  return moveToPane(ws, action.ids, dest.id, {
+  const moved = moveToPane(ws, action.ids, dest.id, {
     targetId: action.targetId,
     side: action.side,
   });
+  // Where the destination's strip showed the slot, not where its stored
+  // order puts the anchor: its order becomes the user's.
+  if (!action.order || moved === ws) return moved;
+  return withStrip(
+    moved,
+    dest.id,
+    arrangeTabs(stripOf(moved, dest.id), action.order)
+  );
 }
 
 /** The tab an action names, and whether bringing it to the front

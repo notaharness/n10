@@ -181,6 +181,20 @@ describe('moving between panes', () => {
     expect(shape(ws)[1]!.order).toEqual(['branch:a', 'branch:c']);
   });
 
+  it('lays the destination out as its strip showed it, and makes it arranged', () => {
+    // Pane 1 holds a and b; its strip showed b first (orchestrators
+    // first, say), and the slot opened after b.
+    const ws = then(twoPanes(), {
+      type: 'move',
+      ids: [id('branch:c')],
+      targetId: id('branch:b'),
+      side: 'after',
+      order: [id('branch:b'), id('branch:c'), id('branch:a')],
+    });
+    expect(shape(ws)[0]!.order).toEqual(['branch:b', 'branch:c', 'branch:a']);
+    expect(ws.arranged).toEqual(['pane-1']);
+  });
+
   // A property-test counterexample: a drag naming a tab no longer open
   // beside one that is, within one pane, is a reorder, not a move.
   it('reorders within the pane when the move names a closed tab too', () => {

@@ -114,6 +114,9 @@ export type TabsAction =
       ids: readonly string[];
       targetId: string;
       side: 'before' | 'after';
+      /** Into another pane: that pane's whole order as its strip showed
+       *  it, the tabs in place. The pane is then arranged by hand. */
+      order?: readonly string[];
     }
   /** Put the tabs `ids` name in that order, the rest after them: the
    *  strip as presented, with a dragged block in its new place. */

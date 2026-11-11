@@ -1023,9 +1023,11 @@ the pointer instead (`drag-preview.ts`, `CarriedOverlay.tsx`), so pane
 overflow and the pane portals never clip it, and the zone is read from the
 pointer's own events. Keyboard drags stay on the strip. On a strip, a block
 dropped among its own pane's blocks arranges that pane as presented;
-carried over another pane's strip, a tab or block (a member too, beside a
-block or its own group's member) opens the slot it would land in there, on
-the side the pointer is on, and moves there on drop. Another pane's places
+carried over another pane's strip, a tab or block (a roster row too) opens the slot it would land in there, on
+the side the pointer is on, and moves there on drop: that pane's whole order
+becomes its strip's presented order with the tabs in the slot, and the pane is
+arranged by hand from then on, so a drop beside an orchestrator's chip shown
+first lands there, not where the stored order puts its anchor. Another pane's places
 are targets only under the pointer, never the nearest place. Let go over
 nothing outside its strip's row (the strip's height across its pane), a
 drag is abandoned; within the row, past the strip's ends, it lands on the

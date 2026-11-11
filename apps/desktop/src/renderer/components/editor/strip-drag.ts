@@ -60,13 +60,16 @@ export function acceptsDrop(
 export type StripBlocks = readonly (readonly string[])[];
 
 /** What a drop does: a block's tabs beside another pane's block, or the
- *  strip's tabs in a new order. */
+ *  strip's tabs in a new order. A move into another pane carries that
+ *  pane's whole presented order with the tabs in place (`order`) when
+ *  its strip is known, so they land where its slot showed. */
 export type StripDrop =
   | {
       kind: 'move';
       ids: readonly string[];
       targetId: string;
       side: 'before' | 'after';
+      order?: string[];
     }
   | { kind: 'arrange'; ids: string[] };
 
@@ -74,31 +77,45 @@ const samePane = (a: StripDragData, b: StripDragData) =>
   (a.pane ?? '') === (b.pane ?? '');
 
 /** A block dropped on another pane's block: its tabs go beside that
- *  block there (the reducer moves them across, `workspace-reduce.ts`). */
+ *  block there (the reducer moves them across, `workspace-reduce.ts`),
+ *  in that strip as presented (`blocks`, its blocks) when it is known
+ *  and still the one the drag saw. */
 function beside(
   dragged: StripDragData,
   over: StripDragData,
-  side: 'before' | 'after' = 'before'
+  side: 'before' | 'after' = 'before',
+  blocks?: StripBlocks
 ): StripDrop | null {
   const targetId = side === 'after' ? over.ids.at(-1) : over.ids[0];
-  return targetId ? { kind: 'move', ids: dragged.ids, targetId, side } : null;
+  if (!targetId) return null;
+  const move = { kind: 'move' as const, ids: dragged.ids, targetId, side };
+  if (!blocks || !sameIds(blocks[over.index], over.ids)) return move;
+  const carried = new Set(dragged.ids);
+  const order: (readonly string[])[] = blocks.map((b) =>
+    b.filter((id) => !carried.has(id))
+  );
+  order.splice(over.index + (side === 'after' ? 1 : 0), 0, dragged.ids);
+  return { ...move, order: order.flat() };
 }
 
 /** The move a drop makes. `null` for a drop on itself, nowhere legal, or
  *  from a strip that has changed under the drag. `blocks` are the
- *  dragged block's pane's, as presented. Onto another pane's block, the
- *  tabs land on the side of it the pointer is on (`pointerSide`, before
- *  when unknown): positions in two strips say nothing of each other. */
+ *  dragged block's pane's, as presented. Onto another pane's block
+ *  (whose strip's blocks are `overBlocks`), the tabs land on the side of
+ *  it the pointer is on (`pointerSide`, before when unknown): positions
+ *  in two strips say nothing of each other. */
 export function dropMove(
   activeId: string,
   dragged: StripDragData,
   overId: string,
   over: StripDragData,
   blocks: StripBlocks,
-  pointerSide?: 'before' | 'after'
+  pointerSide?: 'before' | 'after',
+  overBlocks?: StripBlocks
 ): StripDrop | null {
   if (activeId === overId || !acceptsDrop(over, dragged)) return null;
-  if (!samePane(dragged, over)) return beside(dragged, over, pointerSide);
+  if (!samePane(dragged, over))
+    return beside(dragged, over, pointerSide, overBlocks);
   if (dragged.row !== undefined) return rowMove(dragged, over, blocks);
   const from = dragged.index;
   const to = over.index;

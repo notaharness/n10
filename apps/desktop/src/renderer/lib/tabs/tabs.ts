@@ -85,7 +85,9 @@ export interface TabsApi extends Strip {
   moveTabs: (
     ids: readonly string[],
     targetId: string,
-    side: 'before' | 'after'
+    side: 'before' | 'after',
+    /** Into another pane: its whole order as shown (`StripDrop`). */
+    order?: readonly string[]
   ) => void;
   /** Drag-reorder among blocks: the strip's tabs in this order. */
   arrangeTabs: (ids: readonly string[]) => void;
@@ -174,8 +176,8 @@ export function tabsActions(
     closeOthers: (id) => dispatch({ type: 'close-others', id }),
     closeAll: (repo) => dispatch({ type: 'close-all', repo }),
     closeActive: () => dispatch({ type: 'close-active' }),
-    moveTabs: (ids, targetId, side) =>
-      dispatch({ type: 'move', ids, targetId, side }),
+    moveTabs: (ids, targetId, side, order) =>
+      dispatch({ type: 'move', ids, targetId, side, order }),
     arrangeTabs: (ids) => dispatch({ type: 'arrange', ids }),
     renameGroup: (key, name) => dispatch({ type: 'rename-group', key, name }),
     assignCollisionOrdinals: (values) =>

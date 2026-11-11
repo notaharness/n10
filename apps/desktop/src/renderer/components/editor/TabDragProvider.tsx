@@ -69,10 +69,11 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
       String(over.id),
       target,
       blocks.current.get(dragged.pane ?? '') ?? [],
-      pointerSide(over.rect)
+      pointerSide(over.rect),
+      blocks.current.get(target.pane ?? '')
     );
     if (drop?.kind === 'move')
-      tabs.moveTabs(drop.ids, drop.targetId, drop.side);
+      tabs.moveTabs(drop.ids, drop.targetId, drop.side, drop.order);
     else if (drop) tabs.arrangeTabs(drop.ids);
   };
 

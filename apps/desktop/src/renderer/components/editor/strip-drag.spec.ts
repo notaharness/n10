@@ -67,6 +67,29 @@ describe('strip drag', () => {
       side: 'before',
     });
   });
+  it('lands where the other pane’s strip showed the slot, whatever its stored order', () => {
+    // The other pane stores x, o, p but presents the orchestrator's chip
+    // [o, p] first, then x; the drop is on the chip's right half.
+    const carried = { ...block(['y'], 0), pane: 'pane-1' };
+    const chip = { ...block(['o', 'p'], 0), pane: 'pane-2' };
+    const there = [['o', 'p'], ['x']];
+    expect(
+      dropMove('block:y', carried, 'block:o', chip, [['y']], 'after', there)
+    ).toEqual({
+      kind: 'move',
+      ids: ['y'],
+      targetId: 'p',
+      side: 'after',
+      order: ['o', 'p', 'y', 'x'],
+    });
+    expect(
+      dropMove('block:y', carried, 'block:o', chip, [['y']], 'before', there)
+    ).toMatchObject({ order: ['y', 'o', 'p', 'x'] });
+    // A strip that changed under the drag gives the anchor alone.
+    expect(
+      dropMove('block:y', carried, 'block:o', chip, [['y']], 'after', [['x']])
+    ).not.toHaveProperty('order');
+  });
   it('makes no move onto itself', () => {
     const blocks = [['a'], ['b']];
     expect(
