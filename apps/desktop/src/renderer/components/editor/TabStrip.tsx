@@ -10,6 +10,7 @@ import {
   useContext,
   useLayoutEffect,
   useMemo,
+  useRef,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
@@ -18,6 +19,7 @@ import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { useSlotStyle } from './drag-preview.js';
 import { stripEndId } from './strip-collisions.js';
 import { StripBlocksReport } from './strip-blocks.js';
+import { useFirstRowReserve } from './strip-first-row.js';
 import { StripScrollArrows } from './StripScrollArrows.js';
 import {
   useActiveTabInView,
@@ -71,6 +73,8 @@ export function TabStrip({
   const blockIds = useMemo(() => blockKey.split('\n'), [blockKey]);
   const { track, edges, update } = useStripScrollEdges(blockKey, wrap);
   useActiveTabInView(track, wrap, useTabs().activeId, blockKey);
+  const actions = useRef<HTMLDivElement>(null);
+  useFirstRowReserve(track, actions, wrap, blockKey);
   return (
     <SortableContext
       items={blockIds}
@@ -83,14 +87,16 @@ export function TabStrip({
           aria-label="Open tabs"
           data-overflow={wrap ? 'wrap' : 'scroll'}
           className={cn(
-            'flex min-w-0 flex-1 items-stretch gap-2 bg-tab',
+            'flex min-w-0 flex-1 items-stretch bg-tab',
             wrap
               ? // Every row but the last is ruled off from the one below.
                 // At most ten rows, or 70% of the pane if less: past
                 // that the strip scrolls and the pane keeps some content.
                 // The last row's rule sits in the track's bottom pixel,
                 // laid over the strip's own, so one row never scrolls.
-                '-mb-px max-h-[min(calc(10*2.25rem+9*0.5rem+1px),70cqh)] flex-wrap overflow-y-auto pb-px [scrollbar-width:thin] [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
+                // The actions sit at the first row's end, which keeps
+                // their width clear (`strip-first-row.ts`).
+                'relative -mb-px max-h-[min(calc(10*2.25rem+1px),70cqh)] flex-wrap overflow-y-auto pb-px [scrollbar-width:thin] [&>*]:-mb-px [&>*]:border-b [&>*]:border-border [&>[data-first-row-end]]:me-[var(--strip-reserve)] data-[measuring]:[&>*]:!grow-0'
               : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           )}
           onScroll={update}
@@ -102,6 +108,15 @@ export function TabStrip({
         >
           {children}
           <StripEnd />
+          {wrap && (
+            <div
+              ref={actions}
+              data-strip-actions
+              className="absolute top-0 right-0 flex h-9"
+            >
+              {controls}
+            </div>
+          )}
         </div>
         {!wrap && edges.overflow && (
           <StripScrollArrows
@@ -110,7 +125,7 @@ export function TabStrip({
             track={track}
           />
         )}
-        {controls}
+        {!wrap && controls}
       </div>
     </SortableContext>
   );

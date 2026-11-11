@@ -289,7 +289,7 @@ function PinsEnd() {
     <div
       aria-hidden
       data-pins-end
-      className="ml-2 w-px shrink-0 self-stretch bg-border"
+      className="w-px shrink-0 self-stretch bg-border"
     />
   );
 }

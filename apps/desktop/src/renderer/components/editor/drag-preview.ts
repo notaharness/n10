@@ -177,9 +177,6 @@ export const holdInStrip =
     return restrictToParentElement(held);
   };
 
-/** Room between blocks on the strip (its `gap-2`). */
-const GAP_PX = 8;
-
 /**
  * What sortable place `id` adds to its style: a slot opened on the side
  * a cross-pane drop would land, sliding open as the strip's own reorder
@@ -197,7 +194,8 @@ export function useSlotStyle(
   const landing = useLanding(pane, id);
   const out = useCarriedOut();
   const still = usePrefersReducedMotion();
-  const room = landing ? `${landing.width + GAP_PX}px` : undefined;
+  // Tabs touch on the strip: the slot is as wide as what lands.
+  const room = landing ? `${landing.width}px` : undefined;
   return (dragging, transform, transition) => ({
     // Carried out, the tab stays in its place: moved with the pointer
     // before the copy is up, it would widen its strip.

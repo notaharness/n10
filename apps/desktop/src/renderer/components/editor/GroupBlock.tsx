@@ -24,11 +24,11 @@ function opensRoster(e: KeyboardEvent<HTMLElement>): boolean {
   return e.key === 'ArrowDown' && e.altKey && !e.ctrlKey && !e.metaKey;
 }
 
-/** Its followers sit as far off as the strip's blocks do. Wrapped, it
+/** Its followers touch it, as the strip's tabs touch. Wrapped, it
  *  shares its row's width as a tab does. */
 function blockClassName(dragging: boolean, wrap: boolean): string {
   return cn(
-    'flex items-stretch gap-2',
+    'flex items-stretch',
     wrap ? 'grow' : 'shrink-0',
     dragging && 'z-10 opacity-90'
   );
