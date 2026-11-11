@@ -46,6 +46,43 @@ export function tabs(page: Page): Locator {
   return page.getByRole('tab');
 }
 
+/** A tab of its own on the strip, never a group's chip: a chip is a
+ *  tab too, and its name carries its active member's. */
+export function stripTab(
+  page: Page,
+  name: string | RegExp,
+  exact = false
+): Locator {
+  return tab(page, name, exact).and(page.locator('[data-tab-id]'));
+}
+
+/**
+ * Show the tab `name` names wherever it stands: its own tab on the
+ * strip, else its row in its group's roster, the dropdown its chip
+ * opens. For a test that needs the tab open, not the strip's mechanics.
+ */
+export async function showTab(page: Page, name: RegExp): Promise<void> {
+  const own = stripTab(page, name);
+  if ((await own.count()) > 0) {
+    await own.click();
+    return;
+  }
+  const roster = page.locator('[data-group-roster]');
+  for (const chip of await page.locator('[data-group-chip]').all()) {
+    await chip.click();
+    await roster.waitFor({ state: 'visible' });
+    const row = roster.getByRole('button', { name });
+    if ((await row.count()) > 0) {
+      await row.first().click();
+      await roster.waitFor({ state: 'hidden' });
+      return;
+    }
+    await page.keyboard.press('Escape');
+    await roster.waitFor({ state: 'hidden' });
+  }
+  throw new Error(`no tab or roster row named ${String(name)}`);
+}
+
 /**
  * The spinner the tab strip and sidebar show while an agent is
  * actively producing output.

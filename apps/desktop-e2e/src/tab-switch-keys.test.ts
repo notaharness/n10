@@ -5,16 +5,15 @@ import { test, expect } from './fixtures/desktop.js';
 import {
   createWorktree,
   focusTerminal,
+  showTab,
   switchRepo,
   tab,
-  tabs,
 } from './setup/app.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 import { clickAppMenuItem } from './setup/menu.js';
 import {
   confirmNewTerminal,
   openNewTerminalDialog,
-  terminalTabs,
 } from './setup/terminals.js';
 
 /**
@@ -67,12 +66,12 @@ test.describe('Tab switching keys', () => {
       page.getByTestId('shortcut-desktop.tabs.attention')
     ).toHaveText('Ctrl+Shift+a');
     await expect(
-      page.getByTestId('shortcut-desktop.groups.collapse-others')
-    ).toHaveText('Ctrl+Shift+j');
-    await page.getByTestId('shortcut-desktop.groups.collapse-others').click();
+      page.getByTestId('shortcut-desktop.tabs.toggle-pin')
+    ).toHaveText('Ctrl+Alt+p');
+    await page.getByTestId('shortcut-desktop.tabs.toggle-pin').click();
     await page.keyboard.press('Control+Alt+j');
     await expect(
-      page.getByTestId('shortcut-desktop.groups.collapse-others')
+      page.getByTestId('shortcut-desktop.tabs.toggle-pin')
     ).toHaveText('Ctrl+Alt+j');
   });
 
@@ -84,9 +83,13 @@ test.describe('Tab switching keys', () => {
     await createWorktree(page, 'beta');
     await openNewTerminalDialog(app, page);
     await confirmNewTerminal(page, 'Shell');
-    await expect(tabs(page)).toHaveCount(3);
-    const terminal = terminalTabs(page);
-    await expect(terminal).toHaveAttribute('aria-selected', 'true');
+    // All three are the repository's, behind its chip; the walk goes
+    // through them all the same, the chip naming the one shown.
+    const chip = page.locator('[data-group-chip^="place:"]');
+    await expect(chip.locator('[data-group-count]')).toHaveText('3');
+    const shown = chip.locator('[data-group-active-label]');
+    await expect(shown).not.toHaveText(/alpha|beta/);
+    const terminal = await shown.innerText();
 
     // The terminal has the keyboard; the chord reaches the strip and
     // never the terminal, which would send it to the shell.
@@ -118,7 +121,7 @@ test.describe('Tab switching keys', () => {
       )
     ).toBe(0);
     await page.keyboard.press('Control+PageDown');
-    await expect(terminal).toHaveAttribute('aria-selected', 'true');
+    await expect(shown).toHaveText(terminal);
     await page.keyboard.press('Control+PageDown');
     await expectActive(page, /alpha/);
 
@@ -136,7 +139,7 @@ test.describe('Tab switching keys', () => {
     await createWorktree(page, 'alpha');
     await createWorktree(page, 'beta');
     await createWorktree(page, 'gamma');
-    await tab(page, /alpha/).click();
+    await showTab(page, /alpha/);
     await expectActive(page, /alpha/);
     await openSettings(app, page);
     await page.getByLabel('Ctrl+Tab cycles most recently used tabs').click();
