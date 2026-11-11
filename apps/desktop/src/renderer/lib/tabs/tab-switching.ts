@@ -21,9 +21,9 @@ import {
  */
 let mru: TabMru = EMPTY_MRU;
 
-/** The order the strip presents its tabs in (`presentedOrder`): an
- *  orchestrator's player tabs, shown under it, come right after it.
- *  Noted by the strip; the positional shortcuts walk it. */
+/** The order the strip presents its tabs in (`presentedIds`): each
+ *  group together, collapsed members included. Noted by the strip; the
+ *  positional shortcuts walk it. */
 let presented: readonly string[] = [];
 
 /** What a key press needs to know about the app, read at press time. */

@@ -1,39 +1,48 @@
-import { useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import type { SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
 import {
-  useMachines,
-  useOrchestratorGroups,
-  useSessionActivity,
-  useSessions,
-  useTerminals,
-} from '../../lib/data/queries.js';
-import {
-  hasPeerMachines,
-  resolveMachineLabel,
-} from '../../lib/machines/machine-model.js';
-import {
-  itemBranch,
-  itemSessionName,
-} from '../../lib/sidebar/sidebar-model.js';
-import {
-  NO_ORCHESTRATOR_TABS,
-  orchestratorTabs,
-  presentedOrder,
-  stripSelection,
-  stripTabs,
-} from '../../lib/tabs/orchestrator-tabs.js';
-import { useRepoColors } from '../../lib/tabs/repo-colors.js';
-import { indexItems, tabItem } from '../../lib/tabs/tab-item.js';
-import { tabRepo } from '../../lib/tabs/tab-presentation.js';
-import { notePresentedOrder } from '../../lib/tabs/tab-switching.js';
-import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
+  groupOf,
+  isCollapsed,
+  type TabGroup,
+} from '../../lib/tabs/tab-groups.js';
+import { indexItems } from '../../lib/tabs/tab-item.js';
+import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
+import { useTabs } from '../../lib/tabs/tabs.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { EditorPane } from './EditorPane.js';
 import { EmptyState } from './EmptyState.js';
+import { GroupBlock } from './GroupBlock.js';
+import { groupBlockId } from './strip-blocks.js';
 import { TabButton } from './TabButton.js';
 import { TabStrip } from './TabStrip.js';
 import { useEditorPanes } from './use-editor-panes.js';
+import { useStripGroups, type TabFace } from './use-strip-groups.js';
+
+/** The real tabs the strip shows: a group's home, and its members
+ *  unless it is collapsed. */
+function shownTabIds(
+  groups: readonly TabGroup[],
+  choices: Readonly<Record<string, boolean>>
+): string[] {
+  return groups.flatMap((g) => {
+    if (!g.chipped || !isCollapsed(g, choices)) return g.tabs.map((t) => t.id);
+    return g.head ? [g.head.id] : [];
+  });
+}
+
+/** What a group is called: its home's tab's label, else its
+ *  affiliation's. */
+function groupLabel(
+  group: TabGroup,
+  faceOf: (t: TabGroup['tabs'][number]) => TabFace
+): string {
+  if (group.head) {
+    const face = faceOf(group.head);
+    return tabPresentation(face.tab, face.item, face.machineLabel).label;
+  }
+  return group.affiliation?.label ?? '';
+}
 
 /**
  * Tab strip + the active tab's pane, and at most one spare.
@@ -60,86 +69,29 @@ export function EditorArea({
   const { repo } = useRepo();
   const tabs = useTabs();
   const closer = useCloseTabs(items);
-  const activity = useSessionActivity(repo.cwd);
-  const terminals = useTerminals();
-  const sessions = useSessions(repo.cwd);
-  const machines = useMachines();
-  const orchestration = useOrchestratorGroups();
-  const showMachines = hasPeerMachines(machines.data ?? []);
-  const terminalRunning = useMemo(
-    () =>
-      new Set(
-        (terminals.data ?? []).filter((t) => t.running).map((t) => t.name)
-      ),
-    [terminals.data]
-  );
-  const index = useMemo(() => indexItems(repo.cwd, items), [repo.cwd, items]);
-  const itemFor = (tab: Tab) => tabItem(tab, index);
+  const index = indexItems(repo.cwd, items);
+  const { groups, faceOf, colorOf } = useStripGroups(items);
+  const [announced, announce] = useState('');
 
-  const sessionNameFor = (tab: Tab): string | undefined => {
-    // A terminal's session is the tab itself.
-    if (tab.kind === 'terminal') return tab.name;
-    const item = itemFor(tab);
-    if (!item) return undefined;
-    // A worktree row is its own session's; its branch may name
-    // another checkout's too.
-    if (item.kind === 'session') return item.session.name;
-    const branch = itemBranch(item);
-    for (const i of items) {
-      const name = itemSessionName(i);
-      if (name && itemBranch(i) === branch) return name;
-    }
-    return undefined;
+  // The row's one Tab stop: the active tab when it shows, else the
+  // first tab showing.
+  const shown = shownTabIds(groups, tabs.collapsed);
+  const tabStopId =
+    tabs.activeId && shown.includes(tabs.activeId) ? tabs.activeId : shown[0];
+
+  const activeGroup = groupOf(groups, tabs.activeId);
+  const others = groups.filter((g) => g.chipped && g !== activeGroup);
+  const canCollapseOthers =
+    others.some((g) => !isCollapsed(g, tabs.collapsed)) ||
+    (!!activeGroup && isCollapsed(activeGroup, tabs.collapsed));
+  const collapseOthers = () => {
+    tabs.setCollapsed(
+      others.map((g) => g.key),
+      true
+    );
+    if (activeGroup?.chipped) tabs.setCollapsed([activeGroup.key], false);
+    announce(activeGroup ? 'Other groups collapsed' : 'Groups collapsed');
   };
-
-  // The tab title's machine prefix (ux-machines.md §6) — D8-gated on
-  // whether a peer is registered at all, on top of resolveMachineLabel
-  // already returning null for a local session.
-  const machineLabelFor = (tab: Tab): string | null => {
-    if (!showMachines) return null;
-    const name = sessionNameFor(tab);
-    if (!name) return null;
-    const machineId =
-      tab.kind === 'terminal'
-        ? terminals.data?.find((t) => t.name === name)?.machine
-        : sessions.data?.find((s) => s.name === name)?.machine;
-    return resolveMachineLabel(machineId, machines.data);
-  };
-
-  // Each repository's colour; a tab with no repository has none.
-  const repoColors = useRepoColors();
-  const colorOf = (tab: Tab): string | null => {
-    const r = tabRepo(tab);
-    return (r && repoColors.get(r)) ?? null;
-  };
-
-  // What a tab's button shows, whether it stands in the strip or as a
-  // row under its orchestrator's tab.
-  const faceOf = (tab: Tab) => {
-    const sessionName = sessionNameFor(tab);
-    return {
-      tab,
-      item: itemFor(tab),
-      snapshot: sessionName ? activity.data?.[sessionName] : undefined,
-      foreignRepo: foreignRepoOf(tab, repo.cwd),
-      running: tab.kind === 'terminal' && terminalRunning.has(tab.name),
-      machineLabel: machineLabelFor(tab),
-      repoColor: colorOf(tab),
-      unseen: tabs.unseen.includes(tab.id),
-    };
-  };
-
-  // Orchestra's players stand under their orchestrator's tab.
-  const grouping = orchestration.data
-    ? orchestratorTabs(tabs.tabs, orchestration.data, sessionNameFor)
-    : NO_ORCHESTRATOR_TABS;
-  const strip = stripTabs(tabs.tabs, grouping);
-  const { tabStopId } = stripSelection(strip, grouping, tabs.activeId);
-  // Positional keyboard switching walks the order the strip shows.
-  const presented = presentedOrder(tabs.tabs, grouping).join('\n');
-  useEffect(() => {
-    notePresentedOrder(presented ? presented.split('\n') : []);
-  }, [presented]);
 
   // No blanket overlay while a pane mounts: the virtualized diff and
   // the rail each show their own skeletons, and the terminal renders
@@ -159,24 +111,43 @@ export function EditorArea({
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-background">
-      <TabStrip ids={strip.map((t) => t.id)}>
-        {strip.map((tab) => {
-          const players = grouping.players.get(tab.id)?.map((player) => ({
-            ...faceOf(player),
-            active: player.id === tabs.activeId,
-          }));
-          return (
-            <TabButton
-              key={tab.id}
-              {...faceOf(tab)}
-              active={tab.id === tabs.activeId}
+      <TabStrip blockIds={groups.map(groupBlockId)}>
+        {groups.map((group, at) =>
+          group.chipped ? (
+            <GroupBlock
+              key={groupBlockId(group)}
+              group={group}
+              index={at}
+              label={groupLabel(group, faceOf)}
+              faceOf={faceOf}
+              color={colorOf(group)}
+              collapsed={isCollapsed(group, tabs.collapsed)}
               closer={closer}
-              tabStop={tab.id === tabStopId}
-              players={players}
+              tabStopId={tabStopId}
+              menu={{
+                canCollapseOthers,
+                collapseOthers,
+                setCollapsed: (collapsed) =>
+                  tabs.setCollapsed([group.key], collapsed),
+              }}
             />
-          );
-        })}
+          ) : (
+            group.tabs.map((tab) => (
+              <TabButton
+                key={groupBlockId(group)}
+                face={faceOf(tab)}
+                data={{ kind: 'block', ids: [tab.id], index: at }}
+                active={tab.id === tabs.activeId}
+                closer={closer}
+                tabStop={tab.id === tabStopId}
+              />
+            ))
+          )
+        )}
       </TabStrip>
+      <div aria-live="polite" className="sr-only">
+        {announced}
+      </div>
       <div className="relative min-h-0 flex-1" data-editor-panes>
         {/* Another repository's tab renders against that repository
             (EditorPane), so it can be held ready like any other. */}

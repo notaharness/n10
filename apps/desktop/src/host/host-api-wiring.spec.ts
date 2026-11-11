@@ -116,9 +116,6 @@ vi.mock('./services/branch-sessions.js', () =>
 vi.mock('./services/foreign-sessions.js', () =>
   recorder('foreignSessions', ['listForeignSessions'])
 );
-vi.mock('./services/orchestrators.js', () =>
-  recorder('orchestrators', ['listOrchestratorGroups'])
-);
 vi.mock('./services/comment-images.js', () =>
   recorder('commentImages', ['fetchCommentImage'])
 );
@@ -335,7 +332,6 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ],
   ['listSessions', ['/repo'], 'sessions.listSessions'],
   ['listForeignSessions', [], 'foreignSessions.listForeignSessions'],
-  ['listOrchestratorGroups', [], 'orchestrators.listOrchestratorGroups'],
   ['getSessionActivity', [], 'sessions.getSessionActivity'],
   ['writeSession', ['b', 'ls\n'], 'sessions.writeSession'],
   ['resizeSession', ['b', 120, 40], 'sessions.resizeSession'],

@@ -1,14 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContextMenuItem } from '../../../host/contract.js';
 import { terminalTabId, type Tab } from '../../lib/tabs/tab-identity.js';
-import type { PlayerRow } from './OrchestratorPlayers.js';
-import { runTabMenu } from './tab-menu.js';
+import { runGroupMenu, runTabMenu, type GroupMenu } from './tab-menu.js';
 
 /**
- * An orchestrator tab's context menu is the keyboard's way to its
- * players, which its hover card shows only to a pointer: a "Players"
- * heading, one item per player tab, choosing one activates it. Close
- * Others keeps them.
+ * A grouped tab's native menu offers its group's actions below its own;
+ * a chip with no tab of its own offers the group's alone. Close Others
+ * closes every other tab, its group's included.
  */
 
 const terminal = (name: string): Tab => ({
@@ -22,38 +20,33 @@ const terminal = (name: string): Tab => ({
   preview: false,
   listed: true,
 });
-const row = (tab: Tab): PlayerRow => ({
-  tab,
-  item: undefined,
-  snapshot: undefined,
-  running: true,
-  foreignRepo: null,
-  machineLabel: null,
-  repoColor: null,
-  active: false,
-  unseen: false,
-});
 
-const orch = terminal('orch');
-const first = terminal('first-player');
-const second = terminal('second-player');
+const home = terminal('orch');
+const player = terminal('player');
 
 let shown: ContextMenuItem[] = [];
 let choose: string | null = null;
 const tabs = {
-  tabs: [orch, first, second],
+  tabs: [home, player],
   activate: vi.fn(),
   pin: vi.fn(),
 };
 const closer = { close: vi.fn(), closeOthers: vi.fn(), closeAll: vi.fn() };
+const group = (collapsed = false, canCollapseOthers = true): GroupMenu => ({
+  collapsed,
+  canCollapseOthers,
+  showTabs: vi.fn(),
+  setCollapsed: vi.fn(),
+  collapseOthers: vi.fn(),
+});
 
-function menu(players: PlayerRow[] = []) {
+function menu(g?: GroupMenu) {
   return runTabMenu(
-    orch,
+    home,
     tabs as unknown as Parameters<typeof runTabMenu>[1],
     closer as unknown as Parameters<typeof runTabMenu>[2],
     'wrap',
-    players
+    g
   );
 }
 
@@ -76,34 +69,57 @@ afterEach(() => {
 
 const labels = () => shown.flatMap((i) => ('label' in i ? [i.label] : []));
 
-describe('an orchestrator tab’s menu', () => {
-  it('lists its players under a heading, and choosing one activates it', async () => {
-    choose = `player:${second.id}`;
-    await menu([row(first), row(second)]);
-    const at = labels().indexOf('Players');
-    expect(at).toBeGreaterThan(-1);
-    expect(shown.find((i) => 'label' in i && i.label === 'Players')).toEqual(
-      expect.objectContaining({ enabled: false })
-    );
-    expect(labels().slice(at + 1, at + 3)).toEqual([
-      '~/first-player',
-      '~/second-player',
+describe('a grouped tab’s menu', () => {
+  it('offers its group’s actions after its own', async () => {
+    await menu(group());
+    expect(labels().slice(0, 3)).toEqual([
+      'Close',
+      'Close Others',
+      'Close All',
     ]);
-    expect(tabs.activate).toHaveBeenCalledWith(second.id);
+    expect(labels()).toEqual(
+      expect.arrayContaining(['Show tabs', 'Collapse group', 'Collapse others'])
+    );
+  });
+
+  it('offers Expand group on a collapsed group, and runs it', async () => {
+    const g = group(true);
+    choose = 'group-expand';
+    await menu(g);
+    expect(labels()).toContain('Expand group');
+    expect(g.setCollapsed).toHaveBeenCalledWith(false);
     expect(closer.close).not.toHaveBeenCalled();
   });
 
-  it('has no Players heading without players', async () => {
-    await menu();
-    expect(labels()).not.toContain('Players');
+  it('disables Collapse others when no other group would change', async () => {
+    await menu(group(false, false));
+    expect(
+      shown.find((i) => 'label' in i && i.label === 'Collapse others')
+    ).toEqual(expect.objectContaining({ enabled: false }));
   });
 
-  it('Close Others keeps its own players', async () => {
+  it('has no group actions without a group', async () => {
+    await menu();
+    expect(labels()).not.toContain('Show tabs');
+  });
+
+  it('closes every other tab on Close Others', async () => {
     choose = 'close-others';
-    await menu([row(first), row(second)]);
-    expect(closer.closeOthers).toHaveBeenCalledWith(orch.id, [
-      first.id,
-      second.id,
+    await menu(group());
+    expect(closer.closeOthers).toHaveBeenCalledWith(home.id);
+  });
+});
+
+describe('a chip’s own menu', () => {
+  it('offers only the group’s actions, and Show tabs opens the roster', async () => {
+    const g = group();
+    choose = 'group-show';
+    await runGroupMenu(g);
+    expect(labels()).toEqual([
+      'Show tabs',
+      'Collapse group',
+      'Collapse others',
     ]);
+    expect(g.showTabs).toHaveBeenCalled();
   });
 });

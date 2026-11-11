@@ -135,9 +135,15 @@ const action: fc.Arbitrary<TabsAction> = fc.oneof(
   // protects.
   fc.record({
     type: fc.constant('move' as const),
-    id: fc.constantFrom(...IDS),
+    ids: fc.subarray([...IDS], { minLength: 1 }),
     targetId: fc.constantFrom(...IDS),
     side: fc.constantFrom<'before' | 'after'>('before', 'after'),
+  }),
+  // Collapsing is presentation: it never touches a tab.
+  fc.record({
+    type: fc.constant('set-collapsed' as const),
+    keys: fc.subarray(['place:/repos/alpha', 'claude:x']),
+    collapsed: fc.boolean(),
   }),
   // The interesting one: the sidebar re-keying items underneath, and
   // agents coming and going on them — `sync-items` opens a tab for a

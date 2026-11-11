@@ -10,6 +10,7 @@ import type {
   TerminalLaunchRequest,
   TerminalSummary,
 } from '../contract.js';
+import { affiliations } from './affiliations.js';
 import { ensureRecent } from './recent-repos.js';
 import {
   attachRelay,
@@ -33,6 +34,7 @@ const terminals = createTerminalService({
   ended: (name) => {
     relays.delete(name);
   },
+  affiliations,
 });
 
 function summarize(facts: TerminalFacts, home: string): TerminalSummary {

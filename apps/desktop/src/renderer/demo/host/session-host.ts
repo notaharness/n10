@@ -27,7 +27,6 @@ type SessionHost = Pick<
   | 'checkoutPlan'
   | 'listSessions'
   | 'listForeignSessions'
-  | 'listOrchestratorGroups'
   | 'getSessionActivity'
   | 'watchSession'
   | 'unwatchSession'
@@ -199,7 +198,6 @@ export function createSessionHost(
             sessionName: s.name,
           }))
       ),
-    listOrchestratorGroups: () => later([]),
     getSessionActivity: () =>
       later(Object.fromEntries(hub.all().map((s) => [s.name, s.activity()]))),
     // The demo pushes every session's output to the page and lets the

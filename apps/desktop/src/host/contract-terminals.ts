@@ -6,6 +6,8 @@
  * file is a catalogue already.
  */
 
+import type { Affiliation } from '@n10/core';
+
 export type TerminalKind = 'shell' | 'agent';
 
 export interface TerminalLaunchRequest {
@@ -61,6 +63,9 @@ export interface TerminalSummary {
   /** Local client health, independent of `running` (decisions.md D4).
    *  Absent for a local terminal. */
   connectionState?: 'connected' | 'reconnecting' | 'failed';
+  /** What it belongs to (its parent, else its place), once discovery
+   *  has listed it. */
+  affiliation?: Affiliation;
 }
 
 /** A shell in a branch's checkout on one machine — the review sidebar's

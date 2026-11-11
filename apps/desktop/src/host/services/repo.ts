@@ -5,6 +5,7 @@ import {
   type ConfigService,
   type RepositoryHandle,
 } from '@n10/engine';
+import { affiliations } from './affiliations.js';
 import { pullRequests } from './program.js';
 import { PROVIDERS } from './providers.js';
 import {
@@ -26,6 +27,7 @@ import {
 const repositories = createRepositoryService({
   providers: PROVIDERS,
   pullRequests,
+  affiliations,
   // Tests cross the hour a parked repository's data stays warm for.
   ...(Number(process.env.N10_PARKED_TTL_MS) > 0
     ? { parkedTtl: Number(process.env.N10_PARKED_TTL_MS) }
