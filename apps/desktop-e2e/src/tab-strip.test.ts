@@ -150,13 +150,16 @@ test.describe('Tab strip overflow', () => {
     const check = async () => {
       const { rows: ends, right, control } = await layout();
       expect(ends.length).toBeGreaterThan(2);
-      const [first, second] = ends;
+      const [first, ...below] = ends;
       // On the first row, after its last tab.
       expect(Math.round(control.y)).toBe(first![0]);
       expect(first![1]).toBeLessThanOrEqual(control.x + 0.5);
-      // A full row below it runs on under where the button would be.
-      expect(second![1]).toBeGreaterThan(control.x + control.width - 1);
-      expect(second![1]).toBeLessThanOrEqual(right + 0.5);
+      // Every full row below it (all but the last) runs on under where
+      // the button would be, to the strip's edge.
+      for (const [, end] of below.slice(0, -1)) {
+        expect(end).toBeGreaterThan(control.x + control.width - 1);
+        expect(end).toBeLessThanOrEqual(right + 0.5);
+      }
     };
     // Narrow enough for three rows.
     await app.evaluate(({ BrowserWindow }) => {
@@ -177,6 +180,46 @@ test.describe('Tab strip overflow', () => {
       .poll(async () => (await layout()).right)
       .toBeLessThan(before - 100);
     await expect(check).toPass();
+  });
+
+  test('keeps All tabs beside the wrapped tablist, in sight while its rows scroll', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    const control = page.getByRole('button', { name: 'All tabs' });
+    // Not one of the tablist's: a tablist owns tabs.
+    await expect(
+      strip(page).getByRole('button', { name: 'All tabs' })
+    ).toHaveCount(0);
+    // Short enough that the rows hit the strip's height cap and scroll.
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]!;
+      window.setMinimumSize(0, 0);
+      window.setContentSize(700, 260);
+    });
+    await expect
+      .poll(() =>
+        strip(page).evaluate((el) => el.scrollHeight - el.clientHeight)
+      )
+      .toBeGreaterThan(0);
+    await strip(page).evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect
+      .poll(() => strip(page).evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
+    const [track, button] = await Promise.all([box(strip(page)), box(control)]);
+    expect(Math.round(button.y)).toBe(Math.round(track.y));
+    // Left of the track's scrollbar.
+    const scrollbar = await strip(page).evaluate(
+      (el) => (el as HTMLElement).offsetWidth - el.clientWidth
+    );
+    expect(button.x + button.width).toBeLessThanOrEqual(
+      track.x + track.width - scrollbar + 0.5
+    );
+    await expect(control).toBeInViewport();
+    await control.click();
+    await expect(page.getByRole('dialog', { name: 'All tabs' })).toBeVisible();
   });
 
   test('over the room after the last tab, a dragged tab opens the end slot and drops there', async ({

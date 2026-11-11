@@ -194,14 +194,19 @@ export function useSlotStyle(
   const landing = useLanding(pane, id);
   const out = useCarriedOut();
   const still = usePrefersReducedMotion();
-  // Tabs touch on the strip: the slot is as wide as what lands.
+  // Tabs touch on the strip: the slot is as wide as what lands. After
+  // the block ending a wrapped strip's first row, it comes on top of
+  // the room kept there for the strip's actions (`strip-first-row.ts`).
   const room = landing ? `${landing.width}px` : undefined;
+  const roomAfter = landing
+    ? `calc(var(--row-end-reserve, 0px) + ${landing.width}px)`
+    : undefined;
   return (dragging, transform, transition) => ({
     // Carried out, the tab stays in its place: moved with the pointer
     // before the copy is up, it would widen its strip.
     transform: dragging && out ? undefined : transform,
     marginInlineStart: landing?.side === 'before' ? room : undefined,
-    marginInlineEnd: landing?.side === 'after' ? room : undefined,
+    marginInlineEnd: landing?.side === 'after' ? roomAfter : undefined,
     opacity: dragging && out ? 0.4 : undefined,
     transition: still
       ? transition

@@ -80,7 +80,7 @@ export function TabStrip({
       items={blockIds}
       strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
     >
-      <div className="flex min-w-0 shrink-0 border-b border-border bg-tab">
+      <div className="relative flex min-w-0 shrink-0 border-b border-border bg-tab">
         <div
           ref={track}
           role="tablist"
@@ -94,9 +94,9 @@ export function TabStrip({
                 // that the strip scrolls and the pane keeps some content.
                 // The last row's rule sits in the track's bottom pixel,
                 // laid over the strip's own, so one row never scrolls.
-                // The actions sit at the first row's end, which keeps
+                // The actions sit over the first row's end, which keeps
                 // their width clear (`strip-first-row.ts`).
-                'relative -mb-px max-h-[min(calc(10*2.25rem+1px),70cqh)] flex-wrap overflow-y-auto pb-px [scrollbar-width:thin] [&>*]:-mb-px [&>*]:border-b [&>*]:border-border [&>[data-first-row-end]]:me-[var(--strip-reserve)] data-[measuring]:[&>*]:!grow-0'
+                'relative -mb-px max-h-[min(calc(10*2.25rem+1px),70cqh)] flex-wrap overflow-y-auto pb-px [scrollbar-width:thin] [&>*]:-mb-px [&>*]:border-b [&>*]:border-border [&>[data-first-row-end]]:me-[var(--row-end-reserve)] [&>[data-first-row-end]]:[--row-end-reserve:var(--strip-reserve)] data-[measuring]:[&>*]:!grow-0'
               : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           )}
           onScroll={update}
@@ -108,16 +108,18 @@ export function TabStrip({
         >
           {children}
           <StripEnd />
-          {wrap && (
-            <div
-              ref={actions}
-              data-strip-actions
-              className="absolute top-0 right-0 flex h-9"
-            >
-              {controls}
-            </div>
-          )}
         </div>
+        {/* Wrapped, beside the tablist and not in it: no tab of it, and
+            in sight while its rows scroll. */}
+        {wrap && (
+          <div
+            ref={actions}
+            data-strip-actions
+            className="absolute top-0 right-0 flex h-9 bg-tab"
+          >
+            {controls}
+          </div>
+        )}
         {!wrap && edges.overflow && (
           <StripScrollArrows
             left={edges.left}
