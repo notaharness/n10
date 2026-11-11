@@ -112,8 +112,12 @@ test.describe('Tab groups', () => {
     await expect(countOf(page, CLAUDE)).toHaveText('3', { timeout: 30_000 });
     const home = chipOf(page, CLAUDE).getByRole('tab');
     await expect(home).toHaveText(new RegExp(basename(folder)));
-    // Players are ordinary visible tabs, right behind their chip.
+    // A parent's group starts collapsed: its players wait behind the
+    // chip, and expand into ordinary tabs right behind it.
     const members = group(page, CLAUDE).getByRole('tab');
+    await expect(members).toHaveCount(1);
+    await expect(tab(page, new RegExp(first))).toHaveCount(0);
+    await chipOf(page, CLAUDE).locator('[data-group-disclosure]').click();
     await expect(members).toHaveCount(3);
     await expect(tab(page, new RegExp(first))).toBeVisible();
     await expect(tab(page, new RegExp(second))).toBeVisible();
@@ -206,13 +210,18 @@ test.describe('Tab groups', () => {
     markOrchestrator(homeDir);
     await expect(countOf(page, CLAUDE)).toHaveText('3', { timeout: 30_000 });
 
+    // The chip's one icon is the disclosure: a closed folder while its
+    // players wait behind it, open once they show.
+    const disclosure = chipOf(page, CLAUDE).locator('[data-group-disclosure]');
+    await expect(disclosure).toHaveAccessibleName(/^Expand /);
+    await expect(disclosure.locator('svg.lucide-folder-closed')).toBeVisible();
+    await disclosure.click();
+    await expect(disclosure).toHaveAccessibleName(/^Collapse /);
+    await expect(disclosure.locator('svg.lucide-folder-open')).toBeVisible();
+
     // Collapsing keeps what is on screen, the count and the home.
     await tab(page, new RegExp(first)).click();
     await expect(shownTerminal(page)).toContainText(ready(first));
-    // The chip's one icon is the disclosure: an open folder, then closed.
-    const disclosure = chipOf(page, CLAUDE).locator('[data-group-disclosure]');
-    await expect(disclosure).toHaveAccessibleName(/^Collapse /);
-    await expect(disclosure.locator('svg.lucide-folder-open')).toBeVisible();
     await disclosure.click();
     await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
     await expect(disclosure).toHaveAccessibleName(/^Expand /);

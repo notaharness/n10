@@ -842,7 +842,8 @@ focus to its button and keeps hover from reopening it until the pointer
 leaves.
 
 Collapse is in `TabsState.collapsed`, an explicit choice per group over one
-rule by affiliation kind (`initiallyCollapsed`; every group starts expanded),
+rule by affiliation kind (`initiallyCollapsed`: a parent group starts
+collapsed, its players behind the chip, and a place group expanded),
 kept for the run. A collapsed group shows its chip alone; activating a tab in
 it from anywhere expands it, while collapsing the group the active tab is in
 leaves the active content as it is. Collapse others is on the native menus.

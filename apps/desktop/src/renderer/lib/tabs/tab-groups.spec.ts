@@ -139,9 +139,17 @@ describe('collapse', () => {
     ['a1', place('/a')],
     ['a2', place('/a')],
   ]);
-  it('starts every group expanded', () => {
-    expect(initiallyCollapsed(parent('codex:x'))).toBe(false);
+  it('starts a parent group collapsed and a place group expanded', () => {
+    expect(initiallyCollapsed(parent('codex:x'))).toBe(true);
+    expect(initiallyCollapsed(place('/a'))).toBe(false);
+    expect(initiallyCollapsed(null)).toBe(false);
     expect(isCollapsed(group!, {})).toBe(false);
+    const [players] = strip([
+      ['p1', parent('codex:x')],
+      ['p2', parent('codex:x')],
+    ]);
+    expect(isCollapsed(players!, {})).toBe(true);
+    expect(isCollapsed(players!, { 'codex:x': false })).toBe(false);
   });
   it('follows the user’s choice for a chipped group only', () => {
     expect(isCollapsed(group!, { 'place:/a': true })).toBe(true);

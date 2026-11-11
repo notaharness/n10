@@ -128,7 +128,8 @@ export function present(
 /** Whether a group the user has not collapsed or expanded starts
  *  collapsed, by what it belongs to. */
 const STARTS_COLLAPSED: Record<Affiliation['kind'], boolean> = {
-  parent: false,
+  // Players wait behind their parent's chip until asked for.
+  parent: true,
   place: false,
 };
 
