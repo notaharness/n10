@@ -123,8 +123,8 @@ export function GroupRoster({
         escaped.current = false;
       }}
       onFocusOutside={(e) => {
-        // A press on a chip in another pane focuses that pane, and its
-        // terminal takes focus as the roster opens: no reason to close.
+        // A terminal taking focus in an editor pane (the chip's pane
+        // focused as the roster opens) is no reason to close.
         const target = e.target as Element | null;
         if (target?.closest?.('[data-editor-panes]')) e.preventDefault();
       }}
