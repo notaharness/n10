@@ -121,7 +121,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     const r = tabRepo(tab);
     return (r && repoColors.get(r)) ?? null;
   };
-  const groups = present(tabs.tabs, factsOf, tabs.pinned);
+  const groups = present(tabs.tabs, factsOf, tabs.pinned, !tabs.arranged);
   const taskOf = (tab: Tab): string | undefined => {
     if (tab.kind === 'terminal' && tab.terminalKind === 'shell')
       return undefined;

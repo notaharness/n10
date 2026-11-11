@@ -449,3 +449,36 @@ describe('an older file’s collapse choices', () => {
     expect(toSaved(ws)).not.toHaveProperty('collapsed');
   });
 });
+
+describe('a pane arranged by hand', () => {
+  const two = () => run(open('branch:a'), open('branch:b'));
+
+  it('is marked by an arrangement that changes its order, and saved', () => {
+    const ws = then(two(), {
+      type: 'arrange',
+      ids: [id('branch:b'), id('branch:a')],
+    });
+    expect(ws.arranged).toEqual([focusedPaneOf(ws).id]);
+    expect(view(ws).arranged).toBe(true);
+    expect(restoreWorkspace(toSaved(ws)).arranged).toEqual(ws.arranged);
+  });
+
+  it('is not marked by an arrangement that keeps the order', () => {
+    const ws = then(two(), {
+      type: 'arrange',
+      ids: [id('branch:a'), id('branch:b')],
+    });
+    expect(ws.arranged).toEqual([]);
+  });
+
+  it('stays marked through a sync, and a saved pane that is gone is dropped', () => {
+    const ws = then(
+      two(),
+      { type: 'arrange', ids: [id('branch:b'), id('branch:a')] },
+      sync([live])
+    );
+    expect(ws.arranged).toEqual([focusedPaneOf(ws).id]);
+    const saved = { ...toSaved(ws), arranged: ['pane-gone', ...ws.arranged] };
+    expect(restoreWorkspace(saved).arranged).toEqual(ws.arranged);
+  });
+});

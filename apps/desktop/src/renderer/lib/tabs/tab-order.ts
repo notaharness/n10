@@ -18,7 +18,9 @@ export function focusRepo(state: Strip, repo: string): Strip {
 
 /**
  * What the user does to tabs and groups short of opening and closing
- * them: moving, keeping a preview, pinning, collapsing and naming.
+ * them: moving, keeping a preview, pinning and naming. An arrangement
+ * (a drop among the strip's blocks or a group's rows) marks the pane
+ * `arranged`: its order is the user's now.
  */
 
 /**
@@ -57,7 +59,7 @@ export function arrangeTabs(state: Strip, ids: readonly string[]): Strip {
     .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
   const tabs = [...placed, ...state.tabs.filter((t) => !rank.has(t.id))];
   if (tabs.every((t, i) => t === state.tabs[i])) return state;
-  return { ...state, tabs };
+  return { ...state, tabs, arranged: true };
 }
 
 /** End `id`'s preview. Unchanged state when it is no preview. */

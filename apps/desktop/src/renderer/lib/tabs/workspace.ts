@@ -52,6 +52,10 @@ export interface Workspace {
   dismissed: readonly string[];
   /** What the user renamed a group to, by affiliation key. */
   groupNames: Readonly<Record<string, string>>;
+  /** Panes whose order the user set by hand, dragging a tab or group
+   *  there. Until then a pane presents its orchestrators' groups first
+   *  (`present`); after, the order stands as the user left it. */
+  arranged: readonly PaneId[];
   /** Tabs opened in the background — an agent that started outside
    *  the app while the user was looking at something else — and not
    *  activated since. The strip marks them until they are first seen.
@@ -96,6 +100,7 @@ export const EMPTY_WORKSPACE: Workspace = {
   pinned: [],
   dismissed: [],
   groupNames: {},
+  arranged: [],
   unseen: [],
   lastActiveByRepo: {},
   follows: {},
@@ -121,10 +126,12 @@ export function paneOf(ws: Workspace, id: string): PaneNode | undefined {
  */
 export type Strip = Omit<
   Workspace,
-  'tabs' | 'layout' | 'focusedPane' | 'follows' | 'labelState'
+  'tabs' | 'layout' | 'focusedPane' | 'follows' | 'labelState' | 'arranged'
 > & {
   tabs: Tab[];
   activeId: string | null;
+  /** The user set this pane's order by hand (`Workspace.arranged`). */
+  arranged?: boolean;
   /** The tabs in the other panes, read only: an open must not take an
    *  id one of them already has. */
   others?: readonly Tab[];
@@ -144,6 +151,7 @@ export function stripOf(ws: Workspace, paneId: PaneId): Strip {
     groupNames: ws.groupNames,
     unseen: ws.unseen,
     lastActiveByRepo: ws.lastActiveByRepo,
+    arranged: ws.arranged.includes(paneId),
     openedIds: labels?.openedIds ?? [],
     collisionOrdinals: labels?.collisionOrdinals ?? {},
     chipOrdinals: labels?.chipOrdinals ?? {},
@@ -172,6 +180,7 @@ export function withStrip(
     openedIds,
     collisionOrdinals,
     chipOrdinals,
+    arranged,
     ...marks
   } = strip;
   const rest = { ...marks };
@@ -195,6 +204,7 @@ export function withStrip(
       },
     },
     pinned: pinned.length === rest.pinned.length ? rest.pinned : pinned,
+    arranged: withArranged(ws.arranged, paneId, arranged ?? false),
     tabs,
     layout: replacePane(ws.layout, paneId, {
       kind: 'pane',
@@ -203,4 +213,15 @@ export function withStrip(
       activeId,
     }),
   };
+}
+
+/** `arranged` with pane `paneId` in or out of it, the same array when
+ *  that changes nothing. */
+export function withArranged(
+  arranged: readonly PaneId[],
+  paneId: PaneId,
+  on: boolean
+): readonly PaneId[] {
+  if (arranged.includes(paneId) === on) return arranged;
+  return on ? [...arranged, paneId] : arranged.filter((id) => id !== paneId);
 }

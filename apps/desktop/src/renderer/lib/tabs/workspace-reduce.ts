@@ -299,7 +299,6 @@ function distribute(
   return {
     ...ws,
     pinned: pinned.length === after.pinned.length ? after.pinned : pinned,
-    collapsed: after.collapsed,
     dismissed: after.dismissed,
     groupNames: after.groupNames,
     unseen: after.unseen,

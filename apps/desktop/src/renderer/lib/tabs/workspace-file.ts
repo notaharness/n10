@@ -72,6 +72,9 @@ export function toSaved(ws: Workspace): SavedWorkspace {
     pinned: ws.pinned.filter((id) => has(tabs, id)),
     dismissed: ws.dismissed,
     groupNames: ws.groupNames,
+    arranged: ws.arranged.filter((id) =>
+      panesOf(ws.layout).some((p) => p.id === id)
+    ),
     lastActiveByRepo: ws.lastActiveByRepo,
   };
 }
@@ -274,6 +277,7 @@ export function restoreWorkspace(
     pinned: strings(saved.pinned, (id) => has(tabs, id)),
     dismissed: strings(saved.dismissed),
     groupNames: recordOf(saved.groupNames, str),
+    arranged: strings(saved.arranged, (id) => panes.some((p) => p.id === id)),
     lastActiveByRepo: recordOf(saved.lastActiveByRepo, str),
   };
 }

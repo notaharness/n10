@@ -29,8 +29,9 @@ export interface TabGroup {
   head: Tab | null;
   /** Every member, the head first, the rest in their strip order. */
   tabs: Tab[];
-  /** Shown as one chip whose roster lists its tabs: every parent group,
-   *  and a place group of more than one tab. */
+  /** Shown as one chip whose roster lists its tabs: a group of more
+   *  than one tab, a parent's or a place's. A group of one shows as its
+   *  tab. */
   chipped: boolean;
   /** On a group shown right after the parent group its home reports to
    *  (`Affiliation.follows`): that group's key. It moves with it. */
@@ -64,7 +65,9 @@ function headOf(group: Tab[], facts: (tab: Tab) => TabFacts, a: Affiliation) {
 /**
  * Groups whose head reports to another parent come right after that
  * parent's group, in their own first-tab order; groups do not nest. A
- * cycle of parents is broken at its member that comes first.
+ * cycle of parents is broken at its member that comes first. Only a
+ * chip follows a chip: a group of one tab stands as that tab, placed by
+ * its own order like any other.
  */
 function orderFollowers(groups: TabGroup[]): TabGroup[] {
   const byKey = new Map(groups.map((g) => [g.key, g]));
@@ -72,7 +75,8 @@ function orderFollowers(groups: TabGroup[]): TabGroup[] {
   const parentOf = (g: TabGroup): TabGroup | undefined => {
     const follows =
       g.affiliation?.kind === 'parent' ? g.affiliation.follows : undefined;
-    return follows ? byKey.get(follows) : undefined;
+    const parent = follows ? byKey.get(follows) : undefined;
+    return g.chipped && parent?.chipped ? parent : undefined;
   };
   const children = new Map<TabGroup, TabGroup[]>();
   for (const g of groups) {
@@ -121,10 +125,17 @@ function pinnedGroup(tab: Tab, facts: (tab: Tab) => TabFacts): TabGroup {
   };
 }
 
+/**
+ * The pane's groups, pinned tabs first. `orchestratorsFirst`: a pane
+ * whose order the user has not set by hand (`Workspace.arranged`) shows
+ * the groups an orchestrator heads before the rest, each side in its
+ * first-tab order, so n10 opening tabs on its own leads with them.
+ */
 export function present(
   tabs: readonly Tab[],
   facts: (tab: Tab) => TabFacts,
-  pinned: readonly string[] = []
+  pinned: readonly string[] = [],
+  orchestratorsFirst = false
 ): TabGroup[] {
   const pins = new Set(pinned);
   const members = new Map<
@@ -146,15 +157,16 @@ export function present(
       affiliation,
       head,
       tabs: head ? [head, ...list.filter((t) => t !== head)] : list,
-      chipped:
-        affiliation?.kind === 'parent' ||
-        (affiliation?.kind === 'place' && list.length > 1),
+      chipped: affiliation !== null && list.length > 1,
     };
   });
   const pinnedFirst = tabs
     .filter((t) => pins.has(t.id))
     .map((t) => pinnedGroup(t, facts));
-  return [...pinnedFirst, ...orderFollowers(groups)];
+  const ordered = orchestratorsFirst
+    ? [...groups.filter((g) => g.head), ...groups.filter((g) => !g.head)]
+    : groups;
+  return [...pinnedFirst, ...orderFollowers(ordered)];
 }
 
 /** What a group is called: the user's name for it, else `derived`. */
