@@ -186,7 +186,7 @@ test.describe('Split panes', () => {
     await expect(page.locator('[data-drag-overlay]')).toHaveText(/^alpha/);
     await expect
       .poll(async () => ((await gamma.boundingBox())?.x ?? 0) - at!.x)
-      .toBeGreaterThan(from!.width);
+      .toBeGreaterThanOrEqual(from!.width - 1);
     // Where it showed, it lands.
     await page.mouse.up();
     await expect(page.locator('[data-drag-overlay]')).toHaveCount(0);

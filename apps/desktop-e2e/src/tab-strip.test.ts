@@ -123,26 +123,60 @@ test.describe('Tab strip overflow', () => {
       .toEqual([order.at(-1), ...order.slice(0, -1)]);
   });
 
-  test('wrapped rows stay inside the fixed control rail', async ({
+  test('keeps All tabs at the first row’s end, and later rows run to the strip’s edge, across a resize', async ({
     desktop,
   }) => {
-    const { page } = desktop;
-    const edges = await tabs(page).evaluateAll((els) =>
-      els.map((el) => {
-        const r = el.getBoundingClientRect();
-        return { top: Math.round(r.top), right: r.right };
-      })
-    );
-    const ends = new Map<number, number>();
-    for (const e of edges) ends.set(e.top, e.right);
-    const stripBox = await box(strip(page));
-    const stripRight = stripBox.x + stripBox.width;
-    const control = await box(page.getByRole('button', { name: 'All tabs' }));
-    expect(control.x).toBeGreaterThanOrEqual(stripRight);
-    const rowEnds = [...ends.values()];
-    expect(rowEnds.length).toBeGreaterThan(1);
-    for (const end of rowEnds) expect(end).toBeLessThanOrEqual(stripRight);
-    expect(rowEnds.at(-1)).toBeLessThan(stripRight - 40);
+    const { page, app } = desktop;
+    /** Each row's top and right end, the All tabs button's box and the
+     *  strip's right edge. */
+    const layout = async () => {
+      const edges = await tabs(page).evaluateAll((els) =>
+        els.map((el) => {
+          const r = el.getBoundingClientRect();
+          return { top: Math.round(r.top), right: r.right };
+        })
+      );
+      const ends = new Map<number, number>();
+      for (const e of edges)
+        ends.set(e.top, Math.max(ends.get(e.top) ?? 0, e.right));
+      const stripBox = await box(strip(page));
+      const control = await box(page.getByRole('button', { name: 'All tabs' }));
+      return {
+        rows: [...ends.entries()].sort(([a], [b]) => a - b),
+        right: stripBox.x + stripBox.width,
+        control,
+      };
+    };
+    const check = async () => {
+      const { rows: ends, right, control } = await layout();
+      expect(ends.length).toBeGreaterThan(2);
+      const [first, second] = ends;
+      // On the first row, after its last tab.
+      expect(Math.round(control.y)).toBe(first![0]);
+      expect(first![1]).toBeLessThanOrEqual(control.x + 0.5);
+      // A full row below it runs on under where the button would be.
+      expect(second![1]).toBeGreaterThan(control.x + control.width - 1);
+      expect(second![1]).toBeLessThanOrEqual(right + 0.5);
+    };
+    // Narrow enough for three rows.
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]!;
+      window.setMinimumSize(0, 0);
+      window.setContentSize(1000, 700);
+    });
+    await expect(check).toPass();
+    // Narrower: the rows break elsewhere, and the button keeps to the
+    // first one's end.
+    const before = (await layout()).right;
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]!;
+      const [w, h] = window.getContentSize();
+      window.setContentSize(w! - 157, h!);
+    });
+    await expect
+      .poll(async () => (await layout()).right)
+      .toBeLessThan(before - 100);
+    await expect(check).toPass();
   });
 
   test('over the room after the last tab, a dragged tab opens the end slot and drops there', async ({
