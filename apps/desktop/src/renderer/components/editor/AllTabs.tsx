@@ -4,7 +4,8 @@ import type { TabGroup } from '../../lib/tabs/tab-groups.js';
 import type { Tab } from '../../lib/tabs/tabs.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover.js';
 import { ScrollArea } from '../ui/scroll-area.js';
-import { RosterRow, walkRows } from './GroupRoster.js';
+import { RosterRow } from './GroupRoster.js';
+import { walkRows } from './roster-keys.js';
 import type { TabFace } from './use-strip-groups.js';
 
 export function AllTabs({

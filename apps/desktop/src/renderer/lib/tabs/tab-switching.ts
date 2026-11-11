@@ -140,10 +140,9 @@ function runAuxiliaryAction(e: KeyEvent, action: DesktopActionId): boolean {
     action !== 'desktop.groups.collapse-others'
   )
     return false;
-  if (!e.repeat && runStripCommand(action)) {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-  }
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (!e.repeat) runStripCommand(action);
   return true;
 }
 

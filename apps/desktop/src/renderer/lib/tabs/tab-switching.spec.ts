@@ -8,6 +8,7 @@ import {
   resetTabMru,
   type TabSwitchingDeps,
 } from './tab-switching.js';
+import { setStripCommands } from './strip-commands.js';
 
 /** Stands in for the window, and for a focused element inside or
  *  outside a dialog (the listener reads `closest`). */
@@ -92,9 +93,38 @@ beforeEach(() => {
   stop = listenForTabSwitching(target, strip.deps);
 });
 
-afterEach(() => stop());
+afterEach(() => {
+  stop();
+  setStripCommands(null);
+});
 
 describe('keyboard tab switching', () => {
+  it.each([
+    ['desktop.tabs.attention', 'A'],
+    ['desktop.groups.collapse-others', 'J'],
+  ] as const)(
+    '%s consumes repeat events without running twice',
+    (action, key) => {
+      strip.bindings = {
+        ...strip.bindings,
+        [action]: [{ ctrl: true, input: key }],
+      };
+      let commands = 0;
+      let delivered = 0;
+      setStripCommands({
+        attention: () => commands++,
+        collapseOthers: () => commands++,
+      });
+      target.addEventListener('keydown', () => delivered++);
+      const first = press(key, { ctrl: true, shift: true });
+      const repeat = press(key, { ctrl: true, shift: true, repeat: true });
+      expect(first.defaultPrevented).toBe(true);
+      expect(repeat.defaultPrevented).toBe(true);
+      expect(commands).toBe(1);
+      expect(delivered).toBe(0);
+    }
+  );
+
   it('Ctrl+PgDn/PgUp go along the strip and stop the event', () => {
     strip.visit('a');
     const e = press('PageDown', { ctrl: true });

@@ -47,7 +47,7 @@ test.describe('An agent that finishes while you are elsewhere', () => {
     await expect(
       page.getByRole('button', { name: 'All tabs, 1 need attention' })
     ).toBeVisible();
-    await page.keyboard.press('Control+Shift+a');
+    await page.keyboard.press('Control+Shift+A');
     await expect(tab(page, /worker/)).toHaveAttribute('aria-selected', 'true');
     await expect
       .poll(() =>
