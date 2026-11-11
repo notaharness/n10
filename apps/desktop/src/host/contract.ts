@@ -338,12 +338,15 @@ export interface SyncState {
  *  renderer's (`lib/tabs/workspace-file.ts`), checked on restore. */
 export type SavedWorkspace = Readonly<Record<string, unknown>>;
 
-/** What a launch finds: a workspace to restore, none, or a file this
- *  build could not read, moved aside to `path`. */
+/** What a launch finds: a workspace to restore, none, a file this
+ *  build could not read, moved aside to `path`, or a file it could
+ *  neither read nor move. After `unreadable` the host refuses every
+ *  save for the rest of its run, so that file is never overwritten. */
 export type LoadedWorkspace =
   | { status: 'none' }
   | { status: 'restored'; workspace: SavedWorkspace }
-  | { status: 'set-aside'; path: string };
+  | { status: 'set-aside'; path: string }
+  | { status: 'unreadable' };
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 

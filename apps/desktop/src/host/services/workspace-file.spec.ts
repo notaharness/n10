@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -13,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   flushWorkspace,
   loadWorkspace,
+  resetWorkspaceFileForTests,
   saveWorkspace,
   WORKSPACE_VERSION,
 } from './workspace-file.js';
@@ -42,7 +44,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (existsSync(dir())) chmodSync(dir(), 0o755);
   flushWorkspace();
+  resetWorkspaceFileForTests();
   vi.useRealTimers();
   if (originalHome === undefined) delete process.env.HOME;
   else process.env.HOME = originalHome;
@@ -81,6 +85,33 @@ describe('loadWorkspace', () => {
     expect(loaded.status === 'set-aside' && loaded.path).toBe(
       join(dir(), aside)
     );
+  });
+});
+
+describe('a file this run must not overwrite', () => {
+  /** A save is refused, and the file is as it was. */
+  async function refusesSaves(expected: () => void) {
+    await expect(saveWorkspace({ a: 9 })).rejects.toThrow();
+    flushWorkspace();
+    expected();
+  }
+
+  it('is one that exists but cannot be read', async () => {
+    mkdirSync(file(), { recursive: true });
+    expect(loadWorkspace()).toEqual({ status: 'unreadable' });
+    await refusesSaves(() => expect(readdirSync(file())).toEqual([]));
+  });
+
+  it('is an unreadable one that could not be set aside', async () => {
+    write('{ not json');
+    // A directory that cannot be written to: nothing moves out of it.
+    chmodSync(dir(), 0o555);
+    expect(loadWorkspace()).toEqual({ status: 'unreadable' });
+    chmodSync(dir(), 0o755);
+    await refusesSaves(() =>
+      expect(readFileSync(file(), 'utf8')).toBe('{ not json')
+    );
+    expect(asideFiles()).toEqual([]);
   });
 });
 
@@ -124,15 +155,33 @@ describe('saveWorkspace', () => {
     const saved = saveWorkspace({ a: 1 });
     flushWorkspace();
     await saved;
-    // A directory where the temporary file goes makes the write fail.
-    mkdirSync(`${file()}.tmp`);
+    // A directory that cannot be written to makes the write fail.
+    chmodSync(dir(), 0o555);
     const failed = saveWorkspace({ a: 2 });
     flushWorkspace();
     await expect(failed).rejects.toThrow();
-    rmSync(`${file()}.tmp`, { recursive: true });
+    chmodSync(dir(), 0o755);
+    expect(readdirSync(dir())).toEqual(['workspace.json']);
     expect(loadWorkspace()).toEqual({
       status: 'restored',
       workspace: { a: 1 },
+    });
+  });
+
+  it('removes its temporary file when the rename fails', async () => {
+    // A non-empty directory in the file's place: the rename onto it fails.
+    mkdirSync(join(file(), 'x'), { recursive: true });
+    const failed = saveWorkspace({ a: 1 });
+    flushWorkspace();
+    await expect(failed).rejects.toThrow();
+    expect(readdirSync(dir())).toEqual(['workspace.json']);
+  });
+
+  it('writes a save still waiting before a load reads the file', () => {
+    void saveWorkspace({ a: 3 });
+    expect(loadWorkspace()).toEqual({
+      status: 'restored',
+      workspace: { a: 3 },
     });
   });
 });

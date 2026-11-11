@@ -1,9 +1,12 @@
 import {
-  existsSync,
+  closeSync,
+  fsyncSync,
   mkdirSync,
+  openSync,
   readFileSync,
   renameSync,
-  writeFileSync,
+  rmSync,
+  writeSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -16,11 +19,17 @@ import type { LoadedWorkspace, SavedWorkspace } from '../contract.js';
  * and checks every field on restore.
  *
  * Saves are debounced — the renderer sends one on every change that
- * matters — and written whole through a temporary file and a rename, so
- * a crash mid-write leaves the previous file. A file that does not
- * parse, or carries a version this build does not know, is set aside
- * under a dated name rather than overwritten, and the workspace starts
- * empty.
+ * matters — and written whole: to a temporary file of this write's own,
+ * synced, then renamed over the file, so a crash or a power cut
+ * mid-write leaves the previous file, and two instances writing at once
+ * never share a temporary file. Between two running instances the last
+ * writer wins the whole file; there is no lock.
+ *
+ * A file that does not parse, or carries a version this build does not
+ * know, is set aside under a dated name rather than overwritten, and the
+ * workspace starts empty. A file that cannot be read, or set aside,
+ * makes this run read-only: every save is refused, so the file is left
+ * for a person to look at.
  */
 
 export const WORKSPACE_VERSION = 1;
@@ -49,6 +58,9 @@ function readable(raw: string): SavedWorkspace | null {
   }
 }
 
+/** Set once a file was found that this run must not overwrite. */
+let readOnly = false;
+
 /** Move an unreadable file out of the way, keeping it for a person to
  *  look at. Where it went, or `null` if it could not be moved. */
 function setAside(path: string): string | null {
@@ -63,18 +75,30 @@ function setAside(path: string): string | null {
   }
 }
 
-/** The saved workspace, or why there is none to restore. */
+function isMissing(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | null)?.code === 'ENOENT';
+}
+
+/** The saved workspace, or why there is none to restore. A save still
+ *  waiting out its debounce lands first, so a reload reads it. */
 export function loadWorkspace(): LoadedWorkspace {
+  flushWorkspace();
   const path = workspacePath();
   let raw: string;
   try {
     raw = readFileSync(path, 'utf8');
-  } catch {
-    return { status: 'none' };
+  } catch (error) {
+    if (isMissing(error)) return { status: 'none' };
+    console.error('[host] workspace read', error);
+    readOnly = true;
+    return { status: 'unreadable' };
   }
   const workspace = readable(raw);
   if (workspace !== null) return { status: 'restored', workspace };
-  return { status: 'set-aside', path: setAside(path) ?? path };
+  const aside = setAside(path);
+  if (aside !== null) return { status: 'set-aside', path: aside };
+  readOnly = true;
+  return { status: 'unreadable' };
 }
 
 interface Waiter {
@@ -86,13 +110,32 @@ let pending: SavedWorkspace | null = null;
 let waiters: Waiter[] = [];
 let timer: ReturnType<typeof setTimeout> | null = null;
 
+/** Write `contents` to `path` through a synced temporary file of this
+ *  write's own; a failure removes it and leaves `path` as it was. */
+function writeWhole(path: string, contents: string): void {
+  const temp = `${path}.${process.pid}.${Date.now().toString(36)}${Math.random()
+    .toString(36)
+    .slice(2, 8)}.tmp`;
+  try {
+    const fd = openSync(temp, 'wx');
+    try {
+      writeSync(fd, contents);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(temp, path);
+  } catch (error) {
+    rmSync(temp, { force: true });
+    throw error;
+  }
+}
+
 function write(workspace: SavedWorkspace): void {
   const path = workspacePath();
-  const dir = join(path, '..');
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  mkdirSync(join(path, '..'), { recursive: true });
   const file: WorkspaceFile = { version: WORKSPACE_VERSION, workspace };
-  writeFileSync(`${path}.tmp`, JSON.stringify(file), 'utf8');
-  renameSync(`${path}.tmp`, path);
+  writeWhole(path, JSON.stringify(file));
 }
 
 /** Write the latest save now, if one is waiting, and settle every save
@@ -115,12 +158,23 @@ export function flushWorkspace(): void {
 }
 
 /** Save `workspace` shortly; a later save before then replaces it.
- *  Settles once the write it ends up in has landed, or failed. */
+ *  Settles once the write it ends up in has landed, or failed. Refused
+ *  outright in a read-only run. */
 export function saveWorkspace(workspace: SavedWorkspace): Promise<void> {
+  if (readOnly) {
+    return Promise.reject(
+      new Error('The workspace file could not be read; it is left as it is.')
+    );
+  }
   pending = workspace;
   if (timer) clearTimeout(timer);
   timer = setTimeout(flushWorkspace, DEBOUNCE_MS);
   return new Promise((resolve, reject) => {
     waiters.push({ resolve, reject });
   });
+}
+
+/** Tests only: forget a read-only run. */
+export function resetWorkspaceFileForTests(): void {
+  readOnly = false;
 }
