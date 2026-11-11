@@ -248,6 +248,12 @@ test.describe('Split panes', () => {
     await expect(pane(page, 1).locator('[data-terminal-grid]')).toHaveCount(1);
     const keys = pane(page, 1).locator('.xterm-helper-textarea');
     await expect(keys).toBeFocused();
+    // The moved tab mounts a new terminal from the session's snapshot,
+    // and a key pressed while that replay is parsed is dropped
+    // (`replays.ts`): type once its rows are drawn.
+    await expect(
+      pane(page, 1).locator('.xterm-rows').getByText(/\S/).first()
+    ).toBeVisible({ timeout: 15_000 });
     await page.keyboard.type('echo n10-split-$((40+2))\n', { delay: 20 });
     await expect(visibleText(page, 'n10-split-42')).toBeVisible({
       timeout: 15_000,
