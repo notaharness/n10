@@ -207,6 +207,37 @@ export function terminalDismissKey(name: string, created?: number): string {
     : `terminal@${created}:${name}`;
 }
 
+/** The session name inside a key from {@link sessionKey}. */
+export function sessionOfKey(key: string): string {
+  const length = /^(\d+):/.exec(key);
+  if (!length) return key;
+  return key.slice(length[0].length + Number(length[1]) + 1);
+}
+
+/** The session name inside a key from {@link terminalDismissKey}. */
+export function terminalOfKey(key: string): string {
+  return key.slice(key.indexOf(':') + 1);
+}
+
+/**
+ * The machine a registry name says its session runs on: the optional
+ * trailing segment of its tuple (`@n10/core`'s `session-key.ts`), after
+ * a terminal's id or a worktree's repository and checkout. `'local'`
+ * when there is none, or the name is no tuple.
+ */
+export function machineOfSession(name: string): string {
+  let value: unknown;
+  try {
+    value = JSON.parse(name);
+  } catch {
+    return 'local';
+  }
+  if (!Array.isArray(value)) return 'local';
+  const at = value[0] === 'terminal' ? 2 : value[0] === 'worktree' ? 3 : -1;
+  const machine: unknown = at < 0 ? undefined : value[at];
+  return typeof machine === 'string' ? machine : 'local';
+}
+
 /** The session key closing `tab` dismisses: a terminal's own, an
  *  item's agent, or `null` for a tab with no session behind it. */
 export function dismissKeyOf(tab: Tab): string | null {

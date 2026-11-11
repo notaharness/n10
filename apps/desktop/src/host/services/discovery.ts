@@ -2,7 +2,11 @@ import { activeRepository } from './repo.js';
 import { adoptSession } from './session-registry.js';
 import { defaultPaneSize } from './sessions.js';
 import { machines } from './machines.js';
-import { adoptTerminal, forgetTerminal } from './terminals.js';
+import {
+  adoptTerminal,
+  forgetTerminal,
+  noteTerminalsScanned,
+} from './terminals.js';
 import type { DiscoveryChangedEvent } from '../contract.js';
 
 let stop: (() => void) | undefined;
@@ -35,6 +39,7 @@ export function startDiscoveryForRepo(cwd: string): void {
         .getSnapshot()
         .machines.filter((m) => !m.isLocal && m.state === 'connected')
         .map((m) => m.peerId),
+    scanned: noteTerminalsScanned,
     changed(delta) {
       for (const name of delta.endedTerminals) forgetTerminal(name);
       // Named by checkout, which is what a worktree's tab remembers:

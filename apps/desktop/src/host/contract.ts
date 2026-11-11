@@ -93,7 +93,7 @@ import type {
 // and those alive in other repositories.
 export type * from './contract-sessions.js';
 import type {
-  ForeignSessionSummary,
+  ForeignSessionsAnswer,
   SessionSummary,
 } from './contract-sessions.js';
 // Pull request diffs at exact commits.
@@ -574,8 +574,9 @@ export interface N10HostApi {
   listSessions(repo: string): Promise<SessionSummary[]>;
   /** Agents alive in other repositories, for the tab strip to give
    *  each a tab in its own group. The open repository's own are left
-   *  out — the sidebar describes those. */
-  listForeignSessions(): Promise<ForeignSessionSummary[]>;
+   *  out — the sidebar describes those — and the answer says which that
+   *  was. It names every live agent session too. */
+  listForeignSessions(): Promise<ForeignSessionsAnswer>;
   /** Debounced per-session agent activity (same registry as the TUI's
    *  sidebar spinner): `active` = producing output now, `flashing` =
    *  went idle after a real work streak and the user hasn't looked. */
@@ -611,6 +612,10 @@ export interface N10HostApi {
   /** Every terminal this host holds, whatever repository is open —
    *  terminals belong to directories, not to the open repo. */
   listTerminals(): Promise<TerminalSummary[]>;
+  /** The machines whose discovery scan has finished, its terminals
+   *  adopted: from then on, a terminal of theirs `listTerminals` does
+   *  not name is gone, not yet to be found. */
+  scannedTerminalMachines(): Promise<string[]>;
   /** Kill the terminal's session, on either backend, and forget it. */
   killTerminal(name: string): Promise<void>;
   /** The agents and terminals working in `branch`'s checkouts of the
@@ -788,6 +793,7 @@ export const IPC = {
   saveClipboardImage: 'n10/session/clipboard-image',
   launchTerminal: 'n10/terminal/launch',
   listTerminals: 'n10/terminal/list',
+  scannedTerminalMachines: 'n10/terminal/scanned-machines',
   killTerminal: 'n10/terminal/kill',
   listBranchSessions: 'n10/branch-sessions/list',
   launchBranchTerminal: 'n10/branch-sessions/terminal',

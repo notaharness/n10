@@ -84,7 +84,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
         repo: repo.cwd,
         sessions: sessionRows,
         terminals: terminals.data ?? [],
-        foreign: foreign.data ?? [],
+        foreign: foreign.data?.sessions ?? [],
       }),
     [repo.cwd, sessionRows, terminals.data, foreign.data]
   );

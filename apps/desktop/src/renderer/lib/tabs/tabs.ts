@@ -1,8 +1,7 @@
 import { createContext, useContext, useMemo, type Dispatch } from 'react';
 import type {
-  ForeignSessionEntry,
-  ItemEntry,
   Strip,
+  SyncListings,
   Tab,
   TabsAction,
   TerminalEntry,
@@ -87,12 +86,7 @@ interface TabsApi extends Strip {
    * in other repositories, each given a tab in its own group unless
    * dismissed.
    */
-  syncItems: (
-    repo: string,
-    entries: ItemEntry[] | undefined,
-    terminals: TerminalEntry[] | undefined,
-    foreign: ForeignSessionEntry[] | undefined
-  ) => void;
+  syncItems: (repo: string, listings: SyncListings) => void;
   /** Tell the strip a repository is now the one in view. */
   repoOpened: (repo: string) => void;
   /** Open (or activate) the tab for a terminal the host just started. */
@@ -136,8 +130,8 @@ export function tabsActions(dispatch: Dispatch<TabsAction>): TabsActions {
     setCollapsed: (keys, collapsed) =>
       dispatch({ type: 'set-collapsed', keys, collapsed }),
     renameGroup: (key, name) => dispatch({ type: 'rename-group', key, name }),
-    syncItems: (repo, entries, terminals, foreign) =>
-      dispatch({ type: 'sync-items', repo, entries, terminals, foreign }),
+    syncItems: (repo, listings) =>
+      dispatch({ type: 'sync-items', repo, ...listings }),
     repoOpened: (repo) => dispatch({ type: 'repo-opened', repo }),
     openTerminal: (terminal) => dispatch({ type: 'open-terminal', terminal }),
     terminalEnded: (name, repo) =>
@@ -164,11 +158,7 @@ export function useRepoTabs(): RepoTabsApi {
       openItem: (itemKey: string, opts?: { preview?: boolean }) =>
         tabs.openItem(cwd, itemKey, opts),
       tabOpening: (itemKey: string) => tabOpening(tabs.tabs, cwd, itemKey),
-      syncItems: (
-        entries: ItemEntry[] | undefined,
-        terminals: TerminalEntry[] | undefined,
-        foreign: ForeignSessionEntry[] | undefined
-      ) => tabs.syncItems(cwd, entries, terminals, foreign),
+      syncItems: (listings: SyncListings) => tabs.syncItems(cwd, listings),
       close: (id: string) => tabs.close(id, cwd),
       terminalEnded: (name: string) => tabs.terminalEnded(name, cwd),
     }),
@@ -181,10 +171,6 @@ export interface RepoTabsApi
   openItem: (itemKey: string, opts?: { preview?: boolean }) => void;
   /** The tab a single click on `itemKey` would show. */
   tabOpening: (itemKey: string) => Tab;
-  syncItems: (
-    entries: ItemEntry[] | undefined,
-    terminals: TerminalEntry[] | undefined,
-    foreign: ForeignSessionEntry[] | undefined
-  ) => void;
+  syncItems: (listings: SyncListings) => void;
   terminalEnded: (name: string) => void;
 }

@@ -104,7 +104,12 @@ vi.mock('./services/sessions.js', () =>
   ])
 );
 vi.mock('./services/terminals.js', () =>
-  recorder('terminals', ['launchTerminal', 'listTerminals', 'killTerminal'])
+  recorder('terminals', [
+    'launchTerminal',
+    'listTerminals',
+    'scannedTerminalMachines',
+    'killTerminal',
+  ])
 );
 vi.mock('./services/branch-sessions.js', () =>
   recorder('branchSessions', [
@@ -347,6 +352,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'terminals.launchTerminal',
   ],
   ['listTerminals', [], 'branchSessions.listTerminals'],
+  ['scannedTerminalMachines', [], 'terminals.scannedTerminalMachines'],
   ['killTerminal', ['n10-shell'], 'terminals.killTerminal'],
   [
     'listBranchSessions',

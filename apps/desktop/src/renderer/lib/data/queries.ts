@@ -17,6 +17,7 @@ import type {
   MachineView,
   RepoInfo,
   SidebarItem,
+  TerminalSummary,
   WorktreeRemovalCheck,
 } from '../../../host/contract.js';
 
@@ -343,11 +344,35 @@ export function useSessions(cwd: string) {
  */
 export function useTerminals() {
   return useQuery({
-    queryKey: keys.terminals,
-    queryFn: () => window.n10.listTerminals(),
-    refetchInterval: 2_000,
-    placeholderData: (prev) => prev,
+    ...terminalListing,
+    select: (listing: TerminalListing) => listing.terminals,
   });
+}
+
+/** The host's terminal listing beside the machines it is complete for. */
+export interface TerminalListing {
+  terminals: TerminalSummary[];
+  /** The machines whose discovery scan had finished, terminals adopted,
+   *  before `terminals` was read: a terminal of theirs it lacks is gone. */
+  scanned: string[];
+}
+
+const terminalListing = {
+  queryKey: keys.terminals,
+  queryFn: async (): Promise<TerminalListing> => {
+    // In this order: what was scanned before the listing was read is
+    // complete in it.
+    const scanned = await window.n10.scannedTerminalMachines();
+    const terminals = await window.n10.listTerminals();
+    return { terminals, scanned };
+  },
+  refetchInterval: 2_000,
+  placeholderData: <T>(prev: T) => prev,
+};
+
+/** {@link useTerminals}, with the machines the listing is complete for. */
+export function useTerminalListing() {
+  return useQuery(terminalListing);
 }
 
 /**

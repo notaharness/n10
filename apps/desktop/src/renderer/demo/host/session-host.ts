@@ -39,6 +39,7 @@ type SessionHost = Pick<
   | 'saveClipboardImage'
   | 'launchTerminal'
   | 'listTerminals'
+  | 'scannedTerminalMachines'
   | 'killTerminal'
   | 'onSessionData'
   | 'onSessionExit'
@@ -188,16 +189,20 @@ export function createSessionHost(
           }))
       ),
     listForeignSessions: () =>
-      later(
-        agents()
+      later({
+        excluded: state.current ?? '',
+        sessions: agents()
           .filter((s) => s.running && s.meta.repo !== state.current)
           .map((s) => ({
             repo: s.meta.repo ?? '',
             branch: s.meta.branch ?? '',
             worktree: worktreeDir(s.meta.repo ?? '', s.meta.branch ?? ''),
             sessionName: s.name,
-          }))
-      ),
+          })),
+        alive: agents()
+          .filter((s) => s.running)
+          .map((s) => s.name),
+      }),
     getSessionActivity: () =>
       later(Object.fromEntries(hub.all().map((s) => [s.name, s.activity()]))),
     // The demo pushes every session's output to the page and lets the
@@ -246,6 +251,7 @@ export function createSessionHost(
     saveClipboardImage: () => later('/tmp/n10-paste-1.png'),
     launchTerminal: (req) =>
       later(terminalSummary(state, openTerminal(state, hub, req))),
+    scannedTerminalMachines: () => later(['local']),
     listTerminals: () =>
       later(
         hub

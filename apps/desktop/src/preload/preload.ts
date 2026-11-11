@@ -111,6 +111,8 @@ const api: N10HostApi = {
     ipcRenderer.invoke(IPC.saveClipboardImage, data, mimeType),
   launchTerminal: (req) => ipcRenderer.invoke(IPC.launchTerminal, req),
   listTerminals: () => ipcRenderer.invoke(IPC.listTerminals),
+  scannedTerminalMachines: () =>
+    ipcRenderer.invoke(IPC.scannedTerminalMachines),
   listBranchSessions: (repo, branch) =>
     ipcRenderer.invoke(IPC.listBranchSessions, repo, branch),
   launchBranchTerminal: (req) =>

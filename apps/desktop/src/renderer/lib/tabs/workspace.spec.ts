@@ -10,6 +10,7 @@ import {
   EMPTY_WORKSPACE,
   reduce,
   type ItemEntry,
+  type SyncListings,
   type TabsAction,
   type TerminalEntry,
   type Workspace,
@@ -37,8 +38,11 @@ const open = (itemKey: string, preview = false): TabsAction => ({
 const sync = (
   entries: ItemEntry[] | undefined,
   terminals?: TerminalEntry[],
-  repo = REPO
-): TabsAction => ({ type: 'sync-items', repo, entries, terminals });
+  repo = REPO,
+  more: Omit<SyncListings, 'entries' | 'terminals'> = {}
+): TabsAction => ({ type: 'sync-items', repo, entries, terminals, ...more });
+/** A sync with tmux's word on which agents run: `x`, or none. */
+const alive = (...names: string[]) => ({ alive: names });
 
 const live: ItemEntry = {
   itemKey: 'branch:x',
@@ -154,9 +158,12 @@ describe('dismissed', () => {
   it('keeps a closed agent closed while it runs, then forgets it once it ends', () => {
     let ws = run(sync([live]), { type: 'close', id: id('branch:x') });
     expect(ws.dismissed).toEqual([sessionKey(REPO, 'x')]);
-    ws = then(ws, sync([live]));
+    ws = then(ws, sync([live], undefined, REPO, alive('x')));
     expect(ids(ws)).toEqual([]);
-    ws = then(ws, sync([{ ...live, running: false }]));
+    ws = then(
+      ws,
+      sync([{ ...live, running: false }], undefined, REPO, alive())
+    );
     expect(ws.dismissed).toEqual([]);
     // Started again later: a new agent, with its tab.
     ws = then(ws, sync([live]));
@@ -168,19 +175,80 @@ describe('dismissed', () => {
     expect(then(ws, sync(undefined))).toBe(ws);
   });
 
+  it('forgets nothing before tmux has said which agents run', () => {
+    const ws = run(sync([live]), { type: 'close', id: id('branch:x') });
+    expect(then(ws, sync([{ ...live, running: false }]))).toBe(ws);
+  });
+
+  // The sidebar's `running` is "this host attached it": a model read
+  // before discovery's scan says not running of an agent tmux still runs.
+  it('keeps one the sidebar has not attached yet while tmux runs it', () => {
+    let ws = run(sync([live]), { type: 'close', id: id('branch:x') });
+    ws = then(
+      ws,
+      sync([{ ...live, running: false }], undefined, REPO, alive('x'))
+    );
+    expect(ws.dismissed).toEqual([sessionKey(REPO, 'x')]);
+    ws = then(ws, sync([live], undefined, REPO, alive('x')));
+    expect(ids(ws)).toEqual([]);
+  });
+
+  it('keeps one the sidebar runs that tmux’s answer is too old to name', () => {
+    const ws = run(sync([live]), { type: 'close', id: id('branch:x') });
+    expect(then(ws, sync([live], undefined, REPO, alive())).dismissed).toEqual([
+      sessionKey(REPO, 'x'),
+    ]);
+  });
+
+  it('keeps one on another machine, which tmux here does not run', () => {
+    const remote = JSON.stringify(['worktree', REPO, '/w/x', 'a'.repeat(32)]);
+    const ws = run(sync([{ ...live, sessionName: remote }]), {
+      type: 'close',
+      id: id('branch:x'),
+    });
+    expect(then(ws, sync([], undefined, REPO, alive())).dismissed).toEqual([
+      sessionKey(REPO, remote),
+    ]);
+  });
+
   it('forgets an agent the user opened again from the sidebar', () => {
     let ws = run(sync([live]), { type: 'close', id: id('branch:x') });
     ws = then(ws, open('branch:x'), sync([live]));
     expect(ws.dismissed).toEqual([]);
   });
 
-  it('keeps another repository’s closed agent until its listing drops it', () => {
+  it('keeps another repository’s closed agent until tmux no longer runs it', () => {
     const foreign = { repo: OTHER, branch: 'f', sessionName: 'f' };
     let ws = run({ type: 'sync-items', repo: REPO, foreign: [foreign] });
     ws = then(ws, { type: 'close', id: id('branch:f', OTHER) });
-    ws = then(ws, { type: 'sync-items', repo: REPO, foreign: [foreign] });
+    ws = then(
+      ws,
+      sync([], undefined, REPO, { foreign: [foreign], ...alive('f') })
+    );
     expect(ids(ws)).toEqual([]);
-    ws = then(ws, { type: 'sync-items', repo: REPO, foreign: [] });
+    // Its own repository open: no foreign listing names it, tmux does.
+    ws = then(ws, sync([], undefined, OTHER, alive('f')));
+    ws = then(ws, sync([], undefined, REPO, alive('f')));
+    expect(ws.dismissed).toEqual([sessionKey(OTHER, 'f')]);
+    ws = then(
+      ws,
+      sync([], undefined, REPO, { foreign: [foreign], ...alive('f') })
+    );
+    expect(ids(ws)).toEqual([]);
+    ws = then(ws, sync([], undefined, REPO, { foreign: [], ...alive() }));
+    expect(ws.dismissed).toEqual([]);
+  });
+
+  it('keeps a closed terminal of another machine until its listing has answered', () => {
+    const name = JSON.stringify(['terminal', 'far-shell', 'peer']);
+    const far = { ...shell(1, 'peer'), name };
+    let ws = run(sync([], [far], REPO, { scanned: ['local', 'peer'] }), {
+      type: 'close',
+      id: terminalTabId(name),
+    });
+    ws = then(ws, sync([], [], REPO, { scanned: ['local'] }));
+    expect(ws.dismissed).toEqual([terminalDismissKey(name, 1)]);
+    ws = then(ws, sync([], [], REPO, { scanned: ['local', 'peer'] }));
     expect(ws.dismissed).toEqual([]);
   });
 
@@ -245,9 +313,22 @@ describe('a restored terminal tab', () => {
     expect(tab(then(restored(1), sync([])))).toMatchObject({ restored: true });
   });
 
-  it('waits for another machine that does not list it', () => {
+  it('waits for another machine that has not answered', () => {
     const ws = then(restored(1, 'peer'), sync([], []));
     expect(tab(ws)).toMatchObject({ restored: true, machine: 'peer' });
+  });
+
+  it('closes on another machine once its listing has answered without it', () => {
+    const ws = then(
+      restored(1, 'peer'),
+      sync([], [], REPO, { scanned: ['local', 'peer'] })
+    );
+    expect(ids(ws)).toEqual([]);
+  });
+
+  it('waits on a listing taken before this machine’s first scan finished', () => {
+    const ws = then(restored(1), sync([], [], REPO, { scanned: [] }));
+    expect(tab(ws)).toMatchObject({ restored: true });
   });
 
   it('gives way to a terminal the host just started under its name', () => {

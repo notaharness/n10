@@ -1,6 +1,13 @@
 import { realpathSync } from 'node:fs';
-import { listLiveWorktreeSessions } from '@n10/core';
-import type { ForeignSessionSummary } from '../contract.js';
+import {
+  aliveWorktreeSessionNames,
+  listLiveWorktreeSessions,
+  readOurSessions,
+} from '@n10/core';
+import type {
+  ForeignSessionsAnswer,
+  ForeignSessionSummary,
+} from '../contract.js';
 import { affiliations } from './affiliations.js';
 import { ensureRecent } from './recent-repos.js';
 import { requireRepo } from './repo.js';
@@ -26,9 +33,17 @@ let lastAnswered = '';
  * agent in a worktree on a detached HEAD: the desktop attaches by
  * branch (`discovery.ts` refuses one with none), so its tab would open
  * the repository and then attach nothing.
+ *
+ * Beside them, `alive` names every agent session tmux runs here, with
+ * none of those left out: what tells the strip a closed agent's
+ * session has ended, which the sidebar cannot (its `running` is "this
+ * host attached it").
  */
-export function listForeignSessions(): ForeignSessionSummary[] {
+export function listForeignSessions(): ForeignSessionsAnswer {
   const open = requireRepo();
+  // One tmux read for both answers. A read that failed lists no
+  // foreign agent and says nothing of which are alive.
+  const tagged = readOurSessions();
   // Identity is the real path — the same string git reports as the
   // toplevel, which is what the core derives a session's repository
   // from — so a repository opened through a symlink still recognises
@@ -40,7 +55,9 @@ export function listForeignSessions(): ForeignSessionSummary[] {
     openRoot = open;
   }
   const out: ForeignSessionSummary[] = [];
-  for (const live of listLiveWorktreeSessions()) {
+  for (const live of listLiveWorktreeSessions({
+    sessions: () => tagged ?? [],
+  })) {
     if (live.repoRoot === openRoot || live.detached) continue;
     out.push({
       repo: live.repoRoot,
@@ -51,7 +68,11 @@ export function listForeignSessions(): ForeignSessionSummary[] {
     });
   }
   noteRepositories(out);
-  return out;
+  return {
+    excluded: open,
+    sessions: out,
+    alive: tagged && aliveWorktreeSessionNames(tagged),
+  };
 }
 
 /** Put each foreign repository on the repo list — so the tab's

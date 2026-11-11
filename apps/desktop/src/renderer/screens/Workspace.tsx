@@ -109,17 +109,25 @@ function WorkspaceInner({
   const terminalTabs = useTerminalTabs();
   // Agents alive in other repositories, as the tab model needs them;
   // `undefined` before the host has answered once.
+  // An answer that left out another repository — fetched before a
+  // switch — is no answer for this one, and one tmux could not give
+  // is none at all.
   const foreignSessions = useForeignSessions();
+  const answer = foreignSessions.data;
+  const answered = answer?.excluded === repo.cwd && answer.alive !== null;
   const foreign: ForeignSessionEntry[] | undefined = useMemo(
     () =>
-      foreignSessions.data?.map((s) => ({
-        repo: s.repo,
-        branch: s.branch,
-        worktree: s.worktree,
-        sessionName: s.sessionName,
-      })),
-    [foreignSessions.data]
+      answered
+        ? answer.sessions.map((s) => ({
+            repo: s.repo,
+            branch: s.branch,
+            worktree: s.worktree,
+            sessionName: s.sessionName,
+          }))
+        : undefined,
+    [answer, answered]
   );
+  const alive = answer?.alive ?? undefined;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(
@@ -180,10 +188,11 @@ function WorkspaceInner({
   // reason to re-run, since the branch it lands on may already be
   // live. Re-running settles — every step above is idempotent and
   // returns the same state object once there is nothing left to do.
-  useRestoredNotice(tabs.tabs, terminalTabs.entries);
+  const { entries: terminals, scanned } = terminalTabs;
+  useRestoredNotice(tabs.tabs, terminals, scanned);
   useEffect(() => {
-    tabs.syncItems(entries, terminalTabs.entries, foreign);
-  }, [tabs, entries, terminalTabs.entries, foreign]);
+    tabs.syncItems({ entries, terminals, foreign, alive, scanned });
+  }, [tabs, entries, terminals, foreign, alive, scanned]);
 
   // Boot milestones (see lib/perf.ts): the shell is on screen once this
   // mounts, and the sidebar is real once the host's first model lands —

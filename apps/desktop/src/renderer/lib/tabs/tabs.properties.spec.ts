@@ -14,6 +14,7 @@ import {
   type Workspace,
 } from './tabs-model.js';
 import { dismissKeyOf } from './tab-identity.js';
+import type { SyncListings } from './tabs-model.js';
 import { restoreWorkspace, toSaved } from './workspace-file.js';
 import {
   focusedPaneOf,
@@ -83,6 +84,16 @@ const TERMINALS: TerminalEntry[] = [
       repo,
     })
   ),
+  // On another machine, whose listing may not have answered.
+  {
+    name: JSON.stringify(['terminal', 'far-shell', 'peer']),
+    kind: 'shell',
+    cwd: '/far',
+    displayPath: '/far',
+    repo: null,
+    created: 2,
+    machine: 'peer',
+  },
 ];
 
 /**
@@ -229,13 +240,19 @@ const action: fc.Arbitrary<TabsAction> = fc.oneof(
         fc.uniqueArray(fc.constantFrom(...FOREIGN), { maxLength: 2 }),
         { nil: undefined, freq: 4 }
       ),
+      // Which agents tmux runs, and which machines' terminal listings
+      // are complete: this one's whenever there is a listing at all.
+      alive: fc.option(fc.subarray(['sa', 'sb']), { nil: undefined, freq: 4 }),
+      scanned: fc.constantFrom(undefined, ['local'], ['local', 'peer']),
     })
-    .map(({ repo, entries, loaded, terminals, foreign }) => ({
+    .map(({ repo, entries, loaded, terminals, foreign, alive, scanned }) => ({
       type: 'sync-items' as const,
       repo,
       entries: loaded ? entries : undefined,
       terminals,
       foreign,
+      alive,
+      scanned,
     }))
 );
 
@@ -940,8 +957,70 @@ describe('the workspace', () => {
           entries: [],
           terminals: [],
           foreign: [],
+          alive: [],
+          scanned: ['local', 'peer'],
         });
         expect(after.dismissed).toEqual([]);
+      }),
+      { numRuns: 300 }
+    );
+  });
+
+  // The converse, and what keeps a closed tab closed: a dismissal is
+  // never forgotten while its session runs, nor on the word of a
+  // listing that has not answered, or is not complete for its machine.
+  it('forgets no dismissal while its session runs, or nothing says it ended', () => {
+    const ended = fc.constantFrom<Omit<SyncListings, 'entries'>>(
+      // Everything alive: tmux runs every agent, every terminal listed.
+      { alive: ['sa', 'sb'], terminals: TERMINALS, scanned: ['local', 'peer'] },
+      // Nothing has answered.
+      {},
+      // This machine's listing is not complete, nor the peer's.
+      { terminals: [], scanned: [] }
+    );
+    fc.assert(
+      fc.property(sequence, ended, (actions, listings) => {
+        const { ws, inView } = replayWorkspace(actions);
+        // A terminal listing that names everything opens tabs on what
+        // is not dismissed; those keys were not dismissed to begin with.
+        const after = reduceWorkspace(ws, {
+          type: 'sync-items',
+          repo: inView,
+          ...listings,
+        });
+        const open = new Set(Object.values(after.tabs).map(dismissKeyOf));
+        const closed = ws.dismissed.filter((key) => !open.has(key));
+        expect(after.dismissed).toEqual(expect.arrayContaining(closed));
+      }),
+      { numRuns: 300 }
+    );
+  });
+
+  // After a restart: a restored terminal tab binds to its own session or
+  // waits; only a listing complete for its machine can close it.
+  it('keeps every restored terminal tab through listings that are not complete', () => {
+    const incomplete = fc.constantFrom<SyncListings>(
+      { entries: [], terminals: [], scanned: [] },
+      { entries: [], terminals: [] },
+      { entries: [] }
+    );
+    fc.assert(
+      fc.property(sequence, incomplete, (actions, listings) => {
+        const { ws, inView } = replayWorkspace(actions);
+        const file = JSON.parse(JSON.stringify(toSaved(ws))) as SavedWorkspace;
+        const back = restoreWorkspace(file);
+        const after = reduceWorkspace(back, {
+          type: 'sync-items',
+          repo: inView,
+          ...listings,
+        });
+        // The default completes this machine's listing, not a peer's.
+        const waiting = Object.values(back.tabs).filter(
+          (tab) =>
+            tab.kind === 'terminal' &&
+            !(listings.terminals && !listings.scanned && tab.machine !== 'peer')
+        );
+        expect(waiting.map((tab) => after.tabs[tab.id])).toEqual(waiting);
       }),
       { numRuns: 300 }
     );

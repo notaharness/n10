@@ -141,6 +141,8 @@ export function createHostApi(): HostApi {
       Promise.resolve(clipboardImage.saveClipboardImage(data, mimeType)),
     launchTerminal: (req) => terminals.launchTerminal(req),
     listTerminals: () => Promise.resolve(branchSessions.listTerminals()),
+    scannedTerminalMachines: () =>
+      Promise.resolve(terminals.scannedTerminalMachines()),
     killTerminal: (name) => Promise.resolve(terminals.killTerminal(name)),
     listBranchSessions: (cwd, branch) =>
       Promise.resolve(branchSessions.listBranchSessions(cwd, branch)),

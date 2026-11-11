@@ -19,13 +19,16 @@ const state = vi.hoisted(() => ({
   }[],
   realpaths: {} as Record<string, string>,
   recents: [] as string[],
+  tmuxFails: false,
 }));
 
 vi.mock('node:fs', () => ({
   realpathSync: (p: string) => state.realpaths[p] ?? p,
 }));
 vi.mock('@n10/core', () => ({
+  readOurSessions: () => (state.tmuxFails ? null : []),
   listLiveWorktreeSessions: () => state.live,
+  aliveWorktreeSessionNames: () => state.live.map((l) => l.sessionName),
 }));
 vi.mock('./repo.js', () => ({
   requireRepo: () => state.open,
@@ -69,6 +72,7 @@ beforeEach(async () => {
   state.live = [];
   state.realpaths = {};
   state.recents = [];
+  state.tmuxFails = false;
   vi.resetModules();
   foreign = await import('./foreign-sessions.js');
 });
@@ -76,7 +80,7 @@ beforeEach(async () => {
 describe('listForeignSessions', () => {
   it('lists agents of other repositories, and not the open one’s', () => {
     state.live = [ALPHA_AGENT, BETA_AGENT];
-    expect(foreign.listForeignSessions()).toEqual([
+    expect(foreign.listForeignSessions().sessions).toEqual([
       {
         repo: '/repos/beta',
         branch: 'feat/b',
@@ -115,9 +119,9 @@ describe('listForeignSessions', () => {
   // its repository and then attach nothing.
   it('leaves out an agent on a detached HEAD, which the desktop cannot attach', () => {
     state.live = [BETA_AGENT, BETA_DETACHED];
-    expect(foreign.listForeignSessions().map((s) => s.sessionName)).toEqual([
-      'feat-b',
-    ]);
+    expect(
+      foreign.listForeignSessions().sessions.map((s) => s.sessionName)
+    ).toEqual(['feat-b']);
   });
 
   // The core answers with real paths; a repository opened through a
@@ -127,6 +131,29 @@ describe('listForeignSessions', () => {
     state.open = '/home/dev/link-to-alpha';
     state.realpaths['/home/dev/link-to-alpha'] = '/repos/alpha';
     state.live = [ALPHA_AGENT];
-    expect(foreign.listForeignSessions()).toEqual([]);
+    expect(foreign.listForeignSessions().sessions).toEqual([]);
+  });
+
+  // A shell switching repository can still hold an answer for the one
+  // it left; the repository the answer leaves out tells it so.
+  it('names the repository it leaves out, as it was opened', () => {
+    state.open = '/home/dev/link-to-alpha';
+    expect(foreign.listForeignSessions().excluded).toBe(
+      '/home/dev/link-to-alpha'
+    );
+  });
+
+  it('names every live agent, the open repository’s and detached ones too', () => {
+    state.live = [ALPHA_AGENT, BETA_AGENT, BETA_DETACHED];
+    expect(foreign.listForeignSessions().alive).toEqual([
+      'feat-a',
+      'feat-b',
+      'hotfix',
+    ]);
+  });
+
+  it('says nothing of which are alive when tmux could not be asked', () => {
+    state.tmuxFails = true;
+    expect(foreign.listForeignSessions().alive).toBeNull();
   });
 });

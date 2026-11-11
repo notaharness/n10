@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { TerminalKind, TerminalSummary } from '../../../host/contract.js';
-import { useTerminals } from '../data/queries.js';
+import { useTerminalListing } from '../data/queries.js';
 import { useLaunchTerminal } from '../data/mutations-terminals.js';
 import { useLaunchProgress } from '../machines/launch-progress.js';
 import { useTabs, type TerminalEntry } from '../tabs/tabs.js';
@@ -53,17 +53,24 @@ function estimatePane(): { cols?: number; rows?: number } {
  */
 export function useTerminalTabs() {
   const tabs = useTabs();
-  const terminals = useTerminals();
+  const listing = useTerminalListing();
   const launch = useLaunchTerminal();
   const progress = useLaunchProgress();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [remoteError, setRemoteError] = useState<string | null>(null);
 
-  // `undefined` until the host has answered once — and it stays the
-  // previous answer across a refetch (`placeholderData`) — so the strip
-  // never sees "no terminals" when the truth is "not asked yet". The
+  // `undefined` until the host's listing is complete for this machine —
+  // discovery's first scan has adopted what tmux kept — and it stays the
+  // previous answer across a refetch (`placeholderData`), so the strip
+  // never sees "no terminals" when the truth is "not found yet". The
   // reducer closes the tab of any terminal a listing does not name.
-  const entries = useMemo(() => terminals.data?.map(toEntry), [terminals.data]);
+  const data = listing.data;
+  const complete = data?.scanned.includes('local') ?? false;
+  const entries = useMemo(
+    () => (complete ? data?.terminals.map(toEntry) : undefined),
+    [complete, data]
+  );
+  const scanned = data?.scanned;
 
   const launchMutate = launch.mutate;
   const openTerminal = tabs.openTerminal;
@@ -104,8 +111,10 @@ export function useTerminalTabs() {
 
   return {
     /** The host's terminal listing, for Workspace's sync effect;
-     *  `undefined` before the first answer. */
+     *  `undefined` before it is complete for this machine. */
     entries,
+    /** The machines the listing is complete for. */
+    scanned,
     dialogOpen,
     openDialog: useCallback(() => setDialogOpen(true), []),
     closeDialog: useCallback(() => {

@@ -48,31 +48,36 @@ export function isTerminalDismissed(
   );
 }
 
-/** Whether a restored tab waits on the listing rather than closing: its
- *  session may live on a machine that has not answered. */
-const awaitsMachine = (tab: TerminalTab) =>
-  tab.machine !== undefined && tab.machine !== 'local';
+/** The machines whose listing is complete when a sync names none: this
+ *  one, which a defined listing always speaks for. */
+export const LOCAL_ONLY: readonly string[] = ['local'];
 
 /** How many restored terminal tabs a listing gives up: their session is
  *  gone (`bindRestored`'s rule). For the one notice the user gets. */
 export function restoredGone(
   tabs: readonly Tab[],
-  entries: readonly TerminalEntry[]
+  entries: readonly TerminalEntry[],
+  scanned: readonly string[] = LOCAL_ONLY
 ): number {
   const byName = new Map(entries.map((e) => [e.name, e]));
   return tabs.filter(
     (t) =>
       t.kind === 'terminal' &&
       t.restored &&
-      restoredFate(t, byName.get(t.name)) === 'gone'
+      restoredFate(t, byName.get(t.name), scanned) === 'gone'
   ).length;
 }
 
+/** A restored tab's session, by the listing: the one it was saved with
+ *  (`bind`), gone, or not known yet (`wait`) — named without a creation
+ *  time, or left out by a listing that is not complete for its machine
+ *  yet (`scanned` lacks it: not scanned, or offline). */
 function restoredFate(
   tab: TerminalTab,
-  entry: TerminalEntry | undefined
+  entry: TerminalEntry | undefined,
+  scanned: readonly string[]
 ): 'bind' | 'wait' | 'gone' {
-  if (!entry) return awaitsMachine(tab) ? 'wait' : 'gone';
+  if (!entry) return scanned.includes(tab.machine ?? 'local') ? 'gone' : 'wait';
   if (entry.created === undefined) return 'wait';
   return entry.created === tab.created ? 'bind' : 'gone';
 }
@@ -136,9 +141,10 @@ export function openTerminal(state: Strip, entry: TerminalEntry): Strip {
 export function syncTerminals(
   state: Strip,
   repo: string,
-  entries: TerminalEntry[]
+  entries: TerminalEntry[],
+  scanned: readonly string[] = LOCAL_ONLY
 ): Strip {
-  const bound = bindRestored(state, repo, entries);
+  const bound = bindRestored(state, repo, entries, scanned);
   return dropEnded(openListed(bound, entries), repo, entries);
 }
 
@@ -149,19 +155,21 @@ export function syncTerminals(
  * session is gone — and a later session under its name gets a tab of
  * its own from {@link openListed}. Two cases say neither, and the tab
  * waits: a listing that names it without a creation time yet, and one
- * that leaves out a tab on another machine, which may be offline.
+ * that leaves it out before its machine's listing is complete — this
+ * machine's before discovery's first scan, another's before it answers.
  */
 function bindRestored(
   state: Strip,
   repo: string,
-  entries: TerminalEntry[]
+  entries: TerminalEntry[],
+  scanned: readonly string[]
 ): Strip {
   const byName = new Map(entries.map((e) => [e.name, e]));
   let next = state;
   for (const tab of state.tabs) {
     if (tab.kind !== 'terminal' || !tab.restored) continue;
     const entry = byName.get(tab.name);
-    const fate = restoredFate(tab, entry);
+    const fate = restoredFate(tab, entry, scanned);
     if (fate === 'gone') next = closeTab(next, tab.id, repo);
     if (fate !== 'bind' || !entry) continue;
     const bound = restamp(withoutRestored(tab), entry);

@@ -18,15 +18,16 @@ export function goneNotice(n: number): string {
  */
 export function useRestoredNotice(
   tabs: readonly Tab[],
-  entries: readonly TerminalEntry[] | undefined
+  entries: readonly TerminalEntry[] | undefined,
+  scanned: readonly string[] | undefined
 ): void {
   const told = useRef(false);
   useEffect(() => {
     if (told.current || !entries) return;
     if (!tabs.some((t) => t.kind === 'terminal' && t.restored)) return;
-    const gone = restoredGone(tabs, entries);
+    const gone = restoredGone(tabs, entries, scanned);
     if (gone === 0) return;
     told.current = true;
     toast(goneNotice(gone), { duration: 4000 });
-  }, [tabs, entries]);
+  }, [tabs, entries, scanned]);
 }

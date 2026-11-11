@@ -103,9 +103,14 @@ test.describe('Agents restored across repositories', () => {
     // what a repository identified by the path it was opened through
     // gets the moment its agents are described by the real one.
     await expect
-      .poll(() => page.evaluate(() => window.n10.listForeignSessions()), {
-        timeout: 30_000,
-      })
+      .poll(
+        () =>
+          page.evaluate(async () => {
+            const answer = await window.n10.listForeignSessions();
+            return answer.sessions;
+          }),
+        { timeout: 30_000 }
+      )
       .toEqual([expect.objectContaining({ repo: alphaRoot, branch: ALPHA })]);
     await expect(tab(page, new RegExp(ALPHA))).toHaveCount(1);
     await expect(tabs(page)).toHaveCount(2);

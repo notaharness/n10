@@ -79,6 +79,16 @@ export function activeTabRepo(state: Strip): string | null {
   return active ? tabHome(active) : null;
 }
 
+/** What one sync reconciles the strip against; each `undefined` until
+ *  its source has answered. */
+export interface SyncListings {
+  entries?: ItemEntry[];
+  terminals?: TerminalEntry[];
+  foreign?: ForeignSessionEntry[];
+  alive?: readonly string[];
+  scanned?: readonly string[];
+}
+
 export type TabsAction =
   | { type: 'open-item'; repo: string; itemKey: string; preview: boolean }
   | { type: 'open-settings' }
@@ -126,15 +136,13 @@ export type TabsAction =
    *  `foreign` is the host's other listing: agents alive in *other*
    *  repositories, each of which gets a tab in its own group unless it
    *  was dismissed (see `tab-foreign.ts`). Also `undefined` before the
-   *  first answer, and so is `entries` before the sidebar's: only a
-   *  listing that has answered can say a dismissed session ended. */
-  | {
-      type: 'sync-items';
-      repo: string;
-      entries?: ItemEntry[];
-      terminals?: TerminalEntry[];
-      foreign?: ForeignSessionEntry[];
-    }
+   *  first answer, and so is `entries` before the sidebar's.
+   *
+   *  `alive` names every agent session tmux runs on this machine, any
+   *  repository's: only it says a dismissed agent ended. `scanned` are
+   *  the machines whose terminal listing is complete; a restored or
+   *  dismissed terminal of any other machine waits. */
+  | ({ type: 'sync-items'; repo: string } & SyncListings)
   /** Open (or activate) the tab for a terminal the host just started. */
   | { type: 'open-terminal'; terminal: TerminalEntry }
   /** The host says the process behind a terminal ended, by name — the
@@ -310,7 +318,7 @@ function apply(state: Strip, action: TabsAction): Strip {
     // effects racing into the reducer separately.
     const strip = applyStrip(state, action);
     const withTerminals = action.terminals
-      ? syncTerminals(strip, action.repo, action.terminals)
+      ? syncTerminals(strip, action.repo, action.terminals, action.scanned)
       : strip;
     const withForeign = action.foreign
       ? openForeign(withTerminals, action.repo, action.foreign)
