@@ -860,28 +860,42 @@ The strip derives groups from a pane's tab order on every render
 (`lib/tabs/tab-groups.ts` `present`): one per affiliation, in the order of
 each group's first tab, members in their relative order, the home's tab
 first. Contiguity is derived, never an invariant: nothing re-sorts the tabs
-on sync and no move is refused. Every parent group is a chip, and so is a
-place group of two or more; a lone place tab is an ordinary tab. Nothing of
-a chipped group expands into the row: the strip shows pinned tabs, then one
-block per chip or lone tab, so a group costs the same room however many
-tabs it holds, and a member is one hover away. The chip is one control
-(`GroupChip.tsx`): a folder, open while its roster is; the group's name; its
-tab count; and the count of each state present. Status comes from the
-activity snapshot only: `flashing` is new output, `active` working. Nothing
-yet says blocked, failed or done, and none is inferred from silence, an exit
-or a pull request; the status type keeps those states for a source (tmux's
-pane program state). While the pane's active tab is a member, the chip takes
-the active tab's treatment and reads "group / member", the group's part cut
+on sync and no move is refused. A group of two tabs or more, a parent's or a
+place's, is a chip; a group of one is that tab, and only a chip follows a
+chip. Until the user arranges a pane's blocks by hand (`Workspace.arranged`,
+saved), the pane presents the groups an orchestrator heads first, after
+pins, so n10 opening tabs on its own leads with them; a drop among the
+blocks makes the order the user's, even where the stored order already
+matched it. Nothing of a chipped group expands into the row: the strip
+shows pinned tabs, then one block per chip or lone tab, so a group costs the
+same room however many tabs it holds, and a member is one hover away.
+
+A chip is drawn as a tab (`ChipLook.tsx`, `tab-look-class.ts`): the same
+frame, colours and active treatment, with an orchestrator's brain for an
+orchestrator's group (and on its lone tab), else a folder, open while the
+roster is, and the tab count at its end. Status comes from the activity
+snapshot only: `flashing` is new output, `active` working, and a chip shows
+them as a tab does, blinking and spinning (`group-status.ts` `chipSignal`).
+An orchestrator's chip carries its home's own activity alone: its players
+are the orchestrator's to watch, and blink and spin on their own rows.
+Any other group's chip carries every member's. Nothing yet says blocked,
+failed or done, and none is inferred from silence, an exit or a pull
+request; the status type keeps those states for a source (tmux's pane
+program state). While the pane's active tab is a member, the chip takes the
+active tab's treatment and reads "group / member", the group's part cut
 first; it is the row's Tab stop then, as the active tab would be.
 
 The roster (`GroupRoster.tsx`) is a controlled popover anchored to the chip,
 listing the home first ("Orchestrator …"), then the members in strip order,
-each with its state and the active one marked. Resting on the chip opens it
-without focus (400 ms, closing 180 ms after the pointer leaves chip and
-roster); a press, Enter or Alt+ArrowDown pins it open, the keyboard with its
-rows focused; Escape returns focus to the chip unless a rest opened it over
-a terminal. Choosing a row shows that tab and closes the roster, and the row
-of tabs does not change. A row's native menu is the tab's own (pin, split,
+each with its state and the active one marked. In an orchestrator's roster
+the players sit under the home, and a player's own tabs (a terminal in its
+checkout) under the player (`roster-order.ts`); a place's roster is flat.
+Resting on the chip opens it without focus (400 ms, closing 180 ms after
+the pointer leaves chip and roster); Enter or Alt+ArrowDown opens it with
+its rows focused; Escape returns focus to the chip unless a rest opened it
+over a terminal. Pressing the chip shows the group's first tab, the home
+for an orchestrator's. Choosing a row shows that tab and closes the roster,
+and the row of tabs does not change. A row's native menu is the tab's own (pin, split,
 move to a pane, close); the chip's is the group's (show tabs, rename, tile,
 follow). Pinning is how a member is kept in view: a pinned tab stands
 outside its group.
@@ -891,9 +905,12 @@ chips included (`tab-switching.ts`): activating a member marks its chip.
 Close Others closes every other unpinned tab.
 
 Drag (`strip-drag.ts`): a chip or a lone tab moves between blocks; a pinned
-one only among the pinned. A member moves through its roster row's menu, not
-by dragging: the roster is a portal that closes as a drag starts, which
-would leave dnd-kit without the node it is dragging.
+one only among the pinned. A roster row is a sortable place of its own: it
+moves its tab among the group's rows, or carries it to another pane's strip
+or a pane's side, never onto its own pane's strip, where the group would
+gather it back. The roster is ours to hold open: a drag of one of its rows
+pins it until the row lands back in it or is carried away, and the copy
+under the pointer is the strip's `CarriedOverlay`, drawn by `DragOverlay`.
 Illegal places are disabled droppables (`useSortable`'s `disabled.droppable`),
 so pointer and keyboard drags meet only legal slots and the slot the strip
 opens is the one the drop takes. A block's drop arranges the whole strip in
@@ -901,8 +918,9 @@ its presented order with the block moved, since the stored order may
 interleave groups; a group shown behind the one it follows moves with it as
 one block. The room after the last tab is the last legal place by index,
 not by dnd-kit's mount order. Drags announce "Moving", "Position n of m",
-"Moved" and "Move cancelled". A chip opens its roster on click, not on
-press, so dragging its group opens nothing.
+"Moved" and "Move cancelled". A chip shows its first tab on click, not on
+press, and the click a drop ends in is ignored, so dragging its group
+shows nothing.
 
 ### Contextual tab labels
 
@@ -929,8 +947,8 @@ that metadata and reserves a stable width for an agent's changing title.
 
 The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): tabs by id, a
 layout tree of splits over panes (each with its order and active tab), the
-focused pane, and the user's marks — pins, group names and
-dismissed sessions — beside `unseen` and `lastActiveByRepo`. Every reducer
+focused pane, and the user's marks — pins, group names, the panes arranged
+by hand and dismissed sessions — beside `unseen` and `lastActiveByRepo`. Every reducer
 pass works on one pane's `Strip` (its tabs as an ordered list and its active
 tab, beside the workspace-wide sets); `reduceStrip` is the pass layer.
 
