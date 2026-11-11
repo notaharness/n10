@@ -92,7 +92,9 @@ function ChipLabel({
       <span aria-hidden className="shrink-0 text-muted-foreground">
         /
       </span>
-      <span data-group-active-label className="min-w-0 truncate">
+      {/* Capped short of the whole width, so a long member's label
+          leaves the group a few letters rather than a bare "/". */}
+      <span data-group-active-label className="max-w-44 min-w-0 truncate">
         {active.label}
       </span>
     </span>
