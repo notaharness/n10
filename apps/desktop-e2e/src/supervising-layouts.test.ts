@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { orchestraTags } from '@n10/core/testing/session-tags';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab } from './setup/app.js';
+import { createWorktree, focusTerminal, tab } from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -130,12 +130,25 @@ test.describe('Supervising layouts', () => {
     await expect(chip(page).locator('[data-group-count]')).toHaveText('3', {
       timeout: 30_000,
     });
-    await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
+    // The orchestrator's own terminal is shown, and typed in.
+    const home = chip(page).getByRole('tab');
+    await home.click();
+    await expect(home).toHaveAttribute('aria-selected', 'true');
+    await focusTerminal(page);
+    // A menu is opened with a press, which focuses the tab pressed.
+    const pressed = await home.elementHandle();
+    const terminal = await page.evaluateHandle(
+      () =>
+        document.querySelector(
+          '[data-editor-panes] > :not([data-spare-pane]) .xterm'
+        )!
+    );
 
     await armContextMenuChoice(app, 'Follow group');
-    await chip(page).getByRole('tab').click({ button: 'right' });
+    await home.click({ button: 'right' });
 
-    // The players go to a follow pane; alpha, shown and focused, stays.
+    // The players go to a follow pane. The orchestrator's terminal stays
+    // where it was, the same element.
     await expect(panes(page)).toHaveCount(2);
     const source = panes(page).nth(0);
     const follow = panes(page).nth(1);
@@ -143,7 +156,18 @@ test.describe('Supervising layouts', () => {
     await expect(follow.locator('[data-follow-line]')).toHaveCount(1);
     await expect(follow.getByRole('tab')).toHaveCount(2);
     await expect(source).toHaveAttribute('data-pane-focused', 'true');
-    await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
+    await expect(home).toHaveAttribute('aria-selected', 'true');
+    // Focus is where the menu left it, on the same tab element: the
+    // source was not mounted again.
+    expect(
+      await page.evaluate(
+        ([t, x]) =>
+          document.activeElement === t &&
+          x.isConnected &&
+          !!x.closest('[data-pane-focused]'),
+        [pressed, terminal] as const
+      )
+    ).toBe(true);
     const shownIn = (branch: string) =>
       follow.getByRole('tab', { name: new RegExp(branch) });
     // It starts on the first in strip order; the other is `second`.
