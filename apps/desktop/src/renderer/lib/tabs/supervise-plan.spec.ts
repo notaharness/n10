@@ -14,7 +14,12 @@ const term = (name: string): Tab => ({
   kind: 'terminal',
   id: `terminal:${name}`,
   name,
-  title: name,
+  terminalKind: 'agent',
+  cwd: `/w/${name}`,
+  displayPath: `~/${name}`,
+  repo: null,
+  preview: false,
+  listed: true,
 });
 
 const home = { key: 'boss', worktree: '', repo: '/r' };
