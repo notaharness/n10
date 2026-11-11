@@ -160,7 +160,10 @@ export function EditorArea({
       target.item,
       target.machineLabel
     ).label;
-    const status = rowStatus(target.status);
+    const status = rowStatus(target.status, {
+      exited: target.snapshot?.exited ?? false,
+      unseen: target.unseen,
+    });
     announce(`${label}, ${status}, ${step.index} of ${step.total}`);
     revealTab(target.tab.id);
   };
