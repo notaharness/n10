@@ -23,15 +23,11 @@ describe('group status text', () => {
     ).toBe('9 tabs. 1 blocked, 2 new output, 5 working, 1 idle.');
     expect(tabCount(1)).toBe('1 tab');
     expect(rosterSummary(['working', 'idle'])).toBe('1 working · 1 idle');
-    expect(rosterSummary(['idle', 'idle'])).toBe('No attention needed');
+    expect(rosterSummary(['idle', 'idle'])).toBe('');
   });
-  it('says Ended or Not yet opened for an idle tab, never Done', () => {
-    expect(rowStatus('idle', { exited: true, unseen: false })).toBe('Ended');
-    expect(rowStatus('idle', { exited: false, unseen: true })).toBe(
-      'Not yet opened'
-    );
-    expect(rowStatus('new-output', { exited: true, unseen: true })).toBe(
-      'New output'
-    );
+  it('says nothing for an idle tab, never Done', () => {
+    expect(rowStatus('idle')).toBe('');
+    expect(rowStatus('new-output')).toBe('New output');
+    expect(rowStatus('working')).toBe('Working');
   });
 });

@@ -172,7 +172,7 @@ test.describe('Tab groups', () => {
     await expect(standIn).toHaveText('Codex');
     await expect(chipOf(page, CODEX).getByRole('tab')).toHaveCount(0);
     await standIn.click();
-    await expect(roster(page)).toContainText('Parent not open here');
+    await expect(roster(page)).toContainText('Codex');
     await expect(rosterRows(page)).toHaveCount(2);
     rmSync(dir, { recursive: true, force: true });
   });

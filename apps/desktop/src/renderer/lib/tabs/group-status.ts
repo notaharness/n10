@@ -17,7 +17,7 @@ const ROW_WORDS: Record<TabStatus, string> = {
   'done-unseen': 'Done · Unseen',
   'new-output': 'New output',
   working: 'Working',
-  idle: 'Idle',
+  idle: '',
 };
 
 export const tabCount = (n: number) => `${n} tab${n === 1 ? '' : 's'}`;
@@ -33,10 +33,11 @@ export function statusSummary(
     .join(separator);
 }
 
-/** A roster's header line: its states, or that none needs attention. */
+/** A roster's header line: its states worst first, or nothing while
+ *  every tab is idle. */
 export function rosterSummary(statuses: readonly TabStatus[]): string {
   return statuses.every((s) => s === 'idle')
-    ? 'No attention needed'
+    ? ''
     : statusSummary(statuses, ' · ');
 }
 
@@ -49,14 +50,7 @@ export function groupSummary(statuses: readonly TabStatus[]): string {
     : tabCount(statuses.length);
 }
 
-/** A roster row's status: its state, else what the tab's activity says
- *  short of a state (an agent that ended, a tab not yet looked at). */
-export function rowStatus(
-  status: TabStatus,
-  facts: { exited: boolean; unseen: boolean }
-): string {
-  if (status !== 'idle') return ROW_WORDS[status];
-  if (facts.exited) return 'Ended';
-  if (facts.unseen) return 'Not yet opened';
-  return ROW_WORDS.idle;
+/** A roster row's status: its state, or nothing for an idle tab. */
+export function rowStatus(status: TabStatus): string {
+  return status === 'idle' ? '' : ROW_WORDS[status];
 }

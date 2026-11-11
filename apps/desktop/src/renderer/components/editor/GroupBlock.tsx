@@ -136,7 +136,6 @@ export function GroupBlock({
         />
         <GroupRoster
           label={label}
-          standIn={group.affiliation?.kind === 'parent' && !head}
           faces={faces}
           activeId={tabs.activeId}
           roster={roster}

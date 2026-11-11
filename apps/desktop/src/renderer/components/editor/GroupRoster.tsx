@@ -55,7 +55,9 @@ function RowStatus({
     >
       {active && <CheckIcon aria-hidden className="size-3 shrink-0" />}
       {mark && <mark.Icon aria-hidden className="size-3 shrink-0" />}
-      <span className="truncate">{active ? `Active · ${status}` : status}</span>
+      <span className="truncate">
+        {[active ? 'Active' : '', status].filter(Boolean).join(' · ')}
+      </span>
     </span>
   );
 }
@@ -98,10 +100,7 @@ function RosterRow({
     face.machineLabel
   );
   const Icon = FACE_ICON[kind];
-  const status = rowStatus(face.status, {
-    exited: face.snapshot?.exited ?? false,
-    unseen: face.unseen,
-  });
+  const status = rowStatus(face.status);
   const where = secondary(face);
   return (
     <li className="relative">
@@ -173,7 +172,6 @@ function walkRows(e: KeyboardEvent<HTMLUListElement>): void {
  */
 export function GroupRoster({
   label,
-  standIn,
   faces,
   activeId,
   roster,
@@ -181,8 +179,6 @@ export function GroupRoster({
   onJump,
 }: {
   label: string;
-  /** The parent has no tab here. */
-  standIn: boolean;
   faces: readonly TabFace[];
   activeId: string | null;
   roster: ReturnType<typeof useRosterOpen>;
@@ -193,6 +189,7 @@ export function GroupRoster({
   const list = useRef<HTMLUListElement>(null);
   const escaped = useRef(false);
   const statuses = faces.map((f) => f.status);
+  const summary = rosterSummary(statuses);
   return (
     <PopoverContent
       data-group-roster
@@ -226,7 +223,7 @@ export function GroupRoster({
         if (target?.closest?.('[data-group-chip]')) e.preventDefault();
       }}
     >
-      <div className="flex min-h-12 shrink-0 flex-col gap-0.5 border-b border-border px-3 py-2">
+      <div className="flex min-h-12 shrink-0 flex-col justify-center gap-0.5 border-b border-border px-3 py-2">
         <div className="flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
             {label}
@@ -235,17 +232,14 @@ export function GroupRoster({
             {tabCount(faces.length)}
           </span>
         </div>
-        {standIn && (
-          <span className="text-[11px] leading-4 text-muted-foreground">
-            Parent not open here
+        {summary && (
+          <span
+            className="text-[11px] leading-4 text-muted-foreground"
+            aria-label={groupSummary(statuses)}
+          >
+            {summary}
           </span>
         )}
-        <span
-          className="text-[11px] leading-4 text-muted-foreground"
-          aria-label={groupSummary(statuses)}
-        >
-          {rosterSummary(statuses)}
-        </span>
       </div>
       <ScrollArea
         className="min-h-0 flex-1"
