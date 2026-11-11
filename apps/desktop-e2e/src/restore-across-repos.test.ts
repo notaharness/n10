@@ -2,7 +2,7 @@ import { mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test as base, expect } from './fixtures/desktop.js';
-import { expectAdjoining, tab, tabs, visibleText } from './setup/app.js';
+import { expectNextBlock, tab, tabs, visibleText } from './setup/app.js';
 import { cleanupExternalSessions, tmuxAvailable } from './setup/external.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
@@ -79,11 +79,10 @@ test.describe('Agents restored across repositories', () => {
     // that repository's name — and the workspace stayed where it opened.
     const beta = tab(page, new RegExp(`repo-beta\\s*/\\s*${BETA}`));
     await expect(beta).toBeVisible({ timeout: 30_000 });
-    // Two repositories' tabs in one continuous row, with no gap or
-    // divider between the groups.
+    // Two repositories' tabs, each a block of its own, in one row.
     await expect(tabs(page)).toHaveCount(2);
     const [left, right] = [tabs(page).first(), tabs(page).last()];
-    await expectAdjoining(left, right);
+    await expectNextBlock(left, right);
     expect(await getRepo()).toMatchObject({ cwd: alphaRoot });
 
     // Activating it opens its repository, whose own discovery attaches

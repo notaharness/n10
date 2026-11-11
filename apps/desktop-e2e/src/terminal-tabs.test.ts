@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
 import {
   createWorktree,
-  expectAdjoining,
+  expectNextBlock,
   focusTerminal,
   openPalette,
   tab as tabNamed,
@@ -135,9 +135,8 @@ test.describe('Terminal tabs', () => {
 
       const tab = terminalTabs(page);
       await expect(tab).toHaveAttribute('title', folder);
-      // A group of its own, yet one continuous row: no gap or divider
-      // sets it apart from the repository's tab.
-      await expectAdjoining(tabNamed(page, /some-work/), tab);
+      // A block of its own, right after the repository's tab in one row.
+      await expectNextBlock(tabNamed(page, /some-work/), tab);
       // …and no repository prefix, because it belongs to none.
       await expect(tab).not.toContainText(basename(repoPath));
 
