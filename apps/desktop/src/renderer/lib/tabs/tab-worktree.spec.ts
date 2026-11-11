@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { itemTabId } from './tab-identity.js';
 import {
-  EMPTY_TABS,
-  reduce,
+  EMPTY_STRIP,
+  reduceStrip as reduce,
   type ItemEntry,
-  type TabsState,
+  type Strip,
 } from './tabs-model.js';
 
 /**
@@ -16,10 +16,10 @@ import {
 const REPO = '/repos/alpha';
 const WT = '/repos/alpha/.claude/worktrees/feature';
 
-const open = (state: TabsState, itemKey: string) =>
+const open = (state: Strip, itemKey: string) =>
   reduce(state, { type: 'open-item', repo: REPO, itemKey, preview: false });
 
-const sync = (state: TabsState, entries: ItemEntry[]) =>
+const sync = (state: Strip, entries: ItemEntry[]) =>
   reduce(state, { type: 'sync-items', repo: REPO, entries });
 
 const worktree = (branch: string, extra: Partial<ItemEntry> = {}) => ({
@@ -32,7 +32,7 @@ const worktree = (branch: string, extra: Partial<ItemEntry> = {}) => ({
 
 describe('a worktree that switches branch', () => {
   it('keeps its tab, which follows the checkout onto the new branch', () => {
-    let s = open(EMPTY_TABS, 'branch:feature');
+    let s = open(EMPTY_STRIP, 'branch:feature');
     s = sync(s, [worktree('feature')]);
     s = sync(s, [worktree('other')]);
     expect(s.tabs).toEqual([
@@ -49,7 +49,7 @@ describe('a worktree that switches branch', () => {
   });
 
   it('follows the checkout even when its pull request row stays behind', () => {
-    let s = open(EMPTY_TABS, 'pr:12');
+    let s = open(EMPTY_STRIP, 'pr:12');
     s = sync(s, [worktree('feature', { itemKey: 'pr:12' })]);
     s = sync(s, [
       { itemKey: 'pr:12', branch: 'feature', title: 'Add undo' },
@@ -64,7 +64,7 @@ describe('a worktree that switches branch', () => {
   });
 
   it('keeps the branch it was opened for through a switch back', () => {
-    let s = open(EMPTY_TABS, 'branch:feature');
+    let s = open(EMPTY_STRIP, 'branch:feature');
     s = sync(s, [worktree('feature')]);
     s = sync(s, [worktree('other')]);
     s = sync(s, [worktree('feature')]);
@@ -83,7 +83,7 @@ describe('a worktree that switches branch', () => {
       sessionName: 'feature-session',
       sessionBranch: 'feature',
     });
-    let s = sync(EMPTY_TABS, [entry]);
+    let s = sync(EMPTY_STRIP, [entry]);
     s = sync(s, [entry]);
     expect(s.tabs).toEqual([
       expect.objectContaining({
@@ -94,7 +94,7 @@ describe('a worktree that switches branch', () => {
   });
 
   it('leaves the pull request row it left behind free to open in a tab of its own', () => {
-    let s = open(EMPTY_TABS, 'pr:12');
+    let s = open(EMPTY_STRIP, 'pr:12');
     s = sync(s, [worktree('feature', { itemKey: 'pr:12' })]);
     s = sync(s, [
       { itemKey: 'pr:12', branch: 'feature', title: 'Add undo' },
@@ -116,7 +116,7 @@ describe('a worktree that switches branch', () => {
   });
 
   it('opens its old branch in a new tab rather than the switched one', () => {
-    let s = open(EMPTY_TABS, 'branch:feature');
+    let s = open(EMPTY_STRIP, 'branch:feature');
     s = sync(s, [worktree('feature')]);
     s = sync(s, [worktree('other')]);
     s = open(s, 'branch:feature');
@@ -128,7 +128,7 @@ describe('a worktree that switches branch', () => {
   });
 
   it('is found by the id it was opened with again once back on its branch', () => {
-    let s = open(EMPTY_TABS, 'branch:feature');
+    let s = open(EMPTY_STRIP, 'branch:feature');
     s = sync(s, [worktree('feature')]);
     s = sync(s, [worktree('feature', { itemKey: 'pr:12' })]);
     s = open(s, 'branch:feature');
@@ -137,11 +137,11 @@ describe('a worktree that switches branch', () => {
 });
 
 describe('a worktree that is removed', () => {
-  const removed = (state: TabsState, repo = REPO, worktrees = [WT]) =>
+  const removed = (state: Strip, repo = REPO, worktrees = [WT]) =>
     reduce(state, { type: 'worktrees-removed', repo, worktrees });
 
   it('closes its tab, whichever branch and key the tab followed it to', () => {
-    let s = open(EMPTY_TABS, 'branch:feature');
+    let s = open(EMPTY_STRIP, 'branch:feature');
     s = sync(s, [worktree('feature')]);
     s = sync(s, [worktree('other', { itemKey: 'pr:12' })]);
     s = removed(s);
@@ -150,7 +150,7 @@ describe('a worktree that is removed', () => {
   });
 
   it('hands focus to the neighbour, as a close does', () => {
-    let s = open(EMPTY_TABS, 'branch:feature');
+    let s = open(EMPTY_STRIP, 'branch:feature');
     s = sync(s, [worktree('feature')]);
     s = open(s, 'branch:main');
     s = reduce(s, {
@@ -165,14 +165,14 @@ describe('a worktree that is removed', () => {
   // Opened optimistically while `git worktree add` runs: no sync has
   // seen its item yet, so it has no checkout to be removed from.
   it('leaves a tab alone that has not seen its worktree yet', () => {
-    const s = removed(open(EMPTY_TABS, 'branch:feature'));
+    const s = removed(open(EMPTY_STRIP, 'branch:feature'));
     expect(s.tabs).toHaveLength(1);
   });
 
   // Its agent outlived it: the row stays, re-keyed by its session, and
   // the tab follows it by checkout until discovery reports it gone.
   it('keeps a tab whose agent still runs, until the worktree is reported gone', () => {
-    let s = open(EMPTY_TABS, 'branch:feature');
+    let s = open(EMPTY_STRIP, 'branch:feature');
     s = sync(s, [worktree('feature', { running: true })]);
     s = sync(s, [
       worktree('feature', { itemKey: 'removed:agent', running: true }),
@@ -187,7 +187,7 @@ describe('a worktree that is removed', () => {
   });
 
   it('leaves the tabs of other checkouts and other repositories alone', () => {
-    let s = open(EMPTY_TABS, 'branch:feature');
+    let s = open(EMPTY_STRIP, 'branch:feature');
     s = sync(s, [worktree('feature')]);
     s = removed(s, '/repos/beta');
     s = removed(s, REPO, ['/repos/alpha/.claude/worktrees/elsewhere']);

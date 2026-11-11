@@ -1,5 +1,5 @@
 import { isForeignTab, type Tab } from './tab-identity.js';
-import type { TabsState } from './tabs-model.js';
+import type { Strip } from './workspace.js';
 
 /**
  * Taking a tab off the strip, and where focus goes when it was the
@@ -17,10 +17,10 @@ import type { TabsState } from './tabs-model.js';
  * slid into its place (the last tab, if it was the rightmost).
  */
 export function closeTab(
-  state: TabsState,
+  state: Strip,
   id: string,
   repo: string | undefined
-): TabsState {
+): Strip {
   const idx = state.tabs.findIndex((t) => t.id === id);
   if (idx < 0) return state;
   const tabs = state.tabs.filter((t) => t.id !== id);
@@ -31,6 +31,25 @@ export function closeTab(
   return { ...state, tabs, activeId };
 }
 
+/** Keep only `id` and the pinned tabs. `id` becomes active, or the
+ *  active tab if it survived, else the first tab left. */
+export function closeOtherTabs(state: Strip, id: string): Strip {
+  const pinned = new Set(state.pinned);
+  const tabs = state.tabs.filter((t) => t.id === id || pinned.has(t.id));
+  const kept = (x: string | null) => tabs.find((t) => t.id === x)?.id;
+  const activeId = kept(id) ?? kept(state.activeId) ?? tabs[0]?.id ?? null;
+  return { ...state, tabs, activeId };
+}
+
+/** Close every unpinned tab, focus moving as each close's would. */
+export function closeUnpinned(state: Strip, repo: string | undefined): Strip {
+  const pinned = new Set(state.pinned);
+  return state.tabs.reduce(
+    (next, t) => (pinned.has(t.id) ? next : closeTab(next, t.id, repo)),
+    state
+  );
+}
+
 /**
  * Close every tab of `repo` that belongs to one of `worktrees` — the
  * checkouts discovery reported gone, however they went. A tab knows
@@ -38,10 +57,10 @@ export function closeTab(
  * a worktree still being created is not among them.
  */
 export function closeRemovedWorktrees(
-  state: TabsState,
+  state: Strip,
   repo: string,
   worktrees: readonly string[]
-): TabsState {
+): Strip {
   const gone = new Set(worktrees);
   return state.tabs.reduce(
     (next, t) =>

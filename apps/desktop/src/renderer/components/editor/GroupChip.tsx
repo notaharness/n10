@@ -99,7 +99,7 @@ function HomeBody({
         menu.setCollapsed(false);
         tabs.activate(tab.id);
       }}
-      onDoubleClick={() => tabs.pin(tab.id)}
+      onDoubleClick={() => tabs.keep(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
         runTabMenu(tab, tabs, closer, tabOverflow, menu).catch((err: unknown) =>

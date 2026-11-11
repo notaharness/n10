@@ -333,6 +333,18 @@ export interface SyncState {
 
 // ── Desktop shell (native menus, prefs) ──────────────────────────
 
+/** The tab workspace as the renderer saves it. The host versions and
+ *  stores it (`services/workspace-file.ts`); its shape is the
+ *  renderer's (`lib/tabs/workspace-file.ts`), checked on restore. */
+export type SavedWorkspace = Readonly<Record<string, unknown>>;
+
+/** What a launch finds: a workspace to restore, none, or a file this
+ *  build could not read, moved aside to `path`. */
+export type LoadedWorkspace =
+  | { status: 'none' }
+  | { status: 'restored'; workspace: SavedWorkspace }
+  | { status: 'set-aside'; path: string };
+
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 /** The theme in effect: Electron's `nativeTheme`, which folds the
@@ -377,6 +389,8 @@ export type ContextMenuItem =
       /** A radio item, one of the adjacent items that also have it:
        *  whether it is the one chosen. */
       checked?: boolean;
+      /** Where the platform shows one (macOS), a line on hover. */
+      toolTip?: string;
     };
 
 /** Mirror of app-core's ActivitySnapshot, redeclared so the renderer
@@ -703,6 +717,12 @@ export interface N10HostApi {
   onAutoFixChanged(cb: (event: AutoFixChangedEvent) => void): () => void;
   getDesktopPrefs(): Promise<DesktopPrefs>;
   setDesktopPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
+  /** The tab workspace saved last, if there is one this build can read;
+   *  one it cannot is set aside. */
+  loadWorkspace(): Promise<LoadedWorkspace>;
+  /** Save the tab workspace. Debounced and written whole; settles once
+   *  the write it ended up in landed, or rejects when that failed. */
+  saveWorkspace(workspace: SavedWorkspace): Promise<void>;
   /** The theme in effect; its changes arrive on `onThemeChanged`. */
   getTheme(): Promise<ResolvedTheme>;
   onThemeChanged(cb: (theme: ResolvedTheme) => void): () => void;
@@ -802,6 +822,8 @@ export const IPC = {
   showAppMenu: 'n10/shell/app-menu',
   getDesktopPrefs: 'n10/shell/prefs/get',
   setDesktopPrefs: 'n10/shell/prefs/set',
+  loadWorkspace: 'n10/workspace/load',
+  saveWorkspace: 'n10/workspace/save',
   getTheme: 'n10/shell/theme',
   getKeybindings: 'n10/keybindings/get',
   setKeybinding: 'n10/keybindings/set',

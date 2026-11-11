@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { autoOpenKey, itemTabId } from './tab-identity.js';
+import { sessionKey, itemTabId } from './tab-identity.js';
 import {
-  EMPTY_TABS,
+  EMPTY_STRIP,
   activeTabRepo,
-  reduce,
+  reduceStrip as reduce,
   type ForeignSessionEntry,
   type ItemEntry,
-  type TabsState,
+  type Strip,
   type TerminalEntry,
 } from './tabs-model.js';
 import { terminalTabId } from './tab-identity.js';
@@ -18,23 +18,19 @@ const OTHER = '/repos/beta';
 /** The id the strip gives `itemKey` in `repo`. */
 const id = (itemKey: string, repo = REPO) => itemTabId(repo, itemKey);
 
-const open = (
-  state: TabsState,
-  itemKey: string,
-  preview = false,
-  repo = REPO
-) => reduce(state, { type: 'open-item', repo, itemKey, preview });
+const open = (state: Strip, itemKey: string, preview = false, repo = REPO) =>
+  reduce(state, { type: 'open-item', repo, itemKey, preview });
 
 /** A sidebar sync with no terminal listing to reconcile against — the
  *  state before the host has answered — unless a case hands one over. */
 const sync = (
-  state: TabsState,
+  state: Strip,
   entries: ItemEntry[],
   repo = REPO,
   terminals: TerminalEntry[] | undefined = undefined
 ) => reduce(state, { type: 'sync-items', repo, entries, terminals });
 
-const empty: TabsState = EMPTY_TABS;
+const empty: Strip = EMPTY_STRIP;
 
 describe('sync-items', () => {
   it('re-keys a worktree tab when its branch grows a PR', () => {
@@ -278,12 +274,11 @@ describe('sync-items opens a tab per running agent', () => {
 
     // The duplicate collapsed, as it always did…
     expect(s.tabs.map((t) => t.id)).toEqual([id('branch:c'), id('branch:x')]);
-    // …and the session counts as auto-opened, so a later poll can't
-    // retry the move.
-    expect(s.autoOpened).toContain(autoOpenKey(REPO, 'n10-x'));
-    // …but the user is still looking at what they were looking at.
+    // …but the user is still looking at what they were looking at…
     expect(s.activeId).toBe(id('branch:c'));
 
+    // …and a later poll finds the survivor standing for the agent, so it
+    // cannot retry the move.
     s = sync(s, entries);
     expect(s.activeId).toBe(id('branch:c'));
   });
@@ -291,10 +286,10 @@ describe('sync-items opens a tab per running agent', () => {
 
 // use-close-tabs closes a tab synchronously and kills its session after
 // — the strip does not wait on the round trip — so a kill that fails
-// leaves the session running behind no tab. It recovers by forgetting
-// the auto-open key on error, which is exactly this reducer step.
-describe('forget-auto-opened', () => {
-  it('reopens a running agent on the next sync once its key is forgotten', () => {
+// leaves the session running behind no tab. It recovers by undismissing
+// the session on error, which is exactly this reducer step.
+describe('undismiss', () => {
+  it('reopens a running agent on the next sync once it is undismissed', () => {
     const live: ItemEntry = {
       itemKey: 'branch:feat-x',
       branch: 'feat-x',
@@ -304,26 +299,23 @@ describe('forget-auto-opened', () => {
     let s = sync(empty, [live]);
     s = reduce(s, { type: 'close', id: id('branch:feat-x') });
     expect(s.tabs).toEqual([]);
-    // The kill failed — the agent is still running — but without
-    // forgetting the key the poll that reports it keeps reading as
-    // already seen, forever.
+    // The kill failed — the agent is still running — and while it is
+    // dismissed the poll that reports it opens nothing.
     s = sync(s, [live]);
     expect(s.tabs).toEqual([]);
 
     s = reduce(s, {
-      type: 'forget-auto-opened',
-      keys: [autoOpenKey(REPO, 'n10-feat-x')],
+      type: 'undismiss',
+      keys: [sessionKey(REPO, 'n10-feat-x')],
     });
     s = sync(s, [live]);
     expect(s.tabs).toHaveLength(1);
     expect(s.tabs[0].id).toBe(id('branch:feat-x'));
   });
 
-  it('is a no-op for a key nothing has auto-opened', () => {
+  it('is a no-op for a key nothing dismissed', () => {
     const s = sync(empty, [{ itemKey: 'branch:x', branch: 'x' }]);
-    expect(reduce(s, { type: 'forget-auto-opened', keys: ['nothing'] })).toBe(
-      s
-    );
+    expect(reduce(s, { type: 'undismiss', keys: ['nothing'] })).toBe(s);
   });
 });
 
@@ -392,7 +384,7 @@ describe('open-item after re-key', () => {
     // the branch is not in the sidebar model yet, which after a re-key
     // produced a second tab carrying the first one's id. Panes are
     // keyed by tab id, so the two rendered each other's content.
-    let state: TabsState = EMPTY_TABS;
+    let state: Strip = EMPTY_STRIP;
     state = reduce(state, {
       type: 'open-item',
       repo: REPO,
@@ -419,8 +411,8 @@ describe('open-item after re-key', () => {
   });
 
   describe('reordering by drag', () => {
-    const three = (): TabsState => {
-      let state: TabsState = EMPTY_TABS;
+    const three = (): Strip => {
+      let state: Strip = EMPTY_STRIP;
       for (const key of ['a', 'b', 'c']) {
         state = reduce(state, {
           type: 'open-item',
@@ -431,7 +423,7 @@ describe('open-item after re-key', () => {
       }
       return state;
     };
-    const order = (state: TabsState) =>
+    const order = (state: Strip) =>
       state.tabs.map((t) => (t.kind === 'item' ? t.itemKey : t.id));
 
     it('drops a tab after its target', () => {
@@ -577,10 +569,6 @@ describe('tabs across repositories', () => {
       id('branch:main'),
       id('branch:main', OTHER),
     ]);
-    expect(s.autoOpened).toEqual([
-      autoOpenKey(REPO, 'main'),
-      autoOpenKey(OTHER, 'main'),
-    ]);
   });
 
   it('does not reopen a closed foreign tab when its repo is opened again', () => {
@@ -638,7 +626,7 @@ describe('activeTabRepo', () => {
 });
 
 describe('repo-opened', () => {
-  const openRepo = (state: TabsState, repo: string) =>
+  const openRepo = (state: Strip, repo: string) =>
     reduce(state, { type: 'repo-opened', repo });
 
   it('steps off the previous repo’s tab and onto one of its own', () => {
@@ -691,7 +679,7 @@ describe('repo-opened', () => {
 });
 
 describe('closing a tab keeps focus inside the repo in view', () => {
-  const closeIn = (state: TabsState, tabId: string, repo: string) =>
+  const closeIn = (state: Strip, tabId: string, repo: string) =>
     reduce(state, { type: 'close', id: tabId, repo });
 
   /** alpha's tab sandwiched between two of the other repo's. */
@@ -753,8 +741,7 @@ describe('closing a tab keeps focus inside the repo in view', () => {
 });
 
 describe('sync-items stamps the title', () => {
-  const find = (s: TabsState, key: string) =>
-    s.tabs.find((t) => t.id === id(key));
+  const find = (s: Strip, key: string) => s.tabs.find((t) => t.id === id(key));
 
   it('remembers what the item is called, and follows a rename', () => {
     let s = open(empty, 'pr:42');
@@ -815,13 +802,13 @@ describe('terminal tabs', () => {
     displayPath: REPO,
     repo: REPO,
   };
-  const openTerminal = (state: TabsState, terminal: TerminalEntry) =>
+  const openTerminal = (state: Strip, terminal: TerminalEntry) =>
     reduce(state, { type: 'open-terminal', terminal });
   // Terminals ride along on the same `sync-items` dispatch Workspace
   // makes; an empty `entries` list is a no-op for the item passes, so
   // this exercises exactly the reconciliation a terminal-only poll
   // produces.
-  const syncTerminals = (state: TabsState, terminals: TerminalEntry[]) =>
+  const syncTerminals = (state: Strip, terminals: TerminalEntry[]) =>
     reduce(state, { type: 'sync-items', repo: REPO, entries: [], terminals });
 
   it('opens a pinned tab and activates it', () => {
@@ -899,17 +886,16 @@ describe('terminal tabs', () => {
   });
 
   // Mirrors the item case above: closing a terminal tab kills its
-  // session after the tab is already gone, so a failed kill needs its
-  // auto-open key forgotten or the still-running terminal never gets a
-  // tab back.
-  it('reopens a terminal once its auto-open key is forgotten after a failed kill', () => {
+  // session after the tab is already gone, so a failed kill needs it
+  // undismissed or the still-running terminal never gets a tab back.
+  it('reopens a terminal once it is undismissed after a failed kill', () => {
     let s = syncTerminals(empty, [plain]);
     s = reduce(s, { type: 'close', id: terminalTabId(plain.name) });
     s = syncTerminals(s, [plain]);
     expect(s.tabs).toEqual([]);
 
     s = reduce(s, {
-      type: 'forget-auto-opened',
+      type: 'undismiss',
       keys: [terminalTabId(plain.name)],
     });
     s = syncTerminals(s, [plain]);
@@ -927,7 +913,7 @@ describe('terminal tabs', () => {
       [{ itemKey: 'branch:x', branch: 'x', sessionName: 'x', running: true }],
       OTHER
     );
-    const terminals = (st: TabsState) =>
+    const terminals = (st: Strip) =>
       st.tabs.filter((t) => t.kind === 'terminal');
     expect(terminals(after)).toHaveLength(2);
     terminals(after).forEach((t, i) => expect(t).toBe(terminals(before)[i]));
@@ -1070,7 +1056,7 @@ describe('terminal tabs', () => {
   // the gap between the launch answer and the first listing does not
   // leave a tab whose close then asks to end a session that is gone.
   describe('terminal-ended', () => {
-    const ended = (state: TabsState, name: string, repo = REPO) =>
+    const ended = (state: Strip, name: string, repo = REPO) =>
       reduce(state, { type: 'terminal-ended', name, repo });
 
     it('closes the tab of a terminal no listing ever named', () => {
@@ -1136,7 +1122,7 @@ describe('agents alive in other repositories', () => {
     sessionName: 'feat',
   };
   const foreign = (
-    state: TabsState,
+    state: Strip,
     entries: ForeignSessionEntry[] | undefined,
     repo = REPO
   ) =>
@@ -1200,13 +1186,13 @@ describe('agents alive in other repositories', () => {
 
   // A tab that repository re-keyed onto its pull request is the same
   // agent's tab; the listing, which only knows the branch, must
-  // recognise it even once its auto-open history is forgotten.
+  // recognise it by the tab alone.
   it('recognises a tab that was re-keyed onto a pull request', () => {
     let s = foreign(empty, [inBeta]);
     s = sync(s, [{ itemKey: 'pr:7', branch: 'feat' }], OTHER);
     s = reduce(s, {
-      type: 'forget-auto-opened',
-      keys: [autoOpenKey(OTHER, 'feat')],
+      type: 'undismiss',
+      keys: [sessionKey(OTHER, 'feat')],
     });
     s = foreign(s, [inBeta]);
     expect(s.tabs).toHaveLength(1);

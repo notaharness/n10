@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { SidebarItem } from '../../../host/contract.js';
 import { indexItems, tabItem } from './tab-item.js';
-import { EMPTY_TABS, reduce, type ItemEntry, type Tab } from './tabs-model.js';
+import {
+  EMPTY_STRIP,
+  reduceStrip as reduce,
+  type ItemEntry,
+  type Tab,
+} from './tabs-model.js';
 
 /**
  * A tab resolves to its row among its own repository's rows only. A
@@ -28,7 +33,7 @@ function row(repo: string, branch: string): SidebarItem {
 
 /** A tab opened on `branch` in `repo`, synced to its row. */
 function tabOn(repo: string, branch: string, entry: Partial<ItemEntry> = {}) {
-  let s = reduce(EMPTY_TABS, {
+  let s = reduce(EMPTY_STRIP, {
     type: 'open-item',
     repo,
     itemKey: `branch:${branch}`,

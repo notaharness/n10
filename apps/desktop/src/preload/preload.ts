@@ -187,6 +187,9 @@ const api: N10HostApi = {
   },
   getDesktopPrefs: () => ipcRenderer.invoke(IPC.getDesktopPrefs),
   setDesktopPrefs: (patch) => ipcRenderer.invoke(IPC.setDesktopPrefs, patch),
+  loadWorkspace: () => ipcRenderer.invoke(IPC.loadWorkspace),
+  saveWorkspace: (workspace) =>
+    ipcRenderer.invoke(IPC.saveWorkspace, workspace),
   getTheme: () => ipcRenderer.invoke(IPC.getTheme),
   onThemeChanged: (cb) => {
     const listener = (_e: unknown, theme: ResolvedTheme) => cb(theme);

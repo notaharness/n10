@@ -1,4 +1,10 @@
-import type { TabsState } from './tabs-model.js';
+import type { Tab } from './tab-identity.js';
+import type { Strip } from './workspace.js';
+
+/**
+ * What the user does to tabs and groups short of opening and closing
+ * them: moving, keeping a preview, pinning, collapsing and naming.
+ */
 
 /**
  * Place `ids`, in their current relative order, right before or after
@@ -7,11 +13,11 @@ import type { TabsState } from './tabs-model.js';
  * among the moved ids, or gone, changes nothing.
  */
 export function moveTabs(
-  state: TabsState,
+  state: Strip,
   ids: readonly string[],
   targetId: string,
   side: 'before' | 'after'
-): TabsState {
+): Strip {
   const moving = new Set(ids);
   if (moving.has(targetId)) return state;
   const moved = state.tabs.filter((t) => moving.has(t.id));
@@ -30,9 +36,9 @@ export function moveTabs(
  *  the strip hands over as its whole presented order. Unknown ids are
  *  ignored; unchanged state when the order is. */
 export function arrangeTabs(
-  state: TabsState,
+  state: Strip,
   ids: readonly string[]
-): TabsState {
+): Strip {
   const rank = new Map(ids.map((id, i) => [id, i]));
   const placed = state.tabs
     .filter((t) => rank.has(t.id))
@@ -45,12 +51,60 @@ export function arrangeTabs(
 /** Collapse or expand the groups `keys` name. Unchanged state when
  *  nothing changes. */
 export function setCollapsed(
-  state: TabsState,
+  state: Strip,
   keys: readonly string[],
   collapsed: boolean
-): TabsState {
+): Strip {
   if (keys.every((key) => state.collapsed[key] === collapsed)) return state;
   const next = { ...state.collapsed };
   for (const key of keys) next[key] = collapsed;
   return { ...state, collapsed: next };
+}
+
+/** End `id`'s preview. Unchanged state when it is no preview. */
+export function keepTab(state: Strip, id: string): Strip {
+  if (!state.tabs.some((t) => t.id === id && t.preview)) return state;
+  const tabs = state.tabs.map(
+    (t): Tab =>
+      t.id === id && t.kind === 'item' ? { ...t, preview: false } : t
+  );
+  return { ...state, tabs };
+}
+
+/** Pin or unpin the tabs `ids` names that are on the strip. A pin keeps
+ *  a preview. Unpinning leaves the tab where it is in the order, so it
+ *  shows in its group again where it was. */
+export function setPinned(
+  state: Strip,
+  ids: readonly string[],
+  pinned: boolean
+): Strip {
+  const open = ids.filter((id) => state.tabs.some((t) => t.id === id));
+  const was = new Set(state.pinned);
+  if (!pinned) {
+    const drop = new Set(open);
+    const next = state.pinned.filter((id) => !drop.has(id));
+    return next.length === state.pinned.length
+      ? state
+      : { ...state, pinned: next };
+  }
+  const added = open.filter((id) => !was.has(id));
+  if (added.length === 0) return state;
+  const kept = added.reduce(keepTab, state);
+  return { ...kept, pinned: [...state.pinned, ...added] };
+}
+
+/** Name a group; `null` or a blank name drops the name. */
+export function renameGroup(
+  state: Strip,
+  key: string,
+  name: string | null
+): Strip {
+  const trimmed = name?.trim() ?? '';
+  if ((state.groupNames[key] ?? '') === trimmed) return state;
+  const groupNames = Object.fromEntries(
+    Object.entries(state.groupNames).filter(([k]) => k !== key)
+  );
+  if (trimmed) groupNames[key] = trimmed;
+  return { ...state, groupNames };
 }

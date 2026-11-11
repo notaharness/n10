@@ -29,7 +29,8 @@ import { groupBlockId, stripRuns } from './strip-blocks.js';
 import { TabButton } from './TabButton.js';
 import { TabStrip } from './TabStrip.js';
 import { useEditorPanes } from './use-editor-panes.js';
-import { useStripGroups, type TabFace } from './use-strip-groups.js';
+import { derivedLabel, useGroupRename } from './use-group-rename.js';
+import { useStripGroups } from './use-strip-groups.js';
 
 /** The real tabs the strip shows: a group's home, and its members
  *  unless it is collapsed. */
@@ -41,23 +42,6 @@ function shownTabIds(
     if (!g.chipped || !isCollapsed(g, choices)) return g.tabs.map((t) => t.id);
     return g.head ? [g.head.id] : [];
   });
-}
-
-/** What a group is called: its home's tab's label, else its
- *  affiliation's. */
-function groupLabel(
-  group: TabGroup,
-  faceOf: (t: TabGroup['tabs'][number]) => TabFace
-): string {
-  if (group.head) {
-    const face = faceOf(group.head);
-    return tabPresentation(face.tab, face.item, face.machineLabel).label;
-  }
-  if (group.affiliation) return group.affiliation.label;
-  const first = group.tabs[0];
-  if (!first) return '';
-  const face = faceOf(first);
-  return tabPresentation(face.tab, face.item, face.machineLabel).label;
 }
 
 /**
@@ -96,6 +80,11 @@ export function EditorArea({
     round.current = noteActivation(round.current, byAttention);
     if (byAttention) attentionActivation.current = null;
   }, [tabs.activeId]);
+  const { labelOf, rename, renameAlone, renameActive, dialog } = useGroupRename(
+    groups,
+    faceOf
+  );
+  const pins = groups.filter((g) => g.pinned).length;
 
   const tabStopId = tabStopOf(
     presentedIds(groups),
@@ -171,7 +160,15 @@ export function EditorArea({
     revealTab(target.tab.id);
   };
   useEffect(() => {
-    setStripCommands({ attention, collapseOthers });
+    setStripCommands({
+      attention,
+      collapseOthers,
+      togglePin: () => {
+        const id = tabs.activeId;
+        if (id !== null) tabs.setPinned([id], !tabs.pinned.includes(id));
+      },
+      renameGroup: renameActive,
+    });
     return () => setStripCommands(null);
   });
 
@@ -193,7 +190,7 @@ export function EditorArea({
       index={at}
       ids={ids}
       followers={followers}
-      label={groupLabel(group, faceOf)}
+      label={labelOf(group)}
       faceOf={faceOf}
       color={colorOf(group)}
       collapsed={isCollapsed(group, tabs.collapsed)}
@@ -202,6 +199,7 @@ export function EditorArea({
       menu={{
         canCollapseOthers,
         collapseOthers,
+        rename: () => rename(group.key, derivedLabel(group, faceOf)),
         setCollapsed: (collapsed) => tabs.setCollapsed([group.key], collapsed),
       }}
     />
@@ -231,7 +229,7 @@ export function EditorArea({
           <AllTabs
             groups={groups}
             faceOf={faceOf}
-            labelOf={(group) => groupLabel(group, faceOf)}
+            labelOf={labelOf}
             activeId={tabs.activeId}
             onJump={(tab) => {
               const face = faceOf(tab);
@@ -245,7 +243,9 @@ export function EditorArea({
           />
         }
       >
-        {runs.map((run, at) =>
+        {runs.flatMap((run, at) => [
+          // Pinned tabs end at a rule, before the groups.
+          at === pins && pins > 0 ? <PinsEnd key="pins-end" /> : null,
           run.lead.chipped
             ? groupBlock(
                 run.lead,
@@ -257,13 +257,20 @@ export function EditorArea({
                 <TabButton
                   key={groupBlockId(run.lead)}
                   face={faceOf(tab)}
-                  data={{ kind: 'block', ids: [tab.id], index: at }}
+                  data={{
+                    kind: 'block',
+                    ids: [tab.id],
+                    index: at,
+                    ...(run.lead.pinned ? { pinned: true } : {}),
+                  }}
                   active={tab.id === tabs.activeId}
                   closer={closer}
                   tabStop={tab.id === tabStopId}
+                  pinned={run.lead.pinned}
+                  rename={run.lead.pinned ? undefined : renameAlone(run.lead)}
                 />
-              ))
-        )}
+              )),
+        ])}
       </TabStrip>
       <div aria-live="polite" className="sr-only">
         {announced}
@@ -279,7 +286,7 @@ export function EditorArea({
             index={index}
             shown={tab.id === activePane?.id}
             menuActive={tab.id === activePane?.id && tab.id === tabs.activeId}
-            onPin={() => tabs.pin(tab.id)}
+            onKeep={() => tabs.keep(tab.id)}
           />
         ))}
         {paneActiveId === null && (
@@ -293,6 +300,19 @@ export function EditorArea({
         )}
       </div>
       {confirmDialog}
+      {dialog}
     </div>
+  );
+}
+
+/** The rule between the pinned tabs and the groups: an 8px gap, then a
+ *  1px line in the border colour. */
+function PinsEnd() {
+  return (
+    <div
+      aria-hidden
+      data-pins-end
+      className="ml-2 w-px shrink-0 self-stretch bg-border"
+    />
   );
 }

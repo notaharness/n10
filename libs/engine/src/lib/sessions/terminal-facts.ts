@@ -23,7 +23,6 @@ export function terminalFacts(
 ) {
   const session = getSession(name);
   const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
-  const affiliation = affiliationOf?.(machine);
   return {
     name,
     ...record,
@@ -35,6 +34,16 @@ export function terminalFacts(
     ...(machine !== LOCAL_MACHINE && session?.pty.connectionState
       ? { connectionState: session.pty.connectionState }
       : {}),
+    ...listedFacts(affiliationOf?.(machine), created),
+  };
+}
+
+/** What discovery's listing adds, once it has named the session. */
+function listedFacts(
+  affiliation: Affiliation | undefined,
+  created: number | undefined
+): { affiliation?: Affiliation; created?: number } {
+  return {
     ...(affiliation ? { affiliation } : {}),
     ...(created !== undefined ? { created } : {}),
   };

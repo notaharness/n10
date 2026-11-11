@@ -1,5 +1,6 @@
 import { pairKey } from './tab-identity.js';
-import type { ItemEntry, ItemTab, Tab, TabsState } from './tabs-model.js';
+import type { ItemEntry, ItemTab, Tab } from './tabs-model.js';
+import type { Strip } from './workspace.js';
 
 /**
  * The passes `sync-items` runs over tabs that already exist:
@@ -18,11 +19,7 @@ import type { ItemEntry, ItemTab, Tab, TabsState } from './tabs-model.js';
  * Follow items whose key changed identity, and collapse any duplicate
  * the change produced.
  */
-export function rekey(
-  state: TabsState,
-  repo: string,
-  entries: ItemEntry[]
-): TabsState {
+export function rekey(state: Strip, repo: string, entries: ItemEntry[]): Strip {
   // Reconcile open tabs with the current sidebar items. An item's
   // key changes identity over its life (worktree `branch:x` grows a
   // PR and becomes `pr:n`; a closed PR reverts; `git switch` in the
@@ -85,7 +82,7 @@ function followedKey(
 
 /**
  * Remember on the tab what its item says about itself — branch,
- * worktree and title — so the strip can still describe the tab once
+ * worktree, title and agent session — so the strip can still describe the tab once
  * the item is out of reach, and the branch it was opened for, once.
  * Returns the same tab when nothing changed, so a quiet poll does not
  * re-render the strip.
@@ -99,10 +96,11 @@ function stamp(tab: ItemTab, entry: ItemEntry | undefined): ItemTab {
     originBranch:
       tab.originBranch ?? (entry.sessionBranch || entry.branch || undefined),
     title: entry.title ?? tab.title,
+    session: entry.sessionName ?? tab.session,
   };
-  const same = (['branch', 'worktree', 'originBranch', 'title'] as const).every(
-    (k) => next[k] === tab[k]
-  );
+  const same = (
+    ['branch', 'worktree', 'originBranch', 'title', 'session'] as const
+  ).every((k) => next[k] === tab[k]);
   return same ? tab : next;
 }
 
@@ -150,10 +148,10 @@ function collapseDuplicateKeys(
  * it opened and preview replacement never happened.
  */
 export function pinLive(
-  state: TabsState,
+  state: Strip,
   repo: string,
   entries: ItemEntry[]
-): TabsState {
+): Strip {
   const branchOf = new Map(entries.map((e) => [e.itemKey, e.branch]));
   const live = new Set(entries.filter((e) => e.running).map((e) => e.branch));
   if (live.size === 0) return state;

@@ -116,6 +116,8 @@ describe('keyboard tab switching', () => {
       setStripCommands({
         attention: () => commands++,
         collapseOthers: () => commands++,
+        togglePin: () => commands++,
+        renameGroup: () => commands++,
       });
       target.addEventListener('keydown', () => delivered++);
       const first = press(key, { ctrl: true, shift: true });
@@ -134,7 +136,12 @@ describe('keyboard tab switching', () => {
 
   it('stands aside while composing or dragging the strip', () => {
     let runs = 0;
-    setStripCommands({ attention: () => runs++, collapseOthers: () => runs++ });
+    setStripCommands({
+      attention: () => runs++,
+      collapseOthers: () => runs++,
+      togglePin: () => runs++,
+      renameGroup: () => runs++,
+    });
     const composing = Object.assign(
       keyEvent('keydown', 'A', { ctrl: true, shift: true }),
       { isComposing: true }

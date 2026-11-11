@@ -1,7 +1,5 @@
 import {
   FolderOpenIcon,
-  BellIcon,
-  PanelsTopLeftIcon,
   GitBranchIcon,
   GitBranchPlusIcon,
   GitPullRequestIcon,
@@ -19,6 +17,7 @@ import { useAllBranches, useMachines } from '../lib/data/queries.js';
 import { useCreateWorktree, useRefreshRemote } from '../lib/data/mutations.js';
 import { isMachineSelectable } from '../lib/machines/machine-model.js';
 import { OpenTerminalOnMachineItems } from './machines/OpenTerminalOnMachineItems.js';
+import { StripCommandItems } from './StripCommandItems.js';
 import { useRepo } from '../lib/repo-context.js';
 import {
   itemBranch,
@@ -28,9 +27,6 @@ import {
 import { requestLaunchMenu } from '../lib/sidebar/launch-menu-request.js';
 import { standsFor, tabIdFor, useRepoTabs } from '../lib/tabs/tabs.js';
 import { useTheme } from '../lib/theme.js';
-import { useDesktopBindings } from '../lib/keybindings.js';
-import { runStripCommand } from '../lib/tabs/strip-commands.js';
-import { keysToDisplayString } from '@n10/core/ui';
 import { errorMessage, MOD } from '../lib/utils.js';
 import {
   CommandDialog,
@@ -42,10 +38,6 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from './ui/command.js';
-
-function shortcutText(keys: Parameters<typeof keysToDisplayString>[0]): string {
-  return keysToDisplayString(keys) || 'Not assigned';
-}
 
 /**
  * ⌘K palette. Three jobs in one box, mirroring the TUI branch picker:
@@ -81,7 +73,6 @@ export function CommandPalette({
   const refresh = useRefreshRemote(repo.cwd);
   const machines = useMachines();
   const [query, setQuery] = useState('');
-  const bindings = useDesktopBindings();
 
   // D8: only a connected peer — one offline is not something to offer
   // "Open terminal on" for from the palette.
@@ -173,32 +164,7 @@ export function CommandPalette({
         )}
 
         <CommandGroup heading="Commands">
-          <CommandItem
-            value="command next attention tabs"
-            onSelect={() => {
-              close();
-              runStripCommand('desktop.tabs.attention');
-            }}
-          >
-            <BellIcon />
-            Next attention
-            <CommandShortcut>
-              {shortcutText(bindings['desktop.tabs.attention'])}
-            </CommandShortcut>
-          </CommandItem>
-          <CommandItem
-            value="command collapse other tab groups"
-            onSelect={() => {
-              close();
-              runStripCommand('desktop.groups.collapse-others');
-            }}
-          >
-            <PanelsTopLeftIcon />
-            Collapse others
-            <CommandShortcut>
-              {shortcutText(bindings['desktop.groups.collapse-others'])}
-            </CommandShortcut>
-          </CommandItem>
+          <StripCommandItems close={close} />
           <CommandItem
             value="command settings preferences"
             onSelect={() => {

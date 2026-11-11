@@ -20,6 +20,7 @@ import {
   setShellGlue,
 } from '../host/register-handlers.js';
 import { stopAllAutoFixers } from '../host/services/auto-fix.js';
+import { flushWorkspace } from '../host/services/workspace-file.js';
 import { stopDiscovery } from '../host/services/discovery.js';
 import { installMachineResolver } from '../host/services/remote-machines.js';
 import { stopRemoteSyncLoop } from '../host/services/remote-sync.js';
@@ -124,6 +125,7 @@ async function shutdown(): Promise<void> {
   const removals = stopRemoteSyncLoop();
   stopDiscovery();
   stopAllAutoFixers();
+  flushWorkspace();
   try {
     killAll();
   } catch {

@@ -160,6 +160,9 @@ vi.mock('./services/auto-fix.js', () =>
 vi.mock('./services/desktop-prefs.js', () =>
   recorder('prefs', ['loadDesktopPrefs', 'saveDesktopPrefs'])
 );
+vi.mock('./services/workspace-file.js', () =>
+  recorder('workspaceFile', ['loadWorkspace', 'saveWorkspace'])
+);
 vi.mock('./services/theme.js', () => recorder('theme', ['getTheme']));
 vi.mock('./services/machines.js', () =>
   recorder('machines', [
@@ -364,6 +367,8 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'updates.setUpdatePreferences',
   ],
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
+  ['loadWorkspace', [], 'workspaceFile.loadWorkspace'],
+  ['saveWorkspace', [{ tabs: {} }], 'workspaceFile.saveWorkspace'],
   ['getTheme', [], 'theme.getTheme'],
   ['getKeybindings', [], 'keybindings.getDesktopKeybindings'],
   [

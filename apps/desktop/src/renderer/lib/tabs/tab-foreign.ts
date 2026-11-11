@@ -1,5 +1,5 @@
-import { autoOpenKey, itemTabId, type Tab } from './tab-identity.js';
-import type { TabsState } from './tabs-model.js';
+import { itemTabId, sessionKey, type Tab } from './tab-identity.js';
+import type { Strip } from './workspace.js';
 
 /**
  * The pass of `sync-items` for agents running in *other* repositories.
@@ -20,41 +20,35 @@ export interface ForeignSessionEntry {
   branch: string;
   /** The checkout the agent belongs to, when the host said. */
   worktree?: string;
-  /** Its registry name in that repository, the key its auto-open
-   *  history is kept under there. */
+  /** Its registry name in that repository, which its dismissal is
+   *  recorded under there too. */
   sessionName: string;
   title?: string;
 }
 
 /**
- * A tab per agent alive in another repository, once each.
- *
- * Recorded in `autoOpened` under the very key that repository's own
- * sync would use, so switching there later does not open — or, worse,
- * focus — a second time what is already on the strip, and a tab the
- * user closed stays closed while the agent runs on. Focus never moves:
+ * A tab per agent alive in another repository that has none and was
+ * not dismissed — under the very key that repository's own sync would
+ * use, so a tab the user closed stays closed while the agent runs on,
+ * whichever repository is in view. Focus never moves:
  * this is the restore path at launch, and a tab from another
  * repository taking focus would switch the workspace. An entry for the
  * repository in view is not this pass's business — that repository's
  * sidebar describes its own agents — and is ignored.
  */
 export function openForeign(
-  state: TabsState,
+  state: Strip,
   repo: string,
   entries: ForeignSessionEntry[]
-): TabsState {
-  const opened = new Set(state.autoOpened);
+): Strip {
+  const dismissed = new Set(state.dismissed);
   let tabs: Tab[] = state.tabs;
-  let changed = false;
   for (const entry of entries) {
     if (entry.repo === repo) continue;
-    const seen = autoOpenKey(entry.repo, entry.sessionName);
-    if (opened.has(seen)) continue;
-    opened.add(seen);
-    changed = true;
+    if (dismissed.has(sessionKey(entry.repo, entry.sessionName))) continue;
     if (!hasTabFor(tabs, entry)) tabs = [...tabs, foreignTab(entry)];
   }
-  return changed ? { ...state, tabs, autoOpened: [...opened] } : state;
+  return tabs === state.tabs ? state : { ...state, tabs };
 }
 
 /** Whether the strip already shows this agent's item — by key, by the
@@ -85,5 +79,6 @@ function foreignTab(entry: ForeignSessionEntry): Tab {
     branch: entry.branch,
     ...(entry.worktree ? { worktree: entry.worktree } : {}),
     title: entry.title ?? entry.branch,
+    session: entry.sessionName,
   };
 }

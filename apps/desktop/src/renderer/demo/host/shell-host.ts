@@ -99,6 +99,8 @@ type ShellHost = Pick<
   | 'onMenuCommand'
   | 'getDesktopPrefs'
   | 'setDesktopPrefs'
+  | 'loadWorkspace'
+  | 'saveWorkspace'
   | 'getTheme'
   | 'onThemeChanged'
   | 'getKeybindings'
@@ -166,6 +168,9 @@ export function createShellHost(state: DemoState): ShellHost {
       themes.emit(resolved());
       return later(prefs);
     },
+    // A page restores nothing: each visit starts from the demo's agents.
+    loadWorkspace: () => later({ status: 'none' as const }),
+    saveWorkspace: () => later(undefined),
     getTheme: () => later(resolved()),
     onThemeChanged: themes.subscribe,
     getKeybindings: () => later(keybindings),

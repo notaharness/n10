@@ -44,6 +44,7 @@ import {
 import { useCloseTabs } from '../lib/tabs/use-close-tabs.js';
 import { REMOTE_HOME_CWD } from '../lib/terminals/terminal-launch-request.js';
 import { useTerminalTabs } from '../lib/terminals/use-terminal-tabs.js';
+import { useRestoredNotice } from '../lib/tabs/use-restored-notice.js';
 import { NewTerminalDialog } from '../components/terminal/NewTerminalDialog.js';
 import { setThemePreference, type ThemePreference } from '../lib/theme.js';
 import { errorMessage } from '../lib/utils.js';
@@ -142,20 +143,25 @@ function WorkspaceInner({
     return () => setRevealHost(null);
   }, [setRevealHost]);
 
-  // The sidebar as the tab model sees it.
-  const entries: ItemEntry[] = useMemo(
+  // The sidebar as the tab model sees it; `undefined` until the host's
+  // first model lands, since only a sidebar that has answered can say a
+  // dismissed agent ended.
+  const loaded = model.data !== undefined;
+  const entries: ItemEntry[] | undefined = useMemo(
     () =>
-      items.map((i) => ({
-        itemKey: itemKey(i),
-        branch: itemBranch(i),
-        title: itemTitle(i),
-        running: itemRunning(i),
-        sessionName: itemSessionName(i),
-        worktree: itemWorktree(i),
-        sessionBranch:
-          i.kind === 'session' ? i.session.sessionBranch : undefined,
-      })),
-    [items]
+      loaded
+        ? items.map((i) => ({
+            itemKey: itemKey(i),
+            branch: itemBranch(i),
+            title: itemTitle(i),
+            running: itemRunning(i),
+            sessionName: itemSessionName(i),
+            worktree: itemWorktree(i),
+            sessionBranch:
+              i.kind === 'session' ? i.session.sessionBranch : undefined,
+          }))
+        : undefined,
+    [items, loaded]
   );
 
   // The one place every store the strip depends on is reconciled: the
@@ -174,6 +180,7 @@ function WorkspaceInner({
   // reason to re-run, since the branch it lands on may already be
   // live. Re-running settles — every step above is idempotent and
   // returns the same state object once there is nothing left to do.
+  useRestoredNotice(tabs.tabs, terminalTabs.entries);
   useEffect(() => {
     tabs.syncItems(entries, terminalTabs.entries, foreign);
   }, [tabs, entries, terminalTabs.entries, foreign]);

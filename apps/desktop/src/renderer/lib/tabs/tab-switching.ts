@@ -10,7 +10,11 @@ import {
   stepMru,
   type TabMru,
 } from './tab-mru.js';
-import { hasStripCommands, runStripCommand } from './strip-commands.js';
+import {
+  hasStripCommands,
+  isStripCommand,
+  runStripCommand,
+} from './strip-commands.js';
 
 /**
  * The keyboard tab switcher, apart from React: one MRU order for the
@@ -135,11 +139,7 @@ function commit(): void {
 }
 
 function runAuxiliaryAction(e: KeyEvent, action: DesktopActionId): boolean {
-  if (
-    action !== 'desktop.tabs.attention' &&
-    action !== 'desktop.groups.collapse-others'
-  )
-    return false;
+  if (!isStripCommand(action)) return false;
   if (!hasStripCommands()) return true;
   e.preventDefault();
   e.stopImmediatePropagation();

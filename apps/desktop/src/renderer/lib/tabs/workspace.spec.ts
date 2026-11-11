@@ -1,0 +1,250 @@
+import { describe, expect, it } from 'vitest';
+import type { SavedWorkspace } from '../../../host/contract.js';
+import {
+  itemTabId,
+  sessionKey,
+  terminalDismissKey,
+  terminalTabId,
+} from './tab-identity.js';
+import {
+  EMPTY_WORKSPACE,
+  reduce,
+  type ItemEntry,
+  type TabsAction,
+  type TerminalEntry,
+  type Workspace,
+} from './tabs-model.js';
+import { restoreWorkspace, toSaved } from './workspace-file.js';
+import { focusedPaneOf, stripOf } from './workspace.js';
+
+const REPO = '/repos/alpha';
+const OTHER = '/repos/beta';
+const id = (key: string, repo = REPO) => itemTabId(repo, key);
+
+const run = (...actions: TabsAction[]) =>
+  actions.reduce(reduce, EMPTY_WORKSPACE);
+const then = (ws: Workspace, ...actions: TabsAction[]) =>
+  actions.reduce(reduce, ws);
+const view = (ws: Workspace) => stripOf(ws, focusedPaneOf(ws).id);
+const ids = (ws: Workspace) => view(ws).tabs.map((t) => t.id);
+const open = (itemKey: string, preview = false): TabsAction => ({
+  type: 'open-item',
+  repo: REPO,
+  itemKey,
+  preview,
+});
+const sync = (
+  entries: ItemEntry[] | undefined,
+  terminals?: TerminalEntry[],
+  repo = REPO
+): TabsAction => ({ type: 'sync-items', repo, entries, terminals });
+
+const live: ItemEntry = {
+  itemKey: 'branch:x',
+  branch: 'x',
+  sessionName: 'x',
+  running: true,
+};
+const shell = (created?: number, machine?: string): TerminalEntry => ({
+  name: 'notes-shell',
+  kind: 'shell',
+  cwd: '/home/dev/notes',
+  displayPath: '~/notes',
+  repo: null,
+  ...(created !== undefined ? { created } : {}),
+  ...(machine ? { machine } : {}),
+});
+
+describe('keep and pin', () => {
+  it('ends a preview without pinning it', () => {
+    const ws = run(open('branch:a', true), {
+      type: 'keep',
+      id: id('branch:a'),
+    });
+    expect(view(ws).tabs[0].preview).toBe(false);
+    expect(ws.pinned).toEqual([]);
+  });
+
+  it('pins a preview and keeps it, leaving the order alone', () => {
+    const ws = run(open('branch:a'), open('branch:b', true), {
+      type: 'set-pinned',
+      ids: [id('branch:b')],
+      pinned: true,
+    });
+    expect(ws.pinned).toEqual([id('branch:b')]);
+    expect(view(ws).tabs[1].preview).toBe(false);
+    expect(ids(ws)).toEqual([id('branch:a'), id('branch:b')]);
+    expect(view(ws).activeId).toBe(id('branch:b'));
+  });
+
+  it('unpins without moving the tab or focus', () => {
+    let ws = run(open('branch:a'), open('branch:b'), {
+      type: 'set-pinned',
+      ids: [id('branch:b')],
+      pinned: true,
+    });
+    ws = then(ws, { type: 'set-pinned', ids: [id('branch:b')], pinned: false });
+    expect(ws.pinned).toEqual([]);
+    expect(ids(ws)).toEqual([id('branch:a'), id('branch:b')]);
+    expect(view(ws).activeId).toBe(id('branch:b'));
+  });
+
+  it('changes nothing for a tab that is not there, or already pinned', () => {
+    const ws = run(open('branch:a'), {
+      type: 'set-pinned',
+      ids: [id('branch:a')],
+      pinned: true,
+    });
+    expect(
+      then(ws, { type: 'set-pinned', ids: [id('branch:a')], pinned: true })
+    ).toBe(ws);
+    expect(
+      then(ws, { type: 'set-pinned', ids: ['nothing'], pinned: true })
+    ).toBe(ws);
+  });
+
+  it('drops the pin when its tab closes', () => {
+    const ws = run(
+      open('branch:a'),
+      { type: 'set-pinned', ids: [id('branch:a')], pinned: true },
+      { type: 'close', id: id('branch:a') }
+    );
+    expect(ws.pinned).toEqual([]);
+  });
+
+  it('keeps pinned tabs through Close Others and Close All', () => {
+    let ws = run(open('branch:a'), open('branch:b'), open('branch:c'), {
+      type: 'set-pinned',
+      ids: [id('branch:a')],
+      pinned: true,
+    });
+    ws = then(ws, { type: 'close-others', id: id('branch:c') });
+    expect(ids(ws)).toEqual([id('branch:a'), id('branch:c')]);
+    expect(view(ws).activeId).toBe(id('branch:c'));
+    ws = then(ws, { type: 'close-all', repo: REPO });
+    expect(ids(ws)).toEqual([id('branch:a')]);
+    expect(view(ws).activeId).toBe(id('branch:a'));
+  });
+});
+
+describe('rename-group', () => {
+  const rename = (name: string | null): TabsAction => ({
+    type: 'rename-group',
+    key: 'claude:x',
+    name,
+  });
+
+  it('names a group by its key, trimmed', () => {
+    expect(run(rename('  Ops  ')).groupNames).toEqual({ 'claude:x': 'Ops' });
+  });
+
+  it('gives the group its label back for a blank name or null', () => {
+    expect(run(rename('Ops'), rename('   ')).groupNames).toEqual({});
+    expect(run(rename('Ops'), rename(null)).groupNames).toEqual({});
+  });
+
+  it('returns the same workspace for an unchanged name', () => {
+    const ws = run(rename('Ops'));
+    expect(then(ws, rename('Ops'))).toBe(ws);
+  });
+});
+
+describe('dismissed', () => {
+  it('keeps a closed agent closed while it runs, then forgets it once it ends', () => {
+    let ws = run(sync([live]), { type: 'close', id: id('branch:x') });
+    expect(ws.dismissed).toEqual([sessionKey(REPO, 'x')]);
+    ws = then(ws, sync([live]));
+    expect(ids(ws)).toEqual([]);
+    ws = then(ws, sync([{ ...live, running: false }]));
+    expect(ws.dismissed).toEqual([]);
+    // Started again later: a new agent, with its tab.
+    ws = then(ws, sync([live]));
+    expect(ids(ws)).toEqual([id('branch:x')]);
+  });
+
+  it('forgets nothing on a sidebar that has not answered', () => {
+    const ws = run(sync([live]), { type: 'close', id: id('branch:x') });
+    expect(then(ws, sync(undefined))).toBe(ws);
+  });
+
+  it('forgets an agent the user opened again from the sidebar', () => {
+    let ws = run(sync([live]), { type: 'close', id: id('branch:x') });
+    ws = then(ws, open('branch:x'), sync([live]));
+    expect(ws.dismissed).toEqual([]);
+  });
+
+  it('keeps another repository’s closed agent until its listing drops it', () => {
+    const foreign = { repo: OTHER, branch: 'f', sessionName: 'f' };
+    let ws = run({ type: 'sync-items', repo: REPO, foreign: [foreign] });
+    ws = then(ws, { type: 'close', id: id('branch:f', OTHER) });
+    ws = then(ws, { type: 'sync-items', repo: REPO, foreign: [foreign] });
+    expect(ids(ws)).toEqual([]);
+    ws = then(ws, { type: 'sync-items', repo: REPO, foreign: [] });
+    expect(ws.dismissed).toEqual([]);
+  });
+
+  it('dismisses a terminal by its session, so a later one of its name opens', () => {
+    let ws = run(sync([], [shell(1)]), {
+      type: 'close',
+      id: terminalTabId('notes-shell'),
+    });
+    expect(ws.dismissed).toEqual([terminalDismissKey('notes-shell', 1)]);
+    expect(ids(then(ws, sync([], [shell(1)])))).toEqual([]);
+    ws = then(ws, sync([], [shell(2)]));
+    expect(ids(ws)).toEqual([terminalTabId('notes-shell')]);
+    expect(ws.dismissed).toEqual([]);
+  });
+});
+
+describe('a restored terminal tab', () => {
+  /** A workspace that went through the file, as a launch restores it. */
+  const restored = (created: number, machine?: string) => {
+    const saved = run(sync([], [shell(created, machine)]));
+    const file = JSON.parse(JSON.stringify(toSaved(saved))) as SavedWorkspace;
+    return restoreWorkspace(file);
+  };
+  const tab = (ws: Workspace) => view(ws).tabs[0];
+
+  it('comes back restored, waiting for a listing', () => {
+    expect(tab(restored(1))).toMatchObject({ restored: true, created: 1 });
+  });
+
+  it('binds to the session it was saved with', () => {
+    const ws = then(restored(1), sync([], [shell(1)]));
+    expect(tab(ws)).toMatchObject({ listed: true, created: 1 });
+    expect(tab(ws)).not.toHaveProperty('restored');
+  });
+
+  it('closes when its name now belongs to a later session, which gets a tab of its own', () => {
+    const ws = then(restored(1), sync([], [shell(2)]));
+    expect(view(ws).tabs).toHaveLength(1);
+    expect(tab(ws)).toMatchObject({ created: 2, listed: true });
+    expect(tab(ws)).not.toHaveProperty('restored');
+  });
+
+  it('closes when a listing does not have it', () => {
+    expect(ids(then(restored(1), sync([], [])))).toEqual([]);
+  });
+
+  it('waits on a listing that does not know the creation time yet, or no listing', () => {
+    expect(tab(then(restored(1), sync([], [shell()])))).toMatchObject({
+      restored: true,
+    });
+    expect(tab(then(restored(1), sync([])))).toMatchObject({ restored: true });
+  });
+
+  it('waits for another machine that does not list it', () => {
+    const ws = then(restored(1, 'peer'), sync([], []));
+    expect(tab(ws)).toMatchObject({ restored: true, machine: 'peer' });
+  });
+
+  it('gives way to a terminal the host just started under its name', () => {
+    const ws = then(restored(1), {
+      type: 'open-terminal',
+      terminal: shell(5),
+    });
+    expect(tab(ws)).toMatchObject({ created: 5, listed: false });
+    expect(tab(ws)).not.toHaveProperty('restored');
+    expect(view(ws).activeId).toBe(terminalTabId('notes-shell'));
+  });
+});

@@ -18,6 +18,8 @@ function toEntry(t: TerminalSummary): TerminalEntry {
     displayPath: t.displayPath,
     repo: t.repo,
     ...(t.branch ? { branch: t.branch } : {}),
+    ...(t.created !== undefined ? { created: t.created } : {}),
+    machine: t.machine,
   };
 }
 

@@ -57,6 +57,10 @@ export interface TerminalSummary {
   branch?: string;
   running: boolean;
   spawnedAt: number;
+  /** When its tmux session was created (epoch seconds), once discovery
+   *  has listed it: a name can be reused by a later session, this
+   *  cannot. A restored tab binds only to the session it was saved with. */
+  created?: number;
   /** The machine this terminal runs on — `'local'` or a beam peerId
    *  (decisions.md D2, D8). */
   machine: string;
