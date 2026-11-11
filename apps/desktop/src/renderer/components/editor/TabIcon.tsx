@@ -15,11 +15,13 @@ export function TabIcon({
   running,
   snapshot,
   active,
+  iconClassName = 'size-4',
 }: {
   Icon: typeof SettingsIcon;
   running: boolean;
   snapshot: SessionActivitySnapshot | undefined;
   active: boolean;
+  iconClassName?: string;
 }) {
   const fill = active ? 'bg-tab-active' : 'bg-tab group-hover:bg-tab-hover';
   const ring = active
@@ -27,7 +29,7 @@ export function TabIcon({
     : 'ring-tab group-hover:ring-tab-hover';
   return (
     <span className="relative flex shrink-0">
-      <Icon className="size-4" />
+      <Icon aria-hidden className={iconClassName} />
       {snapshot?.active ? (
         <span
           className={cn(

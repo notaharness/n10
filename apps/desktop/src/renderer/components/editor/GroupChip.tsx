@@ -64,6 +64,7 @@ function HomeBody({
       ref={setHandle}
       {...handle}
       {...hover.handlers}
+      aria-label={name}
       aria-selected={active}
       aria-description={
         containsActive && !active ? 'Contains active tab' : undefined
@@ -100,10 +101,15 @@ function HomeBody({
       }}
       title={[
         name,
-        `Orchestrator: ${face.taskTitle ?? (face.harness ? harnessLabel(face.harness) : 'Agent')}`,
+        `Orchestrator: ${
+          face.taskTitle ??
+          (face.harness ? harnessLabel(face.harness) : 'Agent')
+        }`,
         tab.kind === 'item' ? `Repository: ${tab.repo}` : undefined,
         tab.kind === 'terminal' ? `Directory: ${tab.cwd}` : undefined,
-      ].filter(Boolean).join('\n')}
+      ]
+        .filter(Boolean)
+        .join('\n')}
       className={cn(CHIP_BODY, 'cursor-default')}
     >
       <HomeLabel face={face} name={name} />
