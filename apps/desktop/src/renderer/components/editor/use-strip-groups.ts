@@ -15,10 +15,6 @@ import {
   resolveMachineLabel,
 } from '../../lib/machines/machine-model.js';
 import { useRepo } from '../../lib/repo-context.js';
-import {
-  itemBranch,
-  itemSessionName,
-} from '../../lib/sidebar/sidebar-model.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
 import { affiliationIndex, tabFacts } from '../../lib/tabs/tab-affiliation.js';
 import {
@@ -31,6 +27,7 @@ import {
   type TabStatus,
 } from '../../lib/tabs/tab-groups.js';
 import { indexItems, tabItem } from '../../lib/tabs/tab-item.js';
+import { listedSessions, tabSessions } from '../../lib/tabs/tab-sessions.js';
 import { tabRepo } from '../../lib/tabs/tab-presentation.js';
 import { notePresentedOrder } from '../../lib/tabs/tab-switching.js';
 import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
@@ -78,8 +75,8 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
   const index = useMemo(() => indexItems(repo.cwd, items), [repo.cwd, items]);
 
   const sessionRows = useMemo(
-    () => items.flatMap((i) => (i.kind === 'session' ? [i.session] : [])),
-    [items]
+    () => listedSessions(items, sessions.data),
+    [items, sessions.data]
   );
   const affiliations = useMemo(
     () =>
@@ -92,27 +89,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     [repo.cwd, sessionRows, terminals.data, foreign.data]
   );
 
-  /** The session a tab shows or works beside: a terminal's own, a
-   *  worktree row's, else the agent in a checkout on the item's branch. */
-  const sessionOf = (tab: Tab): string | undefined => {
-    if (tab.kind === 'terminal') return tab.name;
-    const item = tabItem(tab, index);
-    if (!item) return undefined;
-    if (item.kind === 'session') return item.session.name;
-    const branch = itemBranch(item);
-    for (const i of items) {
-      const name = itemSessionName(i);
-      if (name && itemBranch(i) === branch) return name;
-    }
-    return undefined;
-  };
-  /** Only a tab's own session counts toward its status: a pull request
-   *  beside an agent does not copy the agent's. */
-  const ownSession = (tab: Tab): string | undefined => {
-    if (tab.kind === 'terminal') return tab.name;
-    const item = tabItem(tab, index);
-    return item?.kind === 'session' ? item.session.name : undefined;
-  };
+  const { sessionOf, ownSession } = tabSessions(items, index);
 
   const machineLabelFor = (tab: Tab): string | null => {
     if (!showMachines) return null;
