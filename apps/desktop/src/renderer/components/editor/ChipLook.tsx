@@ -3,7 +3,7 @@ import type { ChipSignal } from '../../lib/tabs/group-status.js';
 import { usePlanTotal } from '../../lib/plan/plan.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
 import { chipClassName } from './tab-look-class.js';
-import { PlanCountBadge, RepoBand } from './tab-marks.js';
+import { PlanCountBadge, RepoBand, UnseenDot } from './tab-marks.js';
 import { TabIcon } from './TabIcon.js';
 import type { TabFace } from './use-strip-groups.js';
 
@@ -86,8 +86,8 @@ function ChipLabel({
   );
 }
 
-/** The chip's insides: icon, name, its members' plan total, tab count
- *  and repository band. */
+/** The chip's insides: icon, name, its members' plan total, the mark
+ *  of a tab behind it not yet looked at, tab count and repository band. */
 export function ChipFace({
   head,
   label,
@@ -121,6 +121,7 @@ export function ChipFace({
       />
       <ChipLabel label={label} active={active} />
       <PlanCountBadge count={planned} />
+      {signal.unseen && <UnseenDot />}
       <span
         data-group-count
         className="shrink-0 rounded bg-muted px-1 text-[11px] leading-4 tabular-nums text-muted-foreground"
@@ -139,6 +140,7 @@ export function ChipLook(face: Parameters<typeof ChipFace>[0]) {
       className={chipClassName({
         containsActive: face.active !== null,
         flashing: face.signal.flashing,
+        unseen: face.signal.unseen,
         dragging: false,
         wrap: false,
       })}

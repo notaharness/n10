@@ -7,23 +7,25 @@ import { tabStateClassName } from './tab-marks.js';
  */
 
 /** A chip is drawn as a tab is: the active tab's colours while its
- *  group holds the active tab, blinking while its group has news
- *  (`chipSignal`). */
+ *  group holds the active tab, blinking while its group has news, and
+ *  lit while a tab behind it is unseen (`chipSignal`). */
 export function chipClassName({
   containsActive,
   flashing,
+  unseen = false,
   dragging,
   wrap,
 }: {
   containsActive: boolean;
   flashing: boolean;
+  unseen?: boolean;
   dragging: boolean;
   wrap: boolean;
 }): string {
   return cn(
     tabClassName({
       active: containsActive,
-      unseen: false,
+      unseen,
       dragging,
       flashing,
       wrap,

@@ -64,10 +64,12 @@ export function rowStatus(
 }
 
 /** What a chip shows of its tabs' activity: whether it blinks for new
- *  output and spins for work. */
+ *  output, spins for work, and marks a tab opened behind it that
+ *  nobody has looked at. */
 export interface ChipSignal {
   flashing: boolean;
   working: boolean;
+  unseen: boolean;
 }
 
 /** A tab's activity, as its session's snapshot has it. */
@@ -83,15 +85,19 @@ type Activity = { active: boolean; flashing: boolean } | undefined;
  * every member's, since nothing else surfaces them. `activity` is the
  * group's tabs', in its order; `home` says whether the first is the
  * orchestrator's (`TabGroup.head`), and `homeElsewhere` whether its tab
- * is open outside the group.
+ * is open outside the group. `unseen` is the tabs' unseen marks, in the
+ * same order, carried by the same rule.
  */
 export function chipSignal(
   activity: readonly Activity[],
-  { home, homeElsewhere }: { home: boolean; homeElsewhere: boolean }
+  { home, homeElsewhere }: { home: boolean; homeElsewhere: boolean },
+  unseen: readonly boolean[] = []
 ): ChipSignal {
-  const own = home ? activity.slice(0, 1) : homeElsewhere ? [] : activity;
+  const carried = home ? 1 : homeElsewhere ? 0 : activity.length;
+  const own = activity.slice(0, carried);
   return {
     flashing: own.some((a) => a?.flashing),
     working: own.some((a) => a?.active),
+    unseen: unseen.slice(0, carried).some(Boolean),
   };
 }

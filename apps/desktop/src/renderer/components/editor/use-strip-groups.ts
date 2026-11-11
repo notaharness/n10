@@ -212,16 +212,16 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     return colors.size === 1 ? only ?? null : null;
   };
 
-  const signalOf = (group: TabGroup) =>
-    chipSignal(
-      group.tabs.map((tab) => faceOf(tab).snapshot),
-      group.head
-        ? { home: true, homeElsewhere: false }
-        : {
-            home: false,
-            homeElsewhere: homeOpenAmong(group, tabs.allTabs, factsOf),
-          }
+  const signalOf = (group: TabGroup) => {
+    const faces = group.tabs.map(faceOf);
+    const home = group.head !== null;
+    const homeElsewhere = !home && homeOpenAmong(group, tabs.allTabs, factsOf);
+    return chipSignal(
+      faces.map((f) => f.snapshot),
+      { home, homeElsewhere },
+      faces.map((f) => f.unseen)
     );
+  };
 
   // Positional keyboard switching walks the order the strip presents,
   // the members behind chips included.

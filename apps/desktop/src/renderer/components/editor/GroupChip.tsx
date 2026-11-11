@@ -120,6 +120,7 @@ export function GroupChip({
         className={chipClassName({
           containsActive,
           flashing: signal.flashing,
+          unseen: signal.unseen,
           dragging,
           wrap: tabOverflow === 'wrap',
         })}
