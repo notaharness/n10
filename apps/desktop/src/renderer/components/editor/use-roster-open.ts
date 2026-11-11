@@ -9,9 +9,9 @@ export const HOVER_CLOSE_MS = 180;
 
 /**
  * How a roster is open: `hover` (the pointer rests on the chip; it
- * closes when the pointer leaves), `pinned` (a press opened it, or
- * pressed it while hover had it open; it closes on a choice, Escape or a
- * press outside) or `keyboard` (as pinned, with its rows focused).
+ * closes when the pointer leaves), `pinned` (held open while a row's
+ * menu is up; it closes on a choice, Escape or a press outside) or
+ * `keyboard` (as pinned, with its rows focused).
  */
 export type RosterMode = 'hover' | 'pinned' | 'keyboard';
 
@@ -61,11 +61,6 @@ export function useRosterOpen() {
      *  pending hover-open is dropped. */
     cancelHover() {
       if (mode === null) clear();
-    },
-    /** A press on the roster button or a label that opens it. */
-    press() {
-      clear();
-      setMode((now) => (now === null || now === 'hover' ? 'pinned' : null));
     },
     /** Keep a hover-open roster open, as a press would (its row's menu
      *  takes the pointer away). */

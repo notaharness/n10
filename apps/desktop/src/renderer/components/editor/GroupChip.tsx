@@ -103,9 +103,9 @@ function ChipLabel({
 
 /**
  * A group's chip: one control standing for the whole group on the
- * strip. Its folder, name, tab count and states; pressing it, Enter or
- * Alt+ArrowDown opens the roster of its tabs, as resting on it does, and
- * dragging it moves the group. It shows as active while the pane's
+ * strip. Its folder, name, tab count and states. Pressing it shows the
+ * group's first tab; Enter or Alt+ArrowDown opens the roster of its
+ * tabs, as resting on it does; dragging it moves the group. It shows as active while the pane's
  * active tab is one of its members, and names that member.
  */
 export function GroupChip({
@@ -122,7 +122,7 @@ export function GroupChip({
   chipRef,
   menu,
   onKeyDown,
-  justDropped,
+  onPress,
 }: {
   group: TabGroup;
   label: string;
@@ -141,8 +141,8 @@ export function GroupChip({
   chipRef: RefObject<HTMLDivElement | null>;
   menu: GroupMenu;
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
-  /** Whether the group was just dropped: the click that follows is no press. */
-  justDropped: () => boolean;
+  /** A press of the chip (not the click a drop ends in). */
+  onPress: () => void;
 }) {
   const containsActive = active !== null;
   const planned = usePlanTotal(planIds);
@@ -171,9 +171,7 @@ export function GroupChip({
           handle.onKeyDown(e);
           if (!e.defaultPrevented) onKeyDown(e);
         }}
-        onClick={() => {
-          if (!justDropped()) roster.press();
-        }}
+        onClick={onPress}
         onContextMenu={(e) => {
           e.preventDefault();
           runGroupMenu(menu).catch((err: unknown) =>

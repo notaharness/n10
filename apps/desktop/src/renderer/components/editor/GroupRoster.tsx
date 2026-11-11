@@ -19,6 +19,7 @@ import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
 import type { useRosterOpen } from './use-roster-open.js';
 import { walkRows } from './roster-keys.js';
+import { rosterEntries } from './roster-order.js';
 import { rosterSecondary } from './roster-text.js';
 
 /** The row's state, at its end: active first, then the state. */
@@ -106,12 +107,16 @@ function RowText({
   );
 }
 
+/** How far in a row of `depth` starts: a step per level. */
+const indent = (depth: number) => `${0.5 + depth}rem`;
+
 export function RosterRow({
   face,
   active,
   onJump,
   onMenu,
   home,
+  depth = 0,
 }: {
   face: TabFace;
   active: boolean;
@@ -119,6 +124,8 @@ export function RosterRow({
   /** The tab's native menu, from its row. */
   onMenu?: (tab: Tab) => void;
   home: boolean;
+  /** Under the home (1), or under a player too (2). */
+  depth?: number;
 }) {
   const label = home
     ? ['Orchestrator', face.taskTitle].filter(Boolean).join(' · ')
@@ -135,6 +142,8 @@ export function RosterRow({
         type="button"
         data-roster-row={face.tab.id}
         aria-current={active || undefined}
+        data-roster-depth={depth}
+        style={{ paddingInlineStart: indent(depth) }}
         aria-label={rowName(label, where, active, status)}
         onClick={() => onJump(face.tab)}
         onContextMenu={
@@ -160,7 +169,8 @@ export function RosterRow({
 
 /**
  * A group's tabs, in a popover under its chip: the home first, then the
- * members in strip order, each with its state. Choosing one shows it.
+ * members in strip order, an orchestrator's players under it
+ * (`rosterEntries`), each with its state. Choosing one shows it.
  * Hover opens it without taking focus; the keyboard opens it on the
  * active row, else the first.
  */
@@ -174,6 +184,7 @@ export function GroupRoster({
   onJump,
   onMenu,
   homeId,
+  players,
 }: {
   groupKey: string;
   label: string;
@@ -185,6 +196,8 @@ export function GroupRoster({
   onJump: (tab: Tab) => void;
   onMenu: (tab: Tab) => void;
   homeId?: string;
+  /** A parent's group: its players sit under its home. */
+  players: boolean;
 }) {
   const list = useRef<HTMLUListElement>(null);
   const escaped = useRef(false);
@@ -274,7 +287,7 @@ export function GroupRoster({
         viewportClassName="max-h-[inherit]"
       >
         <ul ref={list} onKeyDown={walkRows} className="flex flex-col">
-          {faces.map((face) => (
+          {rosterEntries(faces, homeId, players).map(({ face, depth }) => (
             <RosterRow
               key={face.tab.id}
               face={face}
@@ -282,6 +295,7 @@ export function GroupRoster({
               onJump={jump}
               onMenu={onMenu}
               home={face.tab.id === homeId}
+              depth={depth}
             />
           ))}
         </ul>

@@ -31,9 +31,11 @@ function blockClassName(dragging: boolean): string {
 
 /**
  * A group on the strip: its chip alone, whose roster lists its tabs.
- * The chip drags the group as one block, the groups shown behind it
- * (`followers`) with it. Choosing a row shows that tab; the strip does
- * not change.
+ * Pressing the chip shows the group's first tab (its home, for an
+ * orchestrator's); resting on it, Enter or Alt+ArrowDown opens the
+ * roster. The chip drags the group as one block, the groups shown
+ * behind it (`followers`) with it. Choosing a row shows that tab; the
+ * strip does not change.
  */
 export function GroupBlock({
   group,
@@ -91,7 +93,6 @@ export function GroupBlock({
     }, 0);
   };
   useDndMonitor({ onDragEnd: noteDrop, onDragCancel: noteDrop });
-  const justDropped = () => dropped.current;
   const jump = (tab: Tab) => {
     roster.close();
     tabs.activate(tab.id);
@@ -138,7 +139,11 @@ export function GroupBlock({
           chipRef={chip}
           menu={groupMenu}
           onKeyDown={onKeyDown}
-          justDropped={justDropped}
+          onPress={() => {
+            if (dropped.current) return;
+            const first = group.tabs[0];
+            if (first) jump(first);
+          }}
         />
         <GroupRoster
           groupKey={group.key}
@@ -150,6 +155,7 @@ export function GroupBlock({
           onJump={jump}
           onMenu={rowMenu}
           homeId={head?.id}
+          players={group.affiliation?.kind === 'parent'}
         />
       </Popover>
       {followers}
