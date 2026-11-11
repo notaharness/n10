@@ -75,9 +75,9 @@ test.describe('Agents restored across repositories', () => {
     await expect(tab(page, new RegExp(ALPHA))).toBeVisible({
       timeout: 30_000,
     });
-    // The other repository's: on the strip in its group, prefixed with
-    // that repository's name — and the workspace stayed where it opened.
-    const beta = tab(page, new RegExp(`repo-beta\\s*/\\s*${BETA}`));
+    // The other repository's: on the strip in its group, named after
+    // that repository — and the workspace stayed where it opened.
+    const beta = tab(page, new RegExp(`^repo-beta · ${BETA}`));
     await expect(beta).toBeVisible({ timeout: 30_000 });
     // Two repositories' tabs, each a block of its own, in one row.
     await expect(tabs(page)).toHaveCount(2);

@@ -19,6 +19,12 @@ import {
   terminalTabs,
 } from './setup/terminals.js';
 
+const directoryLine = (path: string) =>
+  new RegExp(
+    `^Directory: ${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+    'm'
+  );
+
 /**
  * Terminal tabs: opened from the native menu through
  * the where-then-what dialog, shown as a terminal and nothing else,
@@ -45,11 +51,10 @@ test.describe('Terminal tabs', () => {
 
     const tab = terminalTabs(page);
     await expect(tab).toHaveCount(1);
-    // Titled by its directory with the tail kept — the tab is narrow and
-    // the repository's name is at the end of the path — and the whole
-    // path on hover.
+    // Alone in its place, the tab uses the repository name. The tooltip
+    // keeps the whole directory path in a labeled detail line.
     await expect(tab).toContainText(basename(repoPath));
-    await expect(tab).toHaveAttribute('title', repoPath);
+    await expect(tab).toHaveAttribute('title', directoryLine(repoPath));
     await expect(tab).toHaveAttribute('aria-selected', 'true');
 
     // The host knows it as a shell at that repository's root.
@@ -134,7 +139,7 @@ test.describe('Terminal tabs', () => {
       await confirmNewTerminal(page, 'Shell');
 
       const tab = terminalTabs(page);
-      await expect(tab).toHaveAttribute('title', folder);
+      await expect(tab).toHaveAttribute('title', directoryLine(folder));
       // A block of its own, right after the repository's tab in one row.
       await expectNextBlock(tabNamed(page, /some-work/), tab);
       // …and no repository prefix, because it belongs to none.
@@ -222,7 +227,7 @@ test.describe('Terminal tabs', () => {
     await expect(dialog).toBeHidden();
     const tab = terminalTabs(page);
     await expect(tab).toHaveCount(1);
-    await expect(tab).toHaveAttribute('title', repoPath);
+    await expect(tab).toHaveAttribute('title', directoryLine(repoPath));
     const listed = await page.evaluate(() => window.n10.listTerminals());
     expect(listed).toEqual([
       expect.objectContaining({ kind: 'shell', cwd: repoPath, running: true }),

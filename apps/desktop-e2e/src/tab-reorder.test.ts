@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab } from './setup/app.js';
+import { createWorktree, tab, tabs } from './setup/app.js';
 import {
   carryOver,
   expectNothingLifted,
@@ -128,7 +128,8 @@ test.describe('Reordering tabs', () => {
     await tab(page, /beta/).focus();
     await page.keyboard.press('Delete');
     await expect(tab(page, /beta/)).toHaveCount(0);
-    expect(await tabNames(page)).toEqual(['alpha']);
+    await expect(tabs(page)).toHaveCount(1);
+    await expect(tab(page, / · alpha/)).toHaveCount(1);
   });
 
   test('keys on the close button never lift the tab', async ({ desktop }) => {

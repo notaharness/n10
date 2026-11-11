@@ -47,15 +47,16 @@ test.describe('Pull request titles', () => {
     await expect(row.locator('span.truncate').first()).toHaveText(TITLE);
     await expect(row).toContainText(BRANCH);
 
+    // Alone in its place, the tab names its repository, then the title.
     await row.click();
-    const own = tab(page, new RegExp(`^\\s*${TITLE}`));
+    const own = tab(page, new RegExp(`${ALPHA}\\s*·\\s*${TITLE}`));
     await expect(own).toBeVisible();
-    await expect(tab(page, new RegExp(`^\\s*${BRANCH}`))).toHaveCount(0);
+    await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0);
 
     // Out of reach: beta's sidebar has no row for it, and the tab keeps
     // its title all the same.
     await switchRepo(page, otherRepo);
-    const foreign = tab(page, new RegExp(`${ALPHA}\\s*/\\s*${TITLE}`));
+    const foreign = tab(page, new RegExp(`${ALPHA}\\s*·\\s*${TITLE}`));
     await expect(foreign).toBeVisible();
     await expect(tab(page, /42\s*$/)).toHaveCount(0);
     await expect(tab(page, new RegExp(BRANCH))).toHaveCount(0);
