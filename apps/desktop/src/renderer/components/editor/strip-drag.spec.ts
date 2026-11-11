@@ -95,10 +95,18 @@ describe('strip drag', () => {
   });
   it('lets a member land in another pane’s strip, beside a block or its own group', () => {
     const tab = { ...member('g', 1), pane: 'pane-1' };
-    const there = { ...block(['c', 'd'], 0), pane: 'pane-2' };
+    const there: StripDragData = {
+      kind: 'block',
+      label: 'b',
+      ids: ['c', 'd'],
+      index: 0,
+      pane: 'pane-2',
+    };
     expect(acceptsDrop(there, tab)).toBe(true);
     expect(acceptsDrop({ ...there, pane: 'pane-1' }, tab)).toBe(false);
-    expect(acceptsDrop({ ...there, pinned: true }, tab)).toBe(false);
+    expect(acceptsDrop({ ...there, pinned: true } as StripDragData, tab)).toBe(
+      false
+    );
     expect(acceptsDrop({ ...member('h', 0), pane: 'pane-2' }, tab)).toBe(false);
     expect(dropMove('a', tab, 'block:h', there, [], 'after')).toEqual({
       kind: 'move',
