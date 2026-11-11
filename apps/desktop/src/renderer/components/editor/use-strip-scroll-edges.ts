@@ -42,9 +42,9 @@ export function useStripScrollEdges(blockKey: string, wrap: boolean) {
   return { track, edges, update };
 }
 
-/** Keep the active tab (or its collapsed group's home) in view on the
- *  strip, which scrolls sideways in its one row, or down past its row cap
- *  when wrapped: when it changes, when the blocks around it do
+/** Keep the active tab (or the chip of the group it is in) in view on
+ *  the strip, which scrolls sideways in its one row, or down past its row
+ *  cap when wrapped: when it changes, when the blocks around it do
  *  (`blockKey`), and when the strip's room does (a split, a resize). */
 export function useActiveTabInView(
   track: RefObject<HTMLDivElement | null>,
@@ -56,10 +56,9 @@ export function useActiveTabInView(
     const el = track.current;
     if (!el || activeId === null) return;
     const reveal = () => {
-      const key = CSS.escape(activeId);
-      const tab = el.querySelector(
-        `[data-tab-id="${key}"], [data-home-tab="${key}"]`
-      );
+      const tab =
+        el.querySelector(`[data-tab-id="${CSS.escape(activeId)}"]`) ??
+        el.querySelector('[data-group-chip][aria-selected=true]');
       if (!tab) return;
       const by = past(tab.getBoundingClientRect(), el.getBoundingClientRect());
       if (wrap && by.y) el.scrollBy({ top: by.y });
