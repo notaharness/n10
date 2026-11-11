@@ -11,15 +11,17 @@ export async function tabNames(page: Page): Promise<string[]> {
   return (await tabs(page).allInnerTexts()).map((t) => t.split('\n')[0].trim());
 }
 
-/** The strip's tabs as the first of `names` each label contains, left
- *  to right: a label may carry its place or directory around the name. */
+/** The strip's tabs as the first of `names` each one's whole text
+ *  contains, left to right: a label may carry its place or directory
+ *  around the name, and be cut to fit where it shows. */
 export async function namedTabs(
   page: Page,
   names: readonly string[]
 ): Promise<string[]> {
-  return (await tabNames(page)).map(
-    (label) => names.find((name) => label.includes(name)) ?? label
+  const texts = await tabs(page).evaluateAll((els) =>
+    els.map((el) => el.textContent ?? '')
   );
+  return texts.map((text) => names.find((name) => text.includes(name)) ?? text);
 }
 
 /** Press `from` and carry it, in pointer steps, over `to`'s centre —

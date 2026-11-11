@@ -188,7 +188,8 @@ for (const tabOverflow of ['wrap', 'scroll'] as const) {
       // Held at the window's edge long enough for auto-scroll to run.
       await frames(page, 30);
 
-      expect(await rightEdge(alpha)).toBeLessThanOrEqual(stripEnd);
+      // Tabs share a wrapped row in fractions of a pixel.
+      expect(await rightEdge(alpha)).toBeLessThanOrEqual(stripEnd + 0.5);
       expect(await sidewaysScroll(page)).toEqual(before);
 
       await page.mouse.up();

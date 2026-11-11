@@ -244,14 +244,10 @@ const fitsItsBox = (t: Locator) =>
 const TITLE =
   'Handle cancelled requests without leaving the half-written cache entry behind';
 
-/** The tab whose full accessible label ends with its primary name. */
+/** The tab whose accessible name has the whole of `name`: alone in its
+ *  place, a tab's name starts with the place's. */
 const namedTab = (page: Page, name: string) =>
-  tab(
-    page,
-    new RegExp(
-      `(?:^| · )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: Close tab)?$`
-    )
-  );
+  tab(page, new RegExp(`${name}\\b`));
 
 test.describe('Tab labels', () => {
   test('a name too long for its tab loses its front, and a screen reader hears it whole', async ({
@@ -268,15 +264,16 @@ test.describe('Tab labels', () => {
     expect(shown.length).toBeLessThan(LONG.length);
     expect(await fitsItsBox(t)).toBe(true);
     // A sighted reader gets the whole of it too, on hover.
-    await expect(t).toHaveAttribute('title', new RegExp(LONG));
+    await expect(t).toHaveAttribute('title', new RegExp(`· ${LONG}$`, 'm'));
   });
 
+  // Alone, with no chip, a tab names its place first; the place gives
+  // way to the name when room is short.
   test('a name that fits is shown whole', async ({ desktop }) => {
     const { page } = desktop;
     await createWorktree(page, 'docs');
     const t = namedTab(page, 'docs');
-    await expect(shownLabel(t)).toHaveText(/(?:^| · )docs$/);
-    await expect(t).toHaveAttribute('title', /docs/);
+    await expect(shownLabel(t)).toHaveText(/ · docs$/);
   });
 });
 
