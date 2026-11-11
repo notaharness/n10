@@ -11,7 +11,9 @@ import {
   type PaneId,
   type Workspace,
 } from '../../lib/tabs/workspace.js';
+import type { Edge } from '../../lib/tabs/layout.js';
 import { NO_ROOM } from '../../lib/tabs/pane-commands.js';
+import { rebuildsLayout } from '../../lib/tabs/pane-moves.js';
 import { canSplit, zoneAt } from './pane-drop.js';
 import { paneFrame, revealFocusedPane } from './reveal-tab.js';
 import { draggedIds, isStripDragData } from './strip-drag.js';
@@ -83,14 +85,24 @@ function dropAt({ over, active }: Drag, ws: Workspace): DropAt {
   const ids = draggedIds(String(active.id), dragged);
   const from = dragged.pane;
   if (zone === 'centre') return { pane, zone, ids, allowed: from !== pane };
+  return { pane, zone, ids, ...edgeDrop(ws, pane, zone, ids, from) };
+}
+
+/** Whether a drop on `pane`'s `zone` side would split it, and why not. */
+function edgeDrop(
+  ws: Workspace,
+  pane: PaneId,
+  zone: Edge,
+  ids: readonly string[],
+  from: PaneId | undefined
+): { allowed: boolean; hint?: string } {
   const order = panesOf(ws.layout).find((p) => p.id === pane)?.order ?? [];
   const emptied = from === pane && order.every((id) => ids.includes(id));
+  if (emptied || rebuildsLayout(ws, ids, pane, zone)) return { allowed: false };
   const frame = paneFrame(pane);
-  const roomy = frame !== null && canSplit(frame, zone);
-  if (emptied) return { pane, zone, ids, allowed: false };
-  return roomy
-    ? { pane, zone, ids, allowed: true }
-    : { pane, zone, ids, allowed: false, hint: NO_ROOM };
+  return frame !== null && canSplit(frame, zone)
+    ? { allowed: true }
+    : { allowed: false, hint: NO_ROOM };
 }
 
 /** The drag provider's side of pane drops: following the drag and the

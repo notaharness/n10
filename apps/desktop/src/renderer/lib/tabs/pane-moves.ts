@@ -10,6 +10,7 @@ import {
 import { closeNeighbour, paneToward } from './layout-geometry.js';
 import {
   focusedPaneOf,
+  type LayoutNode,
   type PaneId,
   type PaneNode,
   type Workspace,
@@ -209,4 +210,34 @@ export function moveToward(ws: Workspace, edge: Edge): Workspace {
   const next = paneToward(ws.layout, from.id, edge);
   if (!next || from.activeId === null) return ws;
   return moveToPane(ws, [from.activeId], next, undefined, from.activeId);
+}
+
+/** Whether splitting `ids` off beside `target` on `edge` would only
+ *  rebuild the layout there is: a pane's every tab dropped on the facing
+ *  side of the pane beside it lands back in its own place, renamed and
+ *  at an even share. Such a drop does nothing. */
+export function rebuildsLayout(
+  ws: Workspace,
+  ids: readonly string[],
+  target: PaneId,
+  edge: Edge
+): boolean {
+  const after = dropEmptyPanes(splitPane(ws, ids, target, edge));
+  return after !== ws && sameShape(after.layout, ws.layout);
+}
+
+function sameShape(a: LayoutNode, b: LayoutNode): boolean {
+  if (a.kind === 'pane') {
+    return (
+      b.kind === 'pane' &&
+      a.order.length === b.order.length &&
+      a.order.every((id, i) => id === b.order[i])
+    );
+  }
+  return (
+    b.kind === 'split' &&
+    a.direction === b.direction &&
+    a.children.length === b.children.length &&
+    a.children.every((c, i) => sameShape(c, b.children[i]!))
+  );
 }

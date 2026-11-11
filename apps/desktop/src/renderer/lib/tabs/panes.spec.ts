@@ -10,6 +10,7 @@ import {
   type TabsAction,
   type Workspace,
 } from './tabs-model.js';
+import { rebuildsLayout } from './pane-moves.js';
 import { restoreWorkspace, toSaved } from './workspace-file.js';
 import { panesOf, type LayoutNode, type PaneNode } from './workspace.js';
 
@@ -123,6 +124,19 @@ describe('splitting', () => {
       split([id('branch:b')], 'pane-1', 'right')
     );
     expect(ws.pinned).toEqual([id('branch:b')]);
+  });
+});
+
+describe('a drop that changes nothing', () => {
+  it('knows a pane’s every tab dropped on its neighbour’s facing side rebuilds the same layout', () => {
+    // row[pane-1 (a, c), pane-2 (b)]
+    const ws = then(threeTabs(), split([id('branch:b')], 'pane-1', 'right'));
+    // pane-2's only tab onto pane-1's right side: back where it was.
+    expect(rebuildsLayout(ws, [id('branch:b')], 'pane-1', 'right')).toBe(true);
+    // Onto its left side: the panes trade places.
+    expect(rebuildsLayout(ws, [id('branch:b')], 'pane-1', 'left')).toBe(false);
+    // One tab of two: a third pane.
+    expect(rebuildsLayout(ws, [id('branch:a')], 'pane-2', 'left')).toBe(false);
   });
 });
 
