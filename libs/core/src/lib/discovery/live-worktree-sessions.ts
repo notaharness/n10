@@ -129,3 +129,29 @@ function orchestraFields(
     ...(lastReport ? { lastReport } : {}),
   };
 }
+
+/**
+ * The registry name of every worktree agent session alive on this
+ * machine in `sessions`, whichever repository it belongs to and whether
+ * or not its checkout is on a branch, or even still there. The answer
+ * to "has this agent ended?", which asks only whether tmux still runs
+ * it: a session whose checkout went is alive until it exits.
+ */
+export function aliveWorktreeSessionNames(
+  sessions: readonly TaggedSession[]
+): string[] {
+  return sessions.flatMap((session) =>
+    session.paneDead ||
+    session.type !== 'worktree' ||
+    !session.worktreePath ||
+    session.machine !== LOCAL_MACHINE
+      ? []
+      : [
+          worktreeSessionKey(
+            session.worktreePath,
+            session.repo,
+            session.machine
+          ),
+        ]
+  );
+}

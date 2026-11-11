@@ -21,7 +21,10 @@ vi.mock('../session-resolver.js', () => ({
   listOurSessions: () => state.sessions,
 }));
 
-import { listLiveWorktreeSessions } from './live-worktree-sessions.js';
+import {
+  aliveWorktreeSessionNames,
+  listLiveWorktreeSessions,
+} from './live-worktree-sessions.js';
 
 /** What each worktree directory's HEAD file says. */
 const HEADS: Record<string, WorktreeHead> = {
@@ -223,5 +226,35 @@ describe('listLiveWorktreeSessions', () => {
   it('leaves out a retained pane whose agent exited', () => {
     state.sessions = [{ ...ALPHA, paneDead: true }];
     expect(list()).toEqual([]);
+  });
+});
+
+describe('aliveWorktreeSessionNames', () => {
+  const name = (s: TaggedSession) =>
+    worktreeSessionKey(s.worktreePath!, s.repo, s.machine);
+
+  it('names every live agent of any repository, on a branch or not, its checkout there or not', () => {
+    const detached = { ...BETA, name: 'beta-detached', branch: '' };
+    const goneCheckout = session(
+      'alpha-gone',
+      '/repos/alpha/.claude/worktrees/gone',
+      '/repos/alpha',
+      'gone'
+    );
+    expect(aliveWorktreeSessionNames([ALPHA, detached, goneCheckout])).toEqual([
+      name(ALPHA),
+      name(detached),
+      name(goneCheckout),
+    ]);
+  });
+
+  it('leaves out exited panes, terminals and other machines’ sessions', () => {
+    expect(
+      aliveWorktreeSessionNames([
+        { ...ALPHA, paneDead: true },
+        { ...BETA, type: 'shell' },
+        { ...BETA, machine: 'a'.repeat(32) },
+      ])
+    ).toEqual([]);
   });
 });
