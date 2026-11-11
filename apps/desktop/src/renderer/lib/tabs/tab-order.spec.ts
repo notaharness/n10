@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { presentationOrder } from './tab-order.js';
-import { EMPTY_STRIP, type Strip } from './tabs-model.js';
+import { EMPTY_STRIP, reduce, type Strip } from './tabs-model.js';
 import { EMPTY_WORKSPACE, stripOf } from './workspace.js';
 
 it('retains open order and prunes closed tab collision allocations', () => {
@@ -35,12 +35,28 @@ it('retains open order and prunes closed tab collision allocations', () => {
 it('keeps collision and chip ordinals separate for each pane', () => {
   const workspace = {
     ...EMPTY_WORKSPACE,
+    tabs: {
+      a: {
+        id: 'a',
+        kind: 'item' as const,
+        repo: '/a',
+        itemKey: 'branch:a',
+        preview: false as const,
+      },
+      b: {
+        id: 'b',
+        kind: 'item' as const,
+        repo: '/b',
+        itemKey: 'branch:b',
+        preview: false as const,
+      },
+    },
     layout: {
       kind: 'split' as const,
       direction: 'row' as const,
       children: [
-        { kind: 'pane' as const, id: 'left', order: [], activeId: null },
-        { kind: 'pane' as const, id: 'right', order: [], activeId: null },
+        { kind: 'pane' as const, id: 'left', order: ['a'], activeId: 'a' },
+        { kind: 'pane' as const, id: 'right', order: ['b'], activeId: 'b' },
       ],
       sizes: [0.5, 0.5],
     },
@@ -60,4 +76,11 @@ it('keeps collision and chip ordinals separate for each pane', () => {
   expect(stripOf(workspace, 'left').chipOrdinals?.claude?.ordinal).toBe(1);
   expect(stripOf(workspace, 'right').chipOrdinals?.claude?.ordinal).toBe(2);
   expect(stripOf(workspace, 'left').collisionOrdinals).not.toHaveProperty('b');
+  const changed = reduce(workspace, {
+    type: 'assign-chip-ordinals',
+    scope: 'left',
+    values: { claude: { label: 'Claude · n10', ordinal: 3 } },
+  });
+  expect(stripOf(changed, 'left').chipOrdinals?.claude?.ordinal).toBe(3);
+  expect(stripOf(changed, 'right').chipOrdinals?.claude?.ordinal).toBe(2);
 });
