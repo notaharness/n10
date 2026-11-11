@@ -118,12 +118,13 @@ Every rule below has its reasoning in `docs/decisions.md`.
   it exits or is stopped.
   `TabsProvider` sits above the repo gate in `App.tsx`.
   `tabs.properties.spec.ts` holds the invariants.
-- Orchestra players' tabs stand under their orchestrator's tab
-  (`lib/tabs/orchestrator-tabs.ts`, over core's `orchestratorGroups` via
-  `listOrchestratorGroups`): presentation only. The strip omits them; they stay
-  ordinary tabs in `TabsState`, listed in the orchestrator tab's hover card
-  (`OrchestratorPlayers.tsx`) and its context menu. Positional tab switching
-  walks the order the strip presents (`presentedOrder`), not `TabsState`'s.
+- The strip groups tabs by affiliation, the parent a session reports to
+  else its place, which the engine stamps on session, terminal and foreign
+  rows (`lib/tabs/tab-affiliation.ts`). Groups are presentation only:
+  `present` (`lib/tabs/tab-groups.ts`) derives them from `TabsState.tabs`
+  every render, and positional switching walks its order. Collapse is
+  `TabsState.collapsed`; drag legality is `components/editor/strip-drag.ts`.
+  Rules and reasoning: decisions.md "Tab groups".
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Sessions · Files) beside one content pane that
   swaps between Overview, diff, a session's terminal (mounted only while shown) and
