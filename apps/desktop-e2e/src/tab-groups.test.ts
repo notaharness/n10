@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, focusTerminal, tab } from './setup/app.js';
+import { createWorktree, focusTerminal, tab, tabs } from './setup/app.js';
 import {
   addExternalWorktree,
   cleanupExternalSessions,
@@ -14,7 +14,6 @@ import {
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 import { shownTerminal } from './setup/prewarm.js';
 import { orchestraTags } from '@n10/core/testing/session-tags';
-import { tabNames } from './setup/tab-row.js';
 import { startSurvivingTerminal } from './setup/terminals.js';
 import { killFixtureSessions, tagTmuxSession } from './setup/tmux.js';
 
@@ -267,12 +266,21 @@ test.describe('Tab groups', () => {
     await expect(tab(page, new RegExp(first))).toBeVisible();
     const home = chipOf(page, CLAUDE).getByRole('tab');
     const alpha = tab(page, /alpha/);
+    // By the home's mark and each tab's whole label: a shown label is
+    // cut to fit, and how far depends on the font.
     const order = async () => {
-      const names = await tabNames(page);
+      const shown = await tabs(page).evaluateAll((els) =>
+        els.map((el) => ({
+          home: el.hasAttribute('data-home-tab'),
+          label:
+            el.querySelector('[data-tab-label] > :not([aria-hidden])')
+              ?.textContent ?? '',
+        }))
+      );
       return {
-        alpha: names.findIndex((n) => n.includes('alpha')),
-        home: names.findIndex((n) => n.includes(basename(folder))),
-        player: names.findIndex((n) => n.includes(first)),
+        alpha: shown.findIndex((t) => !t.home && t.label.includes('alpha')),
+        home: shown.findIndex((t) => t.home),
+        player: shown.findIndex((t) => !t.home && t.label.includes(first)),
       };
     };
     await expect.poll(order).toMatchObject({ alpha: 0 });
