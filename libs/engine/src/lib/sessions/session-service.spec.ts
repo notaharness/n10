@@ -1,6 +1,7 @@
 import type * as Primitive from '@n10/core';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { worktreeSessionKey } from '@n10/core';
+import { placeAffiliation, worktreeSessionKey } from '@n10/core';
+import type { TaggedSession } from '@n10/core';
 import type { DiscoveryScan } from '@n10/core';
 import type { AppConfig } from '@n10/vcs-core';
 import { worktreeScope } from '@n10/worktree-manager';
@@ -8,6 +9,7 @@ import type { WorktreeService } from '../worktrees/api.js';
 import type { SessionDiscoveryOptions } from './session-discovery.js';
 import { createSessionConnections } from './session-connections.js';
 import { createSessionService } from './session-service.js';
+import { createAffiliationService } from './affiliation-service.js';
 
 const state = vi.hoisted(() => ({
   scan: null as SessionDiscoveryOptions | null,
@@ -81,6 +83,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 function fixture(lastScans?: Map<string, DiscoveryScan>) {
+  const affiliations = createAffiliationService({ placeOf: (dir) => dir });
   const selected = {
     current: true,
     config: {
@@ -121,8 +124,9 @@ function fixture(lastScans?: Map<string, DiscoveryScan>) {
     worktrees,
     isCurrent: () => selected.current,
     lastScans,
+    affiliations,
   });
-  return { service, worktrees, selected };
+  return { service, worktrees, selected, affiliations };
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -433,12 +437,13 @@ it('lists an agent still running in a removed worktree', async () => {
     running: true,
     worktreeRemoved: true as const,
   };
+  const stamped = { ...row, affiliation: placeAffiliation('/repo') };
   state.stranded = [row];
   try {
     const f = fixture();
     f.service.watch({ size });
     await f.service.read();
-    expect(f.service.getSnapshot().sessions).toContainEqual(row);
+    expect(f.service.getSnapshot().sessions).toContainEqual(stamped);
     f.service.park();
   } finally {
     state.stranded = [];
@@ -455,18 +460,19 @@ it('keeps the row of an agent discovery holds stranded', async () => {
     running: true,
     worktreeRemoved: true as const,
   };
+  const stamped = { ...row, affiliation: placeAffiliation('/repo') };
   state.stranded = [row];
   try {
     const f = fixture();
     f.service.watch({ size });
     await f.service.read();
-    expect(f.service.getSnapshot().sessions).not.toContainEqual(row);
+    expect(f.service.getSnapshot().sessions).not.toContainEqual(stamped);
     state.lastScan.mockReturnValue({
       ...scanOf(wt),
       stranded: [{ name: row.name, branch: '', path: row.path }],
     });
     await f.service.refresh();
-    expect(f.service.getSnapshot().sessions).toContainEqual(row);
+    expect(f.service.getSnapshot().sessions).toContainEqual(stamped);
     f.service.park();
   } finally {
     state.stranded = [];
@@ -492,4 +498,43 @@ it('leaves discovery to its schedule when it has seen every listed worktree', as
   state.scanNow.mockClear();
   await f.service.refresh();
   expect(state.scanNow).not.toHaveBeenCalled();
+});
+
+/** A worktree session in the fixture's checkout, reporting to `parent`. */
+function listedPlayer(parent: string): TaggedSession {
+  return {
+    name: 'repo-feature',
+    created: 1,
+    paneDead: false,
+    path: wt.path,
+    spawner: 'orchestra',
+    repo: '/repo',
+    type: 'worktree',
+    branch: 'feature',
+    worktreePath: wt.path,
+    machine: 'local',
+    identityTags: {},
+    orchestrator: parent,
+  };
+}
+
+// Discovery's listing decides the group; a change of it alone, which
+// no worktree event announces, republishes the rows.
+it('stamps each row with its agent’s affiliation from discovery’s listing', async () => {
+  const f = fixture();
+  f.service.watch({ size });
+  await f.service.read();
+  expect(f.service.getSnapshot().sessions[0]?.affiliation).toEqual(
+    placeAffiliation('/repo')
+  );
+  const changed = vi.fn();
+  f.service.subscribe(changed);
+  state.scan?.listed?.('local', [listedPlayer('codex:thread')]);
+  expect(changed).toHaveBeenCalled();
+  expect(f.service.getSnapshot().sessions[0]?.affiliation).toEqual({
+    kind: 'parent',
+    key: 'codex:thread',
+    label: 'Codex · repo',
+  });
+  f.service.park();
 });

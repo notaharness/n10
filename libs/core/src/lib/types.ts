@@ -1,5 +1,6 @@
 import type { PullRequestInfo } from '@n10/vcs-core';
 import type { AutoFixStatus } from './auto-fix/auto-fix-model.js';
+import type { Affiliation } from './affiliation.js';
 
 export type Focus = 'sidebar' | 'terminal';
 
@@ -84,6 +85,9 @@ export interface AgentSession {
    *  ran — and the agent still runs. The row lasts as long as the agent
    *  does, so it can be seen and stopped (`strandedSessionRows`). */
   worktreeRemoved?: true;
+  /** What the row belongs to: its agent's parent, else its repository.
+   *  Stamped by the engine's session service. */
+  affiliation?: Affiliation;
 }
 
 export type { DiffFile, FileCategory } from '@n10/diff';

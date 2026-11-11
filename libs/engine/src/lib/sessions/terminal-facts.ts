@@ -4,6 +4,7 @@ import {
   isSessionAlive,
   LOCAL_MACHINE,
   sessionIdentity,
+  type Affiliation,
   type TerminalKind,
 } from '@n10/core';
 
@@ -13,7 +14,11 @@ export interface TerminalRecord {
 }
 
 /** Transport facts are independent of which shell or repository observes them. */
-export function terminalFacts(name: string, record: TerminalRecord) {
+export function terminalFacts(
+  name: string,
+  record: TerminalRecord,
+  affiliation?: Affiliation
+) {
   const session = getSession(name);
   const machine = sessionIdentity(name)?.machine ?? LOCAL_MACHINE;
   return {
@@ -27,6 +32,7 @@ export function terminalFacts(name: string, record: TerminalRecord) {
     ...(machine !== LOCAL_MACHINE && session?.pty.connectionState
       ? { connectionState: session.pty.connectionState }
       : {}),
+    ...(affiliation ? { affiliation } : {}),
   };
 }
 export type TerminalFacts = ReturnType<typeof terminalFacts>;

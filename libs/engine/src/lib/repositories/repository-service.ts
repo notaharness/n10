@@ -1,6 +1,8 @@
 import {
+  createAffiliationService,
   createSessionConnections,
   createSessionService,
+  type AffiliationService,
   type SessionService,
 } from '../sessions/api.js';
 import { createReviewService, type ReviewService } from '../reviews/api.js';
@@ -68,6 +70,9 @@ export function createRepositoryService(
     worktreeWatchers?: WorktreeWatchers;
     /** `PARKED_REPOSITORY_TTL_MS` unless a shell's tests shorten it. */
     parkedTtl?: number;
+    /** What every session belongs to; shared with a shell's terminal
+     *  service. One of its own when omitted. */
+    affiliations?: AffiliationService;
   }
 ) {
   const {
@@ -78,6 +83,7 @@ export function createRepositoryService(
   const handles = new Map<string, RepositoryHandle>();
   let current: RepositoryHandle | null = null;
   const connections = createSessionConnections();
+  const affiliations = options.affiliations ?? createAffiliationService();
   const lastScans = new Map<string, DiscoveryScan>();
   const baselines = new VisitBaselines(defaultCheckpointDir());
   function create(cwd: string): RepositoryHandle {
@@ -112,6 +118,7 @@ export function createRepositoryService(
       baselines,
     });
     const sessions = createSessionService({
+      affiliations,
       connections,
       lastScans,
       config,

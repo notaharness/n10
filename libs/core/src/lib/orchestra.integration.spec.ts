@@ -17,7 +17,7 @@ import { getSessionLaunchContext } from './session/session-launch-context.js';
 import { launchSession } from './session/launch-session.js';
 import { openSession } from './session/open-session.js';
 import { listOurSessions, resolveWorktreeSession } from './session-resolver.js';
-import { orchestratorGroups } from './discovery/orchestrator-groups.js';
+import { affiliations } from './discovery/affiliations.js';
 import { isTerminalSession, registryNameOf } from './session-identity.js';
 import { sessionTags } from './session-identity-write.js';
 
@@ -562,11 +562,14 @@ describe.skipIf(spawnSync('tmux', ['-V']).status !== 0)(
       });
       const player = sessions.find((s) => s.branch === branch)!;
       expect(player.orchestrator).toBe(`claude:${own}`);
-      const [group] = orchestratorGroups(sessions);
-      expect(group!.orchestrator.key).toBe(terminalSessionKey('conductor'));
-      expect(group!.players.map((p) => p.key)).toEqual([
-        registryNameOf(player),
-      ]);
+      const of = affiliations(sessions, (dir) => dir).sessions;
+      const head = of.get(terminalSessionKey('conductor'));
+      expect(head).toMatchObject({
+        kind: 'parent',
+        key: `claude:${own}`,
+        home: { key: terminalSessionKey('conductor') },
+      });
+      expect(of.get(registryNameOf(player))).toEqual(head);
     });
   }
 );
