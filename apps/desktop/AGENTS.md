@@ -233,8 +233,13 @@ Every rule below has its reasoning in `docs/decisions.md`.
   `rectSortingStrategy` and no axis lock; plain flex-wrap leaves space
   after each row's tabs, and the strip's end (`StripEnd`) takes the last
   row's remaining room. Either way the
-  dragged tab stays inside the strip (`restrictToParentElement`): past its
-  end it would widen a scrolling box that auto-scroll then chases.
+  dragged tab stays inside the strip (`holdInStrip`, `drag-preview.ts`):
+  past its end it would widen a scrolling box that auto-scroll then
+  chases. Carried out of the strip it stays in its place, faded, and a
+  `DragOverlay` copy portalled to the body (`CarriedBlock.tsx`, mounted
+  only then: dnd-kit counts a mounted overlay as shown) follows the
+  pointer; over another pane's strip, that strip opens a slot where it
+  would land.
   Collisions go by pointer first, then nearest centre within the
   keyboard drag's row; the strip's end
   resolves to the last tab and is disabled for keyboard drags. The

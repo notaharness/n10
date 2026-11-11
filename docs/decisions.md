@@ -959,12 +959,18 @@ itself and keeps the active tab in view, so a short pane keeps some content.
 Scroll mode is one row as ever.
 
 Dragging onto a pane's content (`use-pane-drop.ts`): its sides split, its
-middle moves (`pane-drop.ts`). The strip's modifiers keep the dragged tab
-inside its strip, so the zone is read from the pointer's own events, not the
-drag's clamped delta. Keyboard drags stay on the strip. On a strip, a block
-dropped among its own pane's blocks arranges that pane as presented; dropped
-on another pane's block, its tabs move beside it there. Each pane reports its
-own blocks, and end rooms resolve within their pane.
+middle moves (`pane-drop.ts`), the half (or whole) it would take tinted
+strongly enough to read over a terminal in either theme. Inside its strip
+a dragged tab moves itself, held to the strip; out of it, a copy follows
+the pointer instead (`drag-preview.ts`, `CarriedBlock.tsx`), so pane
+overflow and the pane portals never clip it, and the zone is read from the
+pointer's own events. Keyboard drags stay on the strip. On a strip, a block
+dropped among its own pane's blocks arranges that pane as presented;
+carried over another pane's strip, a tab or block (a member too, beside a
+block or its own group's member) opens the slot it would land in there, on
+the side the pointer is on, and moves there on drop. Another pane's places
+are targets only under the pointer, never the nearest place. Each pane
+reports its own blocks, and end rooms resolve within their pane.
 
 `dismissed` replaces auto-open history. Every running agent, listed terminal
 and foreign agent has a tab unless its session is dismissed. Every close
