@@ -56,6 +56,12 @@ const roster = (page: Page) => page.locator('[data-group-roster]');
 const activeLabel = (page: Page, key: string) =>
   chipOf(page, key).locator('[data-group-active-label]');
 const rosterRows = (page: Page) => roster(page).locator('[data-roster-row]');
+/** Open a chip's roster from the keyboard: a press shows its first tab. */
+async function openRoster(page: Page, chip: Locator) {
+  await chip.focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  await expect(roster(page)).toBeVisible();
+}
 const ready = (branch: string) => `player-${branch}-ready`;
 
 /** Press `from`, carry it in pointer steps to `x, y`, and let go. */
@@ -152,27 +158,35 @@ test.describe('Tab groups', () => {
     await expect(shownTerminal(page)).toContainText(ready(second));
     await expect(stripTab(page, new RegExp(second))).toHaveCount(0);
 
-    // Pressing the chip opens its roster: the home first, then the
-    // members, the active one marked. A row shows its tab, and the strip
-    // stays as it was.
-    await chip.click();
+    // An orchestrator's chip carries its brain. Its roster lists the
+    // home first, then the players under it, the active one marked. A
+    // row shows its tab, and the strip stays as it was.
+    await expect(chip.locator('svg.lucide-brain')).toBeVisible();
+    await openRoster(page, chip);
     await expect(chip).toHaveAttribute('aria-expanded', 'true');
-    await expect(chip.locator('svg.lucide-folder-open')).toBeVisible();
     await expect(rosterRows(page)).toHaveCount(3);
     await expect(rosterRows(page).first()).toContainText('Orchestrator');
     await expect(rosterRows(page).first()).toContainText(basename(folder));
+    await expect(rosterRows(page).first()).toHaveAttribute(
+      'data-roster-depth',
+      '0'
+    );
+    await expect(rosterRows(page).nth(1)).toHaveAttribute(
+      'data-roster-depth',
+      '1'
+    );
     await expect(
       roster(page).locator('[data-roster-row][aria-current=true]')
     ).toContainText(second);
     await rosterRows(page).filter({ hasText: first }).click();
     await expect(roster(page)).toHaveCount(0);
-    await expect(chip.locator('svg.lucide-folder-closed')).toBeVisible();
     await expect(activeLabel(page, CLAUDE)).toContainText(first);
     await expect(shownTerminal(page)).toContainText(ready(first));
     await expect(group(page, CLAUDE).getByRole('tab')).toHaveCount(1);
 
+    // Pressing the chip shows the group's first tab: its home.
     await chip.click();
-    await rosterRows(page).first().click();
+    await expect(roster(page)).toHaveCount(0);
     await expect(shownTerminal(page)).toContainText(CONDUCTOR_READY);
     await expect(chip).toHaveAttribute('aria-selected', 'true');
 
@@ -213,7 +227,9 @@ test.describe('Tab groups', () => {
       'Codex · Multiple places'
     );
     await expect(chip).not.toHaveAttribute('data-home-tab');
-    await chip.click();
+    await expect(chip.locator('svg.lucide-folder-closed')).toBeVisible();
+    await openRoster(page, chip);
+    await expect(chip.locator('svg.lucide-folder-open')).toBeVisible();
     await expect(roster(page)).toContainText('Codex');
     await expect(rosterRows(page)).toHaveCount(2);
     rmSync(dir, { recursive: true, force: true });
@@ -266,7 +282,7 @@ test.describe('Tab groups', () => {
       timeout: 30_000,
     });
     await expect(stripTab(page, new RegExp(a))).toHaveCount(0);
-    await place.click();
+    await openRoster(page, place);
     await expect(rosterRows(page).filter({ hasText: a })).toHaveCount(1);
     await expect(rosterRows(page).filter({ hasText: b })).toHaveCount(1);
     await page.keyboard.press('Escape');
@@ -327,7 +343,7 @@ test.describe('Tab groups', () => {
     // A member's task names its roster row, and the chip while shown.
     const session = findN10SessionFor(first, homeDir) as string;
     setTmuxPaneTitle(session, 'Probe scan', homeDir);
-    await place.click();
+    await openRoster(page, place);
     const row = rosterRows(page).filter({ hasText: 'Probe scan' });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
     await expect(
@@ -396,14 +412,9 @@ test.describe('Tab groups', () => {
           home: row.findIndex((t) => t.dataset.homeTab !== undefined),
         };
       });
-    await expect.poll(order).toEqual({ alpha: 0, home: 1 });
-
-    // The chip, dropped on alpha's near half, takes the group in front.
-    const target = await alpha.boundingBox();
-    await drag(page, chip, target!.x + 8, target!.y + target!.height / 2);
+    // Opened after alpha, the orchestrator's group still leads: n10
+    // puts orchestrators first until the strip is arranged by hand.
     await expect.poll(order).toEqual({ home: 0, alpha: 1 });
-    // The drop's click opens no roster.
-    await expect(roster(page)).toHaveCount(0);
 
     // Carried into the room after the last tab, it goes to the end.
     const strip = await page
@@ -411,6 +422,13 @@ test.describe('Tab groups', () => {
       .boundingBox();
     await drag(page, chip, strip!.x + strip!.width - 20, strip!.y + 18);
     await expect.poll(order).toEqual({ alpha: 0, home: 1 });
+    // The drop's click shows no tab of the group.
+    await expect(chip).toHaveAttribute('aria-selected', 'false');
+
+    // The chip, dropped on alpha's near half, takes the group in front.
+    const target = await alpha.boundingBox();
+    await drag(page, chip, target!.x + 8, target!.y + target!.height / 2);
+    await expect.poll(order).toEqual({ home: 0, alpha: 1 });
     await page.getByRole('button', { name: 'All tabs' }).click();
     await expect(
       page
@@ -429,7 +447,7 @@ test.describe('Tab groups', () => {
     markOrchestrator(homeDir);
     await expect(countOf(page, CLAUDE)).toHaveText('3', { timeout: 30_000 });
 
-    await chipOf(page, CLAUDE).click();
+    await openRoster(page, chipOf(page, CLAUDE));
     await armContextMenuChoice(app, 'Pin tab');
     await rosterRows(page).filter({ hasText: first }).click({
       button: 'right',
@@ -513,18 +531,20 @@ test.describe('Tab groups', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  test('a press opens the roster at once, and Escape after a rest leaves the terminal its focus', async ({
+  test('a press shows the group’s first tab, and Escape after a rest leaves the terminal its focus', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
-    branches.push(spawnAgent(repoPath, homeDir));
+    const player = spawnAgent(repoPath, homeDir);
+    branches.push(player);
     markOrchestrator(homeDir);
     await expect(countOf(page, CLAUDE)).toHaveText('2', { timeout: 30_000 });
     const chip = chipOf(page, CLAUDE);
 
+    await openRoster(page, chip);
+    await rosterRows(page).filter({ hasText: player }).click();
+    await expect(shownTerminal(page)).toContainText(ready(player));
     await chip.click();
-    await expect(roster(page)).toBeVisible();
-    await rosterRows(page).first().click();
     await expect(roster(page)).toHaveCount(0);
     await expect(shownTerminal(page)).toContainText(CONDUCTOR_READY);
 
@@ -541,22 +561,87 @@ test.describe('Tab groups', () => {
     await expect(page.locator('.xterm-helper-textarea:focus')).toHaveCount(1);
   });
 
-  test('pressing another group’s chip closes a roster pinned open', async ({
+  test('pressing another group’s chip closes an open roster, and shows that group’s first tab', async ({
     desktop,
   }) => {
     const { page, repoPath, homeDir } = desktop;
-    branches.push(
-      spawnAgent(repoPath, homeDir),
-      spawnAgent(repoPath, homeDir, CODEX)
-    );
+    const codex = [
+      spawnAgent(repoPath, homeDir, CODEX),
+      spawnAgent(repoPath, homeDir, CODEX),
+    ];
+    branches.push(spawnAgent(repoPath, homeDir), ...codex);
     markOrchestrator(homeDir);
     await expect(countOf(page, CLAUDE)).toHaveText('2', { timeout: 30_000 });
-    await expect(countOf(page, CODEX)).toHaveText('1', { timeout: 30_000 });
+    await expect(countOf(page, CODEX)).toHaveText('2', { timeout: 30_000 });
 
-    await chipOf(page, CLAUDE).click();
-    await expect(roster(page)).toHaveCount(1);
+    await openRoster(page, chipOf(page, CLAUDE));
     await chipOf(page, CODEX).click();
-    await expect(roster(page)).toHaveCount(1);
-    await expect(roster(page)).toHaveAttribute('aria-label', /Codex/);
+    await expect(roster(page)).toHaveCount(0);
+    await expect(chipOf(page, CODEX)).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('shows a group of one tab as that tab, an orchestrator’s with its brain', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    const player = spawnAgent(repoPath, homeDir, CODEX);
+    branches.push(player);
+    markOrchestrator(homeDir);
+    const home = stripTab(page, new RegExp(basename(folder)));
+    await expect(home.locator('svg.lucide-brain')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(stripTab(page, new RegExp(player))).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.locator('[data-group-chip]')).toHaveCount(0);
+  });
+
+  test('a roster row reorders within its group, and carries its tab out to a pane’s side', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    const players = [
+      spawnAgent(repoPath, homeDir),
+      spawnAgent(repoPath, homeDir),
+      spawnAgent(repoPath, homeDir),
+    ];
+    branches.push(...players);
+    markOrchestrator(homeDir);
+    await expect(countOf(page, CLAUDE)).toHaveText('4', { timeout: 30_000 });
+    const chip = chipOf(page, CLAUDE);
+    await openRoster(page, chip);
+    const names = () =>
+      rosterRows(page).evaluateAll((rows) =>
+        rows.map((r) => r.getAttribute('data-roster-row'))
+      );
+    const [home, a, b, c] = await names();
+
+    // The last row, dropped on the second's near half, goes before it,
+    // and the roster stays open.
+    const onto = await rosterRows(page).nth(1).boundingBox();
+    await drag(
+      page,
+      rosterRows(page).nth(3),
+      onto!.x + onto!.width / 2,
+      onto!.y + 6
+    );
+    await expect.poll(names).toEqual([home, c, a, b]);
+    await expect(roster(page)).toBeVisible();
+
+    // Carried to the pane's right side, a row splits it off there.
+    const pane = await page.locator('[data-editor-panes]').boundingBox();
+    await drag(
+      page,
+      rosterRows(page).nth(1),
+      pane!.x + pane!.width * 0.97,
+      pane!.y + pane!.height / 2
+    );
+    await expect(page.locator('[data-pane-id]')).toHaveCount(2);
+    await expect(roster(page)).toHaveCount(0);
+    await expect(countOf(page, CLAUDE)).toHaveText('3');
+    await expect(
+      page.locator('[data-pane-id]').nth(1).locator(`[data-tab-id="${c}"]`)
+    ).toHaveCount(1);
   });
 });

@@ -463,12 +463,12 @@ describe('a pane arranged by hand', () => {
     expect(restoreWorkspace(toSaved(ws)).arranged).toEqual(ws.arranged);
   });
 
-  it('is not marked by an arrangement that keeps the order', () => {
+  it('is marked by an arrangement that keeps the stored order, which the strip may not have shown', () => {
     const ws = then(two(), {
       type: 'arrange',
       ids: [id('branch:a'), id('branch:b')],
     });
-    expect(ws.arranged).toEqual([]);
+    expect(ws.arranged).toEqual([focusedPaneOf(ws).id]);
   });
 
   it('stays marked through a sync, and a saved pane that is gone is dropped', () => {

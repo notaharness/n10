@@ -51,14 +51,18 @@ export function moveTabs(
 /** Put the tabs `ids` name first, in that order, and the rest after
  *  them as they were: a block dropped among the strip's blocks, which
  *  the strip hands over as its whole presented order. Unknown ids are
- *  ignored; unchanged state when the order is. */
+ *  ignored. The pane is the user's to order from then on. */
 export function arrangeTabs(state: Strip, ids: readonly string[]): Strip {
   const rank = new Map(ids.map((id, i) => [id, i]));
   const placed = state.tabs
     .filter((t) => rank.has(t.id))
     .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
   const tabs = [...placed, ...state.tabs.filter((t) => !rank.has(t.id))];
-  if (tabs.every((t, i) => t === state.tabs[i])) return state;
+  // The stored order may already be the one dropped: the strip showed
+  // another, orchestrators first. The drop still makes the order the
+  // user's.
+  if (tabs.every((t, i) => t === state.tabs[i]))
+    return state.arranged ? state : { ...state, arranged: true };
   return { ...state, tabs, arranged: true };
 }
 
