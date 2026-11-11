@@ -192,7 +192,7 @@ function WorkspaceInner({
   // tab the sync opens joins the pane already holding its group.
   const groupOf = useGroupOf(items);
   const { entries: terminals, scanned } = terminalTabs;
-  useRestoredNotice(tabs.tabs, terminals, scanned);
+  useRestoredNotice(tabs.allTabs, terminals, scanned);
   useEffect(() => {
     tabs.syncItems({ entries, terminals, foreign, alive, scanned, groupOf });
   }, [tabs, entries, terminals, foreign, alive, scanned, groupOf]);

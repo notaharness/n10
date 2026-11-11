@@ -58,6 +58,9 @@ export interface TabsApi extends Strip {
   /** The pane this is, and whether it has focus. */
   paneId: PaneId;
   focused: boolean;
+  /** Every pane's tabs, this pane's first: for what asks whether a tab
+   *  is open anywhere. */
+  allTabs: readonly Tab[];
   openItem: (
     repo: string,
     itemKey: string,
@@ -121,7 +124,10 @@ export interface WorkspaceStore {
   dispatch: Dispatch<WorkspaceAction>;
 }
 
-export type TabsActions = Omit<TabsApi, keyof Strip | 'paneId' | 'focused'>;
+export type TabsActions = Omit<
+  TabsApi,
+  keyof Strip | 'paneId' | 'focused' | 'allTabs'
+>;
 
 export const WorkspaceContext = createContext<WorkspaceStore | null>(null);
 
@@ -186,15 +192,16 @@ export function useTabs(): TabsApi {
     [dispatch, scope]
   );
   const paneId = scope ?? workspace.focusedPane;
-  return useMemo(
-    () => ({
-      ...stripOf(workspace, paneId),
+  return useMemo(() => {
+    const strip = stripOf(workspace, paneId);
+    return {
+      ...strip,
       paneId,
       focused: workspace.focusedPane === paneId,
+      allTabs: [...strip.tabs, ...(strip.others ?? [])],
       ...actions,
-    }),
-    [workspace, paneId, actions]
-  );
+    };
+  }, [workspace, paneId, actions]);
 }
 
 /** Repo-scoped api for everything rendered inside a repo workspace: the
@@ -208,7 +215,7 @@ export function useRepoTabs(): RepoTabsApi {
       ...tabs,
       openItem: (itemKey: string, opts?: { preview?: boolean }) =>
         tabs.openItem(cwd, itemKey, opts),
-      tabOpening: (itemKey: string) => tabOpening(tabs.tabs, cwd, itemKey),
+      tabOpening: (itemKey: string) => tabOpening(tabs.allTabs, cwd, itemKey),
       syncItems: (listings: SyncRequest) => tabs.syncItems(cwd, listings),
       close: (id: string) => tabs.close(id, cwd),
       terminalEnded: (name: string) => tabs.terminalEnded(name, cwd),
