@@ -135,7 +135,7 @@ test.describe('Tab strip overflow', () => {
     expect(rowEnds.at(-1)).toBeLessThan(stripRight - 40);
   });
 
-  test('dragging a group member to its last member moves it to the end', async ({
+  test('over the room after the last tab, a dragged tab opens the end slot and drops there', async ({
     desktop,
   }) => {
     const { page } = desktop;
@@ -146,9 +146,12 @@ test.describe('Tab strip overflow', () => {
 
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
     await page.mouse.down();
-    await page.mouse.move(to.x + to.width * 0.75, to.y + to.height / 2, {
+    await page.mouse.move(to.x + to.width + 40, to.y + to.height / 2, {
       steps: 15,
     });
+    await expect
+      .poll(() => last.evaluate((el) => el.style.transform))
+      .toMatch(/^translate3d\((?!0px, 0px)/);
     await page.mouse.up();
     await expect
       .poll(() => tabNames(page))
