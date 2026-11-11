@@ -12,8 +12,10 @@ import {
 } from '../../lib/data/queries.js';
 import { resolveMachineLabel } from '../../lib/machines/machine-model.js';
 import { useRepo } from '../../lib/repo-context.js';
+import { chipSignal, type ChipSignal } from '../../lib/tabs/group-status.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
 import {
+  homeOpenAmong,
   present,
   presentedIds,
   statusFromActivity,
@@ -72,6 +74,8 @@ export interface StripGroups {
   /** The repository colour a group's chip carries: its home's, else the
    *  one repository every member naming one shares, else none. */
   colorOf(group: TabGroup): string | null;
+  /** What a group's chip blinks and spins for (`chipSignal`). */
+  signalOf(group: TabGroup): ChipSignal;
   /** What the strip groups a tab by (`useTabFacts`). */
   factsOf(tab: Tab): TabFacts;
   /** Which repository's activity `faceOf`'s statuses come from; `null`
@@ -208,6 +212,17 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     return colors.size === 1 ? only ?? null : null;
   };
 
+  const signalOf = (group: TabGroup) =>
+    chipSignal(
+      group.tabs.map((tab) => faceOf(tab).snapshot),
+      group.head
+        ? { home: true, homeElsewhere: false }
+        : {
+            home: false,
+            homeElsewhere: homeOpenAmong(group, tabs.allTabs, factsOf),
+          }
+    );
+
   // Positional keyboard switching walks the order the strip presents,
   // the members behind chips included.
   // Only the focused pane's: the shortcuts walk the pane they act in.
@@ -221,6 +236,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     groups,
     faceOf,
     colorOf,
+    signalOf,
     factsOf,
     // The activity answer for the repository open now, when there is
     // one: a placeholder carried over from another is none.

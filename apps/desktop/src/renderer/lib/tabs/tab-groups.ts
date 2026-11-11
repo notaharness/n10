@@ -56,6 +56,19 @@ export function isHomeTab(
   );
 }
 
+/** Whether a parent group's home has a tab among `tabs` (every pane's,
+ *  for whether it is open anywhere in the window). */
+export function homeOpenAmong(
+  group: Pick<TabGroup, 'affiliation'>,
+  tabs: readonly Tab[],
+  facts: (tab: Tab) => TabFacts
+): boolean {
+  const a = group.affiliation;
+  if (a?.kind !== 'parent' || !a.home) return false;
+  const home = a.home;
+  return tabs.some((tab) => isHomeTab(tab, facts(tab), home));
+}
+
 function headOf(group: Tab[], facts: (tab: Tab) => TabFacts, a: Affiliation) {
   if (a.kind !== 'parent' || !a.home) return null;
   const home = a.home;

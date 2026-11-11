@@ -878,7 +878,11 @@ snapshot only: `flashing` is new output, `active` working, and a chip shows
 them as a tab does, blinking and spinning (`group-status.ts` `chipSignal`).
 An orchestrator's chip carries its home's own activity alone: its players
 are the orchestrator's to watch, and blink and spin on their own rows.
-Any other group's chip carries every member's. Nothing yet says blocked,
+Its players' chip without it (the home pinned, or in another pane, as
+after Tile group) carries nothing while the orchestrator's tab is open
+anywhere in the window, since that tab shows its status; with no tab for
+the orchestrator at all, it carries every player's, since nothing else
+surfaces them. Any other group's chip carries every member's. Nothing yet says blocked,
 failed or done, and none is inferred from silence, an exit or a pull
 request; the status type keeps those states for a source (tmux's pane
 program state). While the pane's active tab is a member, the chip takes the

@@ -3,6 +3,7 @@ import { placeAffiliation } from '@n10/core/ui';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
+  homeOpenAmong,
   present,
   presentedIds,
   statusCounts,
@@ -105,6 +106,22 @@ describe('present with pins', () => {
       tabs: ['p1', 'p2'],
       chipped: true,
     });
+  });
+
+  it('finds a headless group’s home among other tabs: pinned, or another pane’s', () => {
+    const facts = (tab: Tab): TabFacts =>
+      tab.kind === 'terminal'
+        ? { affiliation: parent('claude:c', 'conductor'), session: tab.name }
+        : { affiliation: null };
+    const group = { affiliation: parent('claude:c', 'conductor') };
+    const players = [terminal('p1'), terminal('p2')];
+    expect(
+      homeOpenAmong(group, [...players, terminal('conductor')], facts)
+    ).toBe(true);
+    expect(homeOpenAmong(group, players, facts)).toBe(false);
+    expect(
+      homeOpenAmong({ affiliation: parent('codex:x') }, players, facts)
+    ).toBe(false);
   });
 
   it('puts an unpinned tab back in its group where it was', () => {

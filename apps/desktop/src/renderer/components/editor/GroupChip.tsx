@@ -2,7 +2,7 @@ import type { KeyboardEvent, RefObject } from 'react';
 import { toast } from 'sonner';
 import { harnessLabel } from '@n10/core/ui';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
-import { chipSignal, groupSummary } from '../../lib/tabs/group-status.js';
+import { groupSummary, type ChipSignal } from '../../lib/tabs/group-status.js';
 import type { TabGroup } from '../../lib/tabs/tab-groups.js';
 import { errorMessage } from '../../lib/utils.js';
 import { PopoverAnchor } from '../ui/popover.js';
@@ -43,14 +43,14 @@ function chipTitle(
  * first tab; Enter or Alt+ArrowDown opens the roster of its tabs, as
  * resting on it does; dragging it moves the group. It shows as active
  * while the pane's active tab is one of its members, and names that
- * member. It blinks and spins for its orchestrator alone, or for any
- * member of any other group (`chipSignal`).
+ * member. It blinks and spins as `signal` says (`chipSignal`).
  */
 export function GroupChip({
   group,
   label,
   faces,
   color,
+  signal,
   active,
   dragging,
   setHandle,
@@ -66,6 +66,7 @@ export function GroupChip({
   /** Its tabs' faces, in its order. */
   faces: readonly TabFace[];
   color: string | null;
+  signal: ChipSignal;
   /** The pane's active tab, when it is one of the group's. */
   active: TabFace | null;
   dragging: boolean;
@@ -83,10 +84,6 @@ export function GroupChip({
   const containsActive = active !== null;
   const head = group.head ? faces[0] ?? null : null;
   const statuses = faces.map((f) => f.status);
-  const signal = chipSignal(
-    faces.map((f) => f.snapshot),
-    { parent: group.affiliation?.kind === 'parent', home: head !== null }
-  );
   return (
     <PopoverAnchor asChild>
       <div

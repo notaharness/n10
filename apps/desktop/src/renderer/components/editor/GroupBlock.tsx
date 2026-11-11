@@ -2,6 +2,7 @@ import { useDndMonitor } from '@dnd-kit/core';
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { TabGroup } from '../../lib/tabs/tab-groups.js';
+import type { ChipSignal } from '../../lib/tabs/group-status.js';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
@@ -50,6 +51,7 @@ export function GroupBlock({
   label,
   faceOf,
   color,
+  signal,
   closer,
   tabStop,
   menu,
@@ -65,6 +67,7 @@ export function GroupBlock({
   label: string;
   faceOf: (tab: Tab) => TabFace;
   color: string | null;
+  signal: ChipSignal;
   closer: Closer;
   /** The chip is the row's one Tab stop. */
   tabStop: boolean;
@@ -135,6 +138,7 @@ export function GroupBlock({
           label={label}
           faces={faces}
           color={color}
+          signal={signal}
           active={faces.find((f) => f.tab.id === tabs.activeId) ?? null}
           dragging={isDragging}
           setHandle={setHandle}

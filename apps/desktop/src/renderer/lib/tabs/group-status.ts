@@ -76,17 +76,20 @@ type Activity = { active: boolean; flashing: boolean } | undefined;
 /**
  * The activity a chip carries. An orchestrator's chip carries its
  * home's own alone: its players are the orchestrator's to watch, and
- * blink and spin on their own rows. Any other group's chip carries
- * every member's. `activity` is the group's tabs', in its order; `home`
- * says whether the first is the orchestrator's (`TabGroup.head`), and
- * `parent` whether the group is an orchestrator's at all, home here or
- * not.
+ * blink and spin on their own rows. Its players' chip without it, while
+ * the orchestrator's tab is open elsewhere in the window (pinned, or in
+ * another pane), carries nothing: that tab already shows its status.
+ * Any other chip, a homeless orchestrator's players' included, carries
+ * every member's, since nothing else surfaces them. `activity` is the
+ * group's tabs', in its order; `home` says whether the first is the
+ * orchestrator's (`TabGroup.head`), and `homeElsewhere` whether its tab
+ * is open outside the group.
  */
 export function chipSignal(
   activity: readonly Activity[],
-  { parent, home }: { parent: boolean; home: boolean }
+  { home, homeElsewhere }: { home: boolean; homeElsewhere: boolean }
 ): ChipSignal {
-  const own = parent ? (home ? activity.slice(0, 1) : []) : activity;
+  const own = home ? activity.slice(0, 1) : homeElsewhere ? [] : activity;
   return {
     flashing: own.some((a) => a?.flashing),
     working: own.some((a) => a?.active),

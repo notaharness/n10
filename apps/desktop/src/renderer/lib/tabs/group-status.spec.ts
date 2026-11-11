@@ -47,30 +47,32 @@ describe('chipSignal', () => {
   const idle = { active: false, flashing: false };
   const flashing = { active: false, flashing: true };
   const working = { active: true, flashing: false };
+  const players = [idle, flashing, working];
 
   it('carries only the home’s own activity for an orchestrator’s group', () => {
-    const players = [idle, flashing, working];
-    expect(chipSignal(players, { parent: true, home: true })).toEqual({
+    const here = { home: true, homeElsewhere: false };
+    expect(chipSignal(players, here)).toEqual({
       flashing: false,
       working: false,
     });
-    expect(
-      chipSignal([{ active: true, flashing: true }, idle], {
-        parent: true,
-        home: true,
-      })
-    ).toEqual({ flashing: true, working: true });
-    expect(chipSignal(players, { parent: true, home: false })).toEqual({
+    expect(chipSignal([{ active: true, flashing: true }, idle], here)).toEqual({
+      flashing: true,
+      working: true,
+    });
+  });
+
+  it('carries nothing for players whose orchestrator’s tab is open elsewhere', () => {
+    expect(chipSignal(players, { home: false, homeElsewhere: true })).toEqual({
       flashing: false,
       working: false,
     });
   });
 
-  it('carries any member’s activity for any other group', () => {
+  it('carries any member’s activity for any other group, a homeless orchestrator’s players’ included', () => {
     expect(
       chipSignal([idle, undefined, flashing, working], {
-        parent: false,
         home: false,
+        homeElsewhere: false,
       })
     ).toEqual({ flashing: true, working: true });
   });

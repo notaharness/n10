@@ -1,6 +1,6 @@
 import { DragOverlay, useDndContext } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
-import { chipSignal } from '../../lib/tabs/group-status.js';
+import type { ChipSignal } from '../../lib/tabs/group-status.js';
 import type { TabGroup } from '../../lib/tabs/tab-groups.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { Strip } from '../../lib/tabs/workspace.js';
@@ -18,6 +18,7 @@ interface Looks {
   faceOf: (tab: Tab) => TabFace;
   labelOf: (group: TabGroup) => string;
   colorOf: (group: TabGroup) => string | null;
+  signalOf: (group: TabGroup) => ChipSignal;
 }
 
 /**
@@ -54,7 +55,7 @@ export function CarriedOverlay(looks: Looks) {
 function carriedLook(
   id: string,
   data: StripDragData,
-  { groups, faceOf, labelOf, colorOf }: Looks,
+  { groups, faceOf, labelOf, colorOf, signalOf }: Looks,
   tabs: Pick<Strip, 'activeId'> & { paneId: string }
 ) {
   const group = groups.find((g) => chipBlockId(tabs.paneId, g.key) === id);
@@ -69,10 +70,7 @@ function carriedLook(
         count={faces.length}
         planIds={faces.flatMap((f) => f.item?.pr?.id ?? [])}
         color={colorOf(group)}
-        signal={chipSignal(
-          faces.map((f) => f.snapshot),
-          { parent: group.affiliation?.kind === 'parent', home: !!head }
-        )}
+        signal={signalOf(group)}
         open={false}
       />
     );

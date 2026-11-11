@@ -62,7 +62,7 @@ export function EditorArea({
   const requestAgentView = useRequestAgentView();
   const closer = useCloseTabs(items);
   const index = indexItems(repo.cwd, items);
-  const { groups, faceOf, colorOf, factsOf, activitySource } =
+  const { groups, faceOf, colorOf, signalOf, factsOf, activitySource } =
     useStripGroups(items);
   const derivedOf = useChipLabels(groups, faceOf);
   const [announced, announce] = useState('');
@@ -152,6 +152,7 @@ export function EditorArea({
       label={labelOf(group)}
       faceOf={faceOf}
       color={colorOf(group)}
+      signal={signalOf(group)}
       closer={closer}
       tabStop={stopOf(group) === tabStop}
       menu={{
@@ -274,6 +275,7 @@ export function EditorArea({
           faceOf={faceOf}
           labelOf={labelOf}
           colorOf={colorOf}
+          signalOf={signalOf}
         />
       </div>
       {confirmDialog}
