@@ -11,6 +11,16 @@ import {
 } from '@n10/core';
 import { logError } from '@n10/logger';
 
+/** What the service reads of a fleet row (`MachineView`). */
+export interface FleetMember {
+  peerId: string;
+  isLocal: boolean;
+  state: string;
+}
+
+const gone = (m: FleetMember) =>
+  m.state === 'revoked' || m.state === 'revoked-by-fleet';
+
 export type AffiliationService = ReturnType<typeof createAffiliationService>;
 
 const EMPTY: Affiliations = { sessions: new Map(), worktrees: new Map() };
@@ -22,11 +32,15 @@ const EMPTY: Affiliations = { sessions: new Map(), worktrees: new Map() };
  * Process-wide, because groups span repositories. Fed by discovery's
  * scans, which list tmux anyway; the session and terminal services stamp
  * its answers onto their rows. Orchestra tags a player without any
- * event, so a change shows at the next scan.
+ * event, so a change shows at the next scan. The fleet says which peerId
+ * is this machine (a `tmux:` target qualified with it means here) and
+ * which peers are gone (`observeFleet`); a peer that is only unreachable
+ * keeps its last listing until it is listed again.
  */
 export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
   const listings = new Map<string, readonly TaggedSession[]>();
   const places = new Map<string, string>();
+  let self: string | undefined;
   let snapshot = EMPTY;
   const listeners = new Set<() => void>();
 
@@ -49,10 +63,10 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
     for (const dir of places.keys()) if (!listed.has(dir)) places.delete(dir);
   }
 
-  function observe(machine: string, sessions: readonly TaggedSession[]): void {
-    listings.set(machine, sessions);
-    if (machine === LOCAL_MACHINE) forgetUnlisted();
-    const next = affiliations([...listings.values()].flat(), placeOf);
+  function derive(): void {
+    const next = affiliations([...listings.values()].flat(), placeOf, {
+      self,
+    });
     if (isDeepStrictEqual(next, snapshot)) return;
     snapshot = next;
     for (const listener of listeners) {
@@ -64,8 +78,35 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
     }
   }
 
+  function observe(machine: string, sessions: readonly TaggedSession[]): void {
+    listings.set(machine, sessions);
+    if (machine === LOCAL_MACHINE) forgetUnlisted();
+    derive();
+  }
+
+  /** The fleet's rows: this machine's peerId, and the peers no longer in
+   *  it (absent from a listing that has this machine's row, or
+   *  revoked), whose listings go. */
+  function observeFleet(machines: readonly FleetMember[]): void {
+    const own = machines.find((m) => m.isLocal);
+    const members = new Set(
+      machines.flatMap((m) => (m.isLocal || gone(m) ? [] : [m.peerId]))
+    );
+    const before = self;
+    self = own?.peerId ?? self;
+    let changed = self !== before;
+    for (const machine of [...listings.keys()]) {
+      if (machine === LOCAL_MACHINE || members.has(machine)) continue;
+      if (!own && !machines.some((m) => m.peerId === machine)) continue;
+      listings.delete(machine);
+      changed = true;
+    }
+    if (changed) derive();
+  }
+
   return {
     observe,
+    observeFleet,
     getSnapshot: () => snapshot,
     subscribe(listener: () => void): () => void {
       listeners.add(listener);

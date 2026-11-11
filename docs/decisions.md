@@ -792,11 +792,16 @@ The strip groups tabs by what they belong to, their affiliation: the parent
 a session reports to, else its place. Membership is derived, never stored
 or chosen.
 
-- **Parent.** A session's `@session-x-orchestra-orchestrator`, with any
-  `beam:<peer>/` qualifier stripped (core `affiliation.ts` `parentKey`), so a
-  parent is one group whether it runs in tmux, in the Codex app or on another
-  machine. Its home is the session whose `@session-x-orchestra-target` is that
-  key, or the local session a `tmux:` key names. `claude:<id>` and
+- **Parent.** A session's `@session-x-orchestra-orchestrator` (core
+  `affiliation.ts` `parentTarget`). `claude:<id>` and `codex:<thread>` are
+  global: any `beam:<peer>/` qualifier goes, so the parent is one group
+  whether it runs in tmux, in the Codex app or on another machine. A
+  `tmux:<session>` name is only unique on its server: it names a session on
+  the qualifier's machine, else on the reporter's own, and its key carries
+  that machine (`beam:<peer>/tmux:<session>` unless it is this one; the fleet
+  supplies this machine's peerId). Its home is the session whose
+  `@session-x-orchestra-target` is that key, or the session the `tmux:` key
+  names. `claude:<id>` and
   `codex:<thread>` name a conversation, which tmux cannot tie to a session;
   Orchestra closes that gap by writing the target on the session it runs in
   (`spawn.sh`, `adopt.sh`) and taking it off every other one. n10 does not
@@ -804,7 +809,8 @@ or chosen.
   heads its group, keyed by its target (else `tmux:<name>`), so players naming
   it either way are one group; a marked session heads one with or without
   players. A home that reports to another parent heads its own group, shown
-  right after its parent's (`follows`): groups do not nest. A parent with no
+  right after its parent's (`follows`): groups do not nest. Every member of a
+  group carries the same affiliation, `follows` included. A parent with no
   home here is labelled by harness and its players' common place
   (`Codex · skolakerfi`).
 - **Inheritance.** A terminal in a player's checkout takes the player's
@@ -816,7 +822,8 @@ or chosen.
 
 Core `discovery/affiliations.ts` derives them over a listing, pure. The
 engine's affiliation service holds each machine's last discovery listing
-(local and connected machines), so a remote player joins its parent when
+(local and connected machines, kept while a peer is unreachable and dropped
+once the fleet no longer lists it or revokes it), so a remote player joins its parent when
 both are listed, and the session and terminal services stamp `affiliation`
 onto their rows; the desktop also stamps its foreign-session listing.
 Orchestra tags a player without an event, so a change shows at the next

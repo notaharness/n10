@@ -5,6 +5,7 @@ import { createAffiliationService } from './affiliation-service.js';
 
 const PEER = 'abcdefabcdefabcdefabcdefabcdefab';
 const CLAUDE = 'claude:conductor';
+const SELF = '0123456789abcdef0123456789abcdef';
 
 function shell(name: string, tags: Partial<TaggedSession> = {}): TaggedSession {
   return {
@@ -61,5 +62,42 @@ describe('affiliation service', () => {
       kind: 'place',
       key: 'place:/',
     });
+  });
+
+  it('reads a tmux: target qualified with this machine’s peerId as here', () => {
+    const service = createAffiliationService({ placeOf: (dir) => dir });
+    service.observe('local', [shell('boss')]);
+    service.observe(PEER, [
+      shell('far', { machine: PEER, orchestrator: `beam:${SELF}/tmux:boss` }),
+    ]);
+    const far = terminalSessionKey('far', PEER);
+    expect(service.of(far)?.key).toBe(`beam:${SELF}/tmux:boss`);
+    service.observeFleet([
+      { peerId: SELF, isLocal: true, state: 'connected' },
+      { peerId: PEER, isLocal: false, state: 'connected' },
+    ]);
+    expect(service.of(far)).toMatchObject({
+      key: 'tmux:boss',
+      home: { key: terminalSessionKey('boss') },
+    });
+  });
+
+  it('forgets a peer that leaves the fleet, and keeps one that is only unreachable', () => {
+    const service = createAffiliationService({ placeOf: (dir) => dir });
+    const far = terminalSessionKey('far', PEER);
+    service.observe(PEER, [shell('far', { machine: PEER })]);
+    const fleet = (state: string) =>
+      service.observeFleet([
+        { peerId: SELF, isLocal: true, state: 'connected' },
+        { peerId: PEER, isLocal: false, state },
+      ]);
+    fleet('offline');
+    service.observeFleet([]);
+    expect(service.of(far)).toBeDefined();
+    fleet('revoked');
+    expect(service.of(far)).toBeUndefined();
+    service.observe(PEER, [shell('far', { machine: PEER })]);
+    service.observeFleet([{ peerId: SELF, isLocal: true, state: 'connected' }]);
+    expect(service.of(far)).toBeUndefined();
   });
 });

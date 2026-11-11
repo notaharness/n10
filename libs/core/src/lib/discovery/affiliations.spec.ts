@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { homelessLabel, parentKey, placeKey } from '../affiliation.js';
+import { homelessLabel, parentTarget, placeKey } from '../affiliation.js';
 import { registryNameOf, type TaggedSession } from '../session-identity.js';
 import { mainCheckoutOf } from '../repository.js';
 import { affiliations, checkoutKey } from './affiliations.js';
@@ -7,6 +7,7 @@ import { affiliations, checkoutKey } from './affiliations.js';
 const CLAUDE = 'claude:7c0ffee0-1234-4abc-8def-0123456789ab';
 const CODEX = 'codex:11111111-2222-3333-4444-555555555555';
 const PEER = '1234567890abcdef1234567890abcdef';
+const SELF = 'feedfacefeedfacefeedfacefeedface';
 const REPO = '/home/u/repo';
 
 let created = 0;
@@ -48,7 +49,7 @@ function player(
  *  else itself. */
 const placeOf = (dir: string) => (dir.startsWith(`${REPO}/`) ? REPO : dir);
 const of = (sessions: TaggedSession[]) =>
-  affiliations(sessions, placeOf).sessions;
+  affiliations(sessions, placeOf, { self: SELF }).sessions;
 const key = registryNameOf;
 
 describe('affiliations', () => {
@@ -113,6 +114,49 @@ describe('affiliations', () => {
     expect(groups.get(key(remoteBoss))?.kind).toBe('place');
   });
 
+  it('finds a remote player’s tmux: parent on the player’s own machine', () => {
+    const localBoss = shell('boss');
+    const remoteBoss = shell('boss', { machine: PEER });
+    const remote = player('r', 'tmux:boss', { machine: PEER });
+    const groups = of([localBoss, remoteBoss, remote]);
+    const head = {
+      kind: 'parent',
+      key: `beam:${PEER}/tmux:boss`,
+      label: 'boss',
+      home: { key: key(remoteBoss), repo: remoteBoss.repo, worktree: '' },
+    };
+    expect(groups.get(key(remote))).toEqual(head);
+    expect(groups.get(key(remoteBoss))).toEqual(head);
+    expect(groups.get(key(localBoss))?.kind).toBe('place');
+  });
+
+  it('finds a qualified tmux: parent on the machine the qualifier names', () => {
+    const localBoss = shell('boss');
+    const remoteBoss = shell('boss', { machine: PEER });
+    const toHere = player('h', `beam:${SELF}/tmux:boss`, { machine: PEER });
+    const toThere = player('t', `beam:${PEER}/tmux:boss`);
+    const groups = of([localBoss, remoteBoss, toHere, toThere]);
+    expect(groups.get(key(toHere))).toMatchObject({
+      key: 'tmux:boss',
+      home: { key: key(localBoss) },
+    });
+    expect(groups.get(key(toThere))).toMatchObject({
+      home: { key: key(remoteBoss) },
+    });
+  });
+
+  it('keeps homeless tmux: parents on different machines apart', () => {
+    const here = player('h', 'tmux:main');
+    const there = player('t', 'tmux:main', { machine: PEER });
+    const groups = of([here, there]);
+    expect(groups.get(key(here))?.key).toBe('tmux:main');
+    expect(groups.get(key(there))).toEqual({
+      kind: 'parent',
+      key: `beam:${PEER}/tmux:main`,
+      label: 'main',
+    });
+  });
+
   it('labels a homeless parent by harness and its players’ common place', () => {
     const a = player('a', CODEX);
     const b = player('b', CODEX);
@@ -135,7 +179,8 @@ describe('affiliations', () => {
       follows: CLAUDE,
       home: { key: key(middle) },
     });
-    expect(groups.get(key(leaf))?.key).toBe(CODEX);
+    // One group, one affiliation: its players follow too.
+    expect(groups.get(key(leaf))).toEqual(groups.get(key(middle)));
     expect(groups.get(key(top))).not.toHaveProperty('follows');
   });
 
@@ -177,13 +222,19 @@ describe('affiliations', () => {
 });
 
 describe('affiliation keys', () => {
-  it('strips only a leading beam qualifier', () => {
-    expect(parentKey(`beam:${PEER}/codex:x`)).toBe('codex:x');
-    expect(parentKey('tmux:beam:x/y')).toBe('tmux:beam:x/y');
+  it('strips a qualifier from a global id, and keeps a tmux name’s machine', () => {
+    expect(parentTarget(`beam:${PEER}/codex:x`).key).toBe('codex:x');
+    expect(parentTarget('tmux:beam:x/y').key).toBe('tmux:beam:x/y');
+    expect(parentTarget('tmux:a', PEER).key).toBe(`beam:${PEER}/tmux:a`);
+    expect(parentTarget(`beam:${SELF}/tmux:a`, PEER, SELF)).toEqual({
+      key: 'tmux:a',
+      tmux: { machine: 'local', name: 'a' },
+    });
   });
 
   it('names a tmux parent by its session', () => {
     expect(homelessLabel('tmux:boss', ['a', 'b'])).toBe('boss');
+    expect(homelessLabel(`beam:${PEER}/tmux:boss`, [])).toBe('boss');
     expect(homelessLabel('other:x', ['a'])).toBe('other · a');
   });
 });
