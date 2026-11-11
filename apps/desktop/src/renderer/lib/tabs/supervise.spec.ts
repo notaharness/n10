@@ -123,28 +123,9 @@ describe('following a group', () => {
       { id: 'pane-2', order: ['p1', 'p3'], active: 'p3' },
     ]);
     expect(ws.focusedPane).toBe('pane-1');
-    expect(ws.follows).toEqual({ 'pane-2': KEY });
-  });
-
-  it('follows in place: an unfocused pane every tab of which it follows', () => {
-    const ws = then(
-      group(),
-      {
-        type: 'split',
-        ids: [id('p1'), id('p3')],
-        target: 'pane-1',
-        edge: 'right',
-      },
-      { type: 'focus-pane', pane: 'pane-1' },
-      follow({ pane: 'pane-2', edge: null, show: id('p1') })
-    );
-    expect(shape(ws)[1]).toEqual({
-      id: 'pane-2',
-      order: ['p1', 'p3'],
-      active: 'p1',
+    expect(ws.follows).toEqual({
+      'pane-2': { key: KEY, ids: [id('p1'), id('p3')] },
     });
-    expect(ws.follows).toEqual({ 'pane-2': KEY });
-    expect(ws.focusedPane).toBe('pane-1');
   });
 
   it('expands the group, so the tabs it follows show', () => {
@@ -154,11 +135,6 @@ describe('following a group', () => {
       follow()
     );
     expect(ws.collapsed[KEY]).toBe(false);
-  });
-
-  it('refuses in place where the pane holds a tab it does not follow', () => {
-    const ws = group();
-    expect(then(ws, follow({ edge: null }))).toBe(ws);
   });
 
   it('follows a group in one pane at most', () => {
@@ -214,6 +190,67 @@ describe('following a group', () => {
     expect(ws.follows).toEqual({});
   });
 
+  it('follows only tabs the source pane holds', () => {
+    const ws = then(
+      group(),
+      { type: 'split', ids: [id('other')], target: 'pane-1', edge: 'bottom' },
+      { type: 'focus-pane', pane: 'pane-1' },
+      follow({ ids: [id('p1'), id('other')], show: id('p1') })
+    );
+    expect(shape(ws).find((p) => p.order.includes('other'))!.id).toBe('pane-2');
+    expect(Object.values(ws.follows)[0]!.ids).toEqual([id('p1')]);
+  });
+
+  it('stops following a tab pinned there, keeping it in the pane', () => {
+    const ws = then(group(), follow(), {
+      type: 'set-pinned',
+      ids: [id('p1')],
+      pinned: true,
+    });
+    expect(ws.follows['pane-2']!.ids).toEqual([id('p3')]);
+    expect(shape(ws)[1]!.order).toContain('p1');
+  });
+
+  it('ends when its last followed tab is pinned, the pane staying', () => {
+    const ws = then(group(), follow(), {
+      type: 'set-pinned',
+      ids: [id('p1'), id('p3')],
+      pinned: true,
+    });
+    expect(ws.follows).toEqual({});
+    expect(panesOf(ws.layout)).toHaveLength(2);
+  });
+
+  it('ends when it is left the only pane: it would be paused for good', () => {
+    const ws = then(group(), follow(), {
+      type: 'close-pane',
+      pane: 'pane-1',
+    });
+    expect(panesOf(ws.layout)).toHaveLength(1);
+    expect(Object.keys(ws.tabs)).toHaveLength(5);
+    expect(ws.follows).toEqual({});
+  });
+
+  it('follows a tiled group’s players in a pane of their own', () => {
+    const ws = then(group(), tile(), {
+      type: 'follow-group',
+      pane: 'pane-2',
+      key: KEY,
+      ids: [id('p1'), id('p3')],
+      edge: 'bottom',
+      show: id('p1'),
+    });
+    expect(shape(ws).map((p) => p.order)).toEqual([
+      ['home', 'other'],
+      ['p2'],
+      ['p1', 'p3'],
+    ]);
+    expect(ws.focusedPane).toBe('pane-1');
+    expect(Object.values(ws.follows)).toEqual([
+      { key: KEY, ids: [id('p1'), id('p3')] },
+    ]);
+  });
+
   it('is not saved: following ends with the run', () => {
     const ws = then(group(), follow());
     expect(toSaved(ws)).not.toHaveProperty('follows');
@@ -245,10 +282,28 @@ describe('where a new tab of a supervised group opens', () => {
     expect(ws.focusedPane).toBe('pane-1');
   });
 
-  it('in the pane following its group', () => {
+  it('in the pane following its group, which follows it from then on', () => {
     const ws = then(group(), follow(), sync);
     expect(shape(ws)[1]!.order).toEqual(['p1', 'p3', 'p4']);
     expect(shape(ws)[1]!.active).toBe('p3');
+    expect(ws.follows['pane-2']!.ids).toEqual([id('p1'), id('p3'), id('p4')]);
+  });
+
+  it('a home it opens goes where the players are, never to be followed', () => {
+    const players = run(open('p1'), open('other'), open('p2'), open('p3'));
+    const home: ItemEntry = {
+      itemKey: 'branch:home',
+      branch: 'home',
+      sessionName: 'sh',
+      running: true,
+    };
+    const ws = then(players, follow({ show: id('p1') }), {
+      ...sync,
+      entries: [home],
+    } as TabsAction);
+    expect(shape(ws)[0]!.order).toContain('home');
+    expect(shape(ws)[1]!.order).toEqual(['p1', 'p3']);
+    expect(ws.follows['pane-2']!.ids).toEqual([id('p1'), id('p3')]);
   });
 });
 
@@ -260,14 +315,9 @@ describe('room for a supervising layout', () => {
   });
 
   it('counts the follow line in the new pane’s height', () => {
-    expect(followEdge({ width: 484, height: 208 }, 0)).toBe('right');
-    expect(followEdge({ width: 484, height: 207 }, 0)).toBeNull();
-    expect(followEdge({ width: 300, height: 392 }, 0)).toBe('bottom');
-    expect(followEdge({ width: 300, height: 391 }, 0)).toBeNull();
-  });
-
-  it('and a source that already follows, its own', () => {
-    expect(followEdge({ width: 300, height: 420 }, 28)).toBe('bottom');
-    expect(followEdge({ width: 300, height: 419 }, 28)).toBeNull();
+    expect(followEdge({ width: 484, height: 208 })).toBe('right');
+    expect(followEdge({ width: 484, height: 207 })).toBeNull();
+    expect(followEdge({ width: 300, height: 392 })).toBe('bottom');
+    expect(followEdge({ width: 300, height: 391 })).toBeNull();
   });
 });

@@ -101,21 +101,15 @@ describe('tile plan', () => {
 });
 
 describe('follow plan', () => {
-  const pane = (order: string[], focused: boolean, focusedActive: string) => ({
-    order: ids(...order),
-    focused,
-    focusedActive: `terminal:${focusedActive}`,
-  });
+  const shown = (name: string) => `terminal:${name}`;
   const none = () => false;
 
   it('takes the unpinned members but the home and what the focused pane shows', () => {
     const order = ['boss', 'p1', 'p2', 'p3', 'x'];
     const groups = groupsOf(order, ['p3']);
-    expect(
-      followPlan(groups, 'claude:boss', pane(order, true, 'p1'), none)
-    ).toEqual({
+    expect(followPlan(groups, 'claude:boss', shown('p1'), none)).toEqual({
       ok: true,
-      plan: { ids: ids('p2'), show: 'terminal:p2', inPlace: false },
+      plan: { ids: ids('p2'), show: 'terminal:p2' },
     });
   });
 
@@ -124,32 +118,16 @@ describe('follow plan', () => {
     const plan = followPlan(
       groupsOf(order),
       'claude:boss',
-      pane(order, false, 'x'),
+      shown('x'),
       (tab) => tab.id === 'terminal:p3'
     );
     expect(plan.ok && plan.plan.show).toBe('terminal:p3');
   });
 
-  it('follows in place in an unfocused pane it would empty', () => {
-    const order = ['c1', 'c2'];
-    const plan = followPlan(
-      groupsOf(order),
-      'codex:x',
-      pane(order, false, 'x'),
-      none
-    );
-    expect(plan.ok && plan.plan.inPlace).toBe(true);
-  });
-
   it('has nothing to follow when only the shown tab and pins are left', () => {
     const order = ['boss', 'p1', 'p2'];
     expect(
-      followPlan(
-        groupsOf(order, ['p2']),
-        'claude:boss',
-        pane(order, true, 'p1'),
-        none
-      )
+      followPlan(groupsOf(order, ['p2']), 'claude:boss', shown('p1'), none)
     ).toEqual({ ok: false, feedback: NOTHING_TO_FOLLOW });
   });
 });

@@ -11,8 +11,9 @@ import {
   splitPane,
 } from './pane-moves.js';
 import {
-  dropGoneFollows,
+  adoptOpened,
   followGroup,
+  settleFollows,
   followShow,
   stopFollowing,
   tileGroup,
@@ -233,7 +234,8 @@ function across(
       ? { groupOf: action.groupOf, isHome: action.isHome }
       : undefined;
   const repo = 'repo' in action ? action.repo : undefined;
-  return distribute(ws, after, placeFor(ws, grouping), repo);
+  const dealt = distribute(ws, after, placeFor(ws, grouping), repo);
+  return grouping ? adoptOpened(ws, dealt, grouping) : dealt;
 }
 
 /** The pane's active tab once its tabs are `order`: the one it had,
@@ -306,7 +308,7 @@ function distribute(
  *  pane shows its active tab — and the focused pane's active tab noted
  *  as where its repository was left, however focus got there. */
 function settle(ws: Workspace): Workspace {
-  const next = dropGoneFollows(dropEmptyPanes(ws));
+  const next = settleFollows(dropEmptyPanes(ws));
   const shown = new Set(panesOf(next.layout).map((p) => p.activeId));
   const unseen = next.unseen.filter((id) => !shown.has(id));
   const seen =

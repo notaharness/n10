@@ -165,8 +165,40 @@ const paneAction: fc.Arbitrary<TabsAction> = fc.oneof(
       minLength: 2,
       maxLength: 3,
     }),
-  })
+  }),
+  ...superviseActions()
 );
+
+/** The supervising layouts (`supervise.ts`), over two groups. A follow
+ *  pane shows the first tab it is given. */
+function superviseActions(): fc.Arbitrary<TabsAction>[] {
+  const key = fc.constantFrom('claude:a', 'claude:b');
+  return [
+    fc.record({
+      type: fc.constant('tile-group' as const),
+      pane: pick,
+      key,
+      home: pick,
+      players: picks,
+      edge: fc.constantFrom('right' as const, 'bottom' as const),
+    }),
+    fc
+      .record({
+        type: fc.constant('follow-group' as const),
+        pane: pick,
+        key,
+        ids: picks,
+        edge: fc.constantFrom('right' as const, 'bottom' as const),
+      })
+      .map((a) => ({ ...a, show: a.ids[0]! })),
+    fc.record({ type: fc.constant('stop-following' as const), pane: pick }),
+    fc.record({
+      type: fc.constant('follow-show' as const),
+      pane: pick,
+      id: pick,
+    }),
+  ];
+}
 
 /** `a` with its picks (`#n`) read against `ws`: the nth open tab, pane
  *  or split, wrapping. Anything else is left as it is. */
@@ -204,7 +236,24 @@ function picked(ws: Workspace, a: TabsAction): TabsAction {
       };
     case 'close-pane':
     case 'focus-pane':
+    case 'stop-following':
       return { ...a, pane: pane(a.pane) };
+    case 'tile-group':
+      return {
+        ...a,
+        pane: pane(a.pane),
+        home: tab(a.home),
+        players: a.players.map(tab),
+      };
+    case 'follow-group':
+      return {
+        ...a,
+        pane: pane(a.pane),
+        ids: a.ids.map(tab),
+        show: tab(a.show),
+      };
+    case 'follow-show':
+      return { ...a, pane: pane(a.pane), id: tab(a.id) };
     case 'resize-split':
       return { ...a, key: from(splits)(a.key) };
     default:
@@ -1107,6 +1156,45 @@ describe('the workspace', () => {
         expect([...placed].sort()).toEqual(Object.keys(ws.tabs).sort());
       }),
       { numRuns: 500 }
+    );
+  });
+
+  it('follows a group from live panes only, one each, with tabs they hold', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const ws = sequenceWs(actions);
+        const panes = panesOf(ws.layout);
+        const entries = Object.entries(ws.follows);
+        expect(panes.length > 1 || entries.length === 0).toBe(true);
+        const keys = entries.map(([, f]) => f.key);
+        expect(new Set(keys).size).toBe(keys.length);
+        for (const [id, f] of entries) {
+          const pane = panes.find((p) => p.id === id);
+          expect(pane).toBeDefined();
+          expect(f.ids.length).toBeGreaterThan(0);
+          for (const t of f.ids) {
+            expect(pane!.order).toContain(t);
+            expect(ws.pinned).not.toContain(t);
+          }
+        }
+      }),
+      { numRuns: 500 }
+    );
+  });
+
+  it('switches a follow pane without moving focus or any tab', () => {
+    fc.assert(
+      fc.property(sequence, pick, pick, (actions, p, t) => {
+        const ws = sequenceWs(actions);
+        const show = picked(ws, { type: 'follow-show', pane: p, id: t });
+        const after = reduceWorkspace(ws, show);
+        expect(after.focusedPane).toBe(ws.focusedPane);
+        expect(panesOf(after.layout).map((x) => x.order)).toEqual(
+          panesOf(ws.layout).map((x) => x.order)
+        );
+        expect(after.follows).toEqual(ws.follows);
+      }),
+      { numRuns: 300 }
     );
   });
 

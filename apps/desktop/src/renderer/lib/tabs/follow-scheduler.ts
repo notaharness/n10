@@ -13,6 +13,10 @@
  *   is shown.
  * - An event stops waiting once its tab's output is no longer new or the
  *   tab leaves the pane (`forget`).
+ * - `observe` turns what has new output now into those events: only a
+ *   change to new output counts. Its first answer from a source (the
+ *   activity of one open repository) is a baseline, not news, and a
+ *   missing answer (none yet, or a placeholder) is no answer.
  */
 
 export const COALESCE_MS = 250;
@@ -29,6 +33,9 @@ export interface FollowSchedulerOptions {
 }
 
 export interface FollowScheduler {
+  /** The followed tabs with new output now, by `source`: `null` while
+   *  there is no answer to read. */
+  observe(fresh: readonly string[], source: string | null): void;
   /** Tab `id` just got new output. */
   note(id: string): void;
   /** Tab `id`'s output is no longer new, or it left the pane. */
@@ -44,6 +51,7 @@ export function followScheduler(opts: FollowSchedulerOptions): FollowScheduler {
   let firstAt: number | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let resume: ReturnType<typeof setTimeout> | null = null;
+  let seen: { source: string; fresh: ReadonlySet<string> } | null = null;
 
   const clear = () => {
     if (timer !== null) clearTimeout(timer);
@@ -77,7 +85,18 @@ export function followScheduler(opts: FollowSchedulerOptions): FollowScheduler {
     else timer = setTimeout(flush, wait);
   };
 
-  return {
+  const api: FollowScheduler = {
+    observe(fresh, source) {
+      if (source === null) return;
+      const now = new Set(fresh);
+      const was = seen?.source === source ? seen.fresh : null;
+      // Another source's waiting events say nothing about this one's.
+      if (seen && !was) for (const id of [...waiting.keys()]) api.forget(id);
+      seen = { source, fresh: now };
+      if (!was) return;
+      for (const id of now) if (!was.has(id)) api.note(id);
+      for (const id of was) if (!now.has(id)) api.forget(id);
+    },
     note(id) {
       const now = Date.now();
       waiting.delete(id);
@@ -113,4 +132,5 @@ export function followScheduler(opts: FollowSchedulerOptions): FollowScheduler {
       resume = null;
     },
   };
+  return api;
 }

@@ -70,9 +70,6 @@ export interface FollowPlan {
   ids: string[];
   /** The tab the follow pane shows first. */
   show: string;
-  /** Every tab of the pane goes, and it has no focus: it follows in
-   *  place rather than splitting. */
-  inPlace: boolean;
 }
 
 /**
@@ -83,26 +80,13 @@ export interface FollowPlan {
 export function followPlan(
   groups: readonly TabGroup[],
   key: string,
-  pane: {
-    order: readonly string[];
-    focused: boolean;
-    /** The active tab of the focused pane, wherever that is. */
-    focusedActive: string | null;
-  },
+  /** The active tab of the focused pane, wherever that is. */
+  focusedActive: string | null,
   hasNewOutput: (tab: Tab) => boolean
 ): Planned<FollowPlan> {
-  const eligible = playersOf(groups, key).filter(
-    (t) => t.id !== pane.focusedActive
-  );
+  const eligible = playersOf(groups, key).filter((t) => t.id !== focusedActive);
   if (eligible.length === 0) return { ok: false, feedback: NOTHING_TO_FOLLOW };
   const ids = eligible.map((t) => t.id);
   const show = (eligible.find(hasNewOutput) ?? eligible[0]!).id;
-  const inPlace = !pane.focused && pane.order.every((id) => ids.includes(id));
-  return { ok: true, plan: { ids, show, inPlace } };
-}
-
-/** The tabs a follow pane follows: its unpinned members of the group it
- *  follows, the home aside, in presented order. */
-export function followedTabs(groups: readonly TabGroup[], key: string): Tab[] {
-  return playersOf(groups, key);
+  return { ok: true, plan: { ids, show } };
 }

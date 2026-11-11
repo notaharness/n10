@@ -18,13 +18,19 @@ export function revealTab(paneId: string, id: string): void {
   });
 }
 
-/** Pane `pane`'s frame on screen, strip included. */
-export function paneFrame(pane: string): DOMRect | null {
-  return (
-    document
-      .querySelector(`[data-pane-id="${CSS.escape(pane)}"]`)
-      ?.getBoundingClientRect() ?? null
-  );
+/** The room pane `pane` has to split: its frame on screen, strip
+ *  included, less a follow pane's line, which stays with it. */
+export function paneFrame(
+  pane: string
+): { width: number; height: number } | null {
+  const el = document.querySelector(`[data-pane-id="${CSS.escape(pane)}"]`);
+  if (!el) return null;
+  const { width, height } = el.getBoundingClientRect();
+  const line = el.querySelector('[data-follow-line]');
+  return {
+    width,
+    height: height - (line?.getBoundingClientRect().height ?? 0),
+  };
 }
 
 /** After a pane command or drop: the focused pane's active tab scrolled

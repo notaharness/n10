@@ -1,71 +1,69 @@
 import { useEffect, useRef } from 'react';
-import { useDndContext } from '@dnd-kit/core';
 import {
   followScheduler,
   type FollowScheduler,
 } from '../../lib/tabs/follow-scheduler.js';
 import {
-  followedTabs,
   NOTHING_LEFT_TO_FOLLOW,
   stoppedFollowing,
 } from '../../lib/tabs/supervise-plan.js';
-import type { TabGroup } from '../../lib/tabs/tab-groups.js';
+import { presentedIds, type TabGroup } from '../../lib/tabs/tab-groups.js';
 import { useRequestAgentView } from '../../lib/tabs/tab-views.js';
 import { useTabs, useWorkspace, type Tab } from '../../lib/tabs/tabs.js';
-import { isStripDragData } from './strip-drag.js';
+import type { Following } from '../../lib/tabs/workspace.js';
 import { sayPane } from './use-pane-menus.js';
 import type { TabFace } from './use-strip-groups.js';
 
 /** What a follow pane's line shows. */
-export interface Following {
-  name: string;
+export interface FollowLineState {
   paused: boolean;
   stop(): void;
 }
 
-const lines = (ids: readonly string[]) => ids.join('\n');
-const unlines = (s: string) => (s ? s.split('\n') : []);
+/** The workspace's view of this pane, kept current for the scheduler's
+ *  callbacks, which outlive a render. */
+interface Latest {
+  order: readonly string[];
+  activeId: string | null;
+  show: ((id: string) => void) | null;
+}
 
 /**
- * This pane's following, when it follows a group: it switches to the
- * followed tab that last got new output (`follow-scheduler.ts`), never
- * taking focus, and pauses while the user is in the pane — it has focus,
- * or a tab is dragged from it. Only a change from no new output to new
- * output counts: what was waiting when following began shows only if it
- * was chosen then. A tab pinned or moved out is no longer followed;
- * with none left, following stops.
+ * Pane `pane`'s following, while it follows `following`: it switches to
+ * the followed tab that last got new output (`follow-scheduler.ts`),
+ * never taking focus, and pauses while the pane is the focused one — a
+ * drag from it or a menu on it focuses it first. Which tabs it follows
+ * is the workspace's (`Following.ids`), not the strip's grouping, so a
+ * gap in the listings ends nothing.
  */
 export function useFollowPane(strip: {
+  following: Following;
   groups: readonly TabGroup[];
   faceOf(tab: Tab): TabFace;
-  labelOf(group: TabGroup): string;
-}): Following | null {
+  activitySource: string | null;
+}): FollowLineState {
   const tabs = useTabs();
-  const { workspace, dispatch } = useWorkspace();
+  const { dispatch } = useWorkspace();
   const requestAgentView = useRequestAgentView();
-  const { active: dragged } = useDndContext();
   const pane = tabs.paneId;
-  const key = workspace.follows[pane];
-  const followed = key === undefined ? [] : followedTabs(strip.groups, key);
-  const ids = lines(followed.map((t) => t.id));
-  const fresh = lines(
-    followed
-      .filter((t) => strip.faceOf(t).status === 'new-output')
-      .map((t) => t.id)
-  );
-  const drag = dragged?.data.current;
-  const paused = tabs.focused || (isStripDragData(drag) && drag.pane === pane);
+  const followed = new Set(strip.following.ids);
+  // Presented order, for ties.
+  const order = presentedIds(strip.groups).filter((id) => followed.has(id));
+  const fresh = tabs.tabs
+    .filter(
+      (t) => followed.has(t.id) && strip.faceOf(t).status === 'new-output'
+    )
+    .map((t) => t.id)
+    .join('\n');
+  const paused = tabs.focused;
 
-  const latest = useRef<{
-    ids: string;
-    activeId: string | null;
-    show: ((id: string) => void) | null;
-  }>({ ids, activeId: tabs.activeId, show: null });
+  const latest = useRef<Latest>({ order, activeId: null, show: null });
   useEffect(() => {
     latest.current = {
-      ids,
+      order,
       activeId: tabs.activeId,
       show: (id) => {
+        // Its agent's output, not a pull request's overview.
         if (tabs.tabs.find((t) => t.id === id)?.kind === 'item')
           requestAgentView(id);
         dispatch({ type: 'follow-show', pane, id });
@@ -74,55 +72,56 @@ export function useFollowPane(strip: {
   });
 
   const scheduler = useRef<FollowScheduler | null>(null);
-  const before = useRef<ReadonlySet<string> | null>(null);
   useEffect(() => {
-    if (key === undefined) return;
     const s = followScheduler({
-      rank: (id) => unlines(latest.current.ids).indexOf(id),
+      rank: (id) => latest.current.order.indexOf(id),
       shown: () => latest.current.activeId,
       show: (id) => latest.current.show?.(id),
     });
     scheduler.current = s;
-    before.current = null;
     return () => {
       s.dispose();
       scheduler.current = null;
     };
-  }, [key]);
+  }, []);
 
+  const source = strip.activitySource;
   useEffect(() => {
-    const s = scheduler.current;
-    if (!s) return;
-    const now = new Set(unlines(fresh));
-    const was = before.current;
-    before.current = now;
-    // What waits when following begins is where it starts, not a switch.
-    if (was === null) return;
-    for (const id of now) if (!was.has(id)) s.note(id);
-    for (const id of was) if (!now.has(id)) s.forget(id);
-  }, [fresh, key]);
+    scheduler.current?.observe(fresh ? fresh.split('\n') : [], source);
+  }, [fresh, source]);
 
   useEffect(() => {
     scheduler.current?.setPaused(paused);
-  }, [paused, key]);
+  }, [paused]);
 
-  const empty = key !== undefined && ids === '';
-  useEffect(() => {
-    if (!empty) return;
-    dispatch({ type: 'stop-following', pane });
-    sayPane(NOTHING_LEFT_TO_FOLLOW);
-  }, [empty, dispatch, pane]);
-
-  if (key === undefined) return null;
-  const group = strip.groups.find((g) => !g.pinned && g.key === key);
-  const name =
-    workspace.groupNames[key] ?? (group ? strip.labelOf(group) : key);
   return {
-    name,
     paused,
-    stop: () => {
-      dispatch({ type: 'stop-following', pane });
-      sayPane(stoppedFollowing(name));
-    },
+    stop: () => dispatch({ type: 'stop-following', pane }),
   };
+}
+
+/**
+ * What this pane says when its following ends while the pane stays:
+ * "No tabs left to follow" when none of the tabs it followed is still
+ * here unpinned, else "Stopped following {group}" (Stop following, or
+ * the pane left the only one). A pane that closes says nothing.
+ */
+export function useFollowEnded(nameOf: (key: string) => string): void {
+  const tabs = useTabs();
+  const { workspace } = useWorkspace();
+  const following = workspace.follows[tabs.paneId];
+  const last = useRef(following);
+  const pinned = new Set(tabs.pinned);
+  const held = (id: string) =>
+    !pinned.has(id) && tabs.tabs.some((t) => t.id === id);
+  useEffect(() => {
+    const ended = last.current;
+    last.current = following;
+    if (!ended || following) return;
+    sayPane(
+      ended.ids.some(held)
+        ? stoppedFollowing(nameOf(ended.key))
+        : NOTHING_LEFT_TO_FOLLOW
+    );
+  });
 }

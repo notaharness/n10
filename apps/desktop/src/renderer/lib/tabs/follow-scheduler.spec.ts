@@ -131,3 +131,50 @@ describe('a follow pane’s switching', () => {
     expect(state.switches).toEqual([]);
   });
 });
+
+describe('what counts as new output', () => {
+  it('takes the first answer as a baseline: output already waiting is no news', () => {
+    const { s, state } = setup('a');
+    s.observe(['b'], 'repo');
+    vi.advanceTimersByTime(1000);
+    expect(state.switches).toEqual([]);
+  });
+
+  it('counts a change to new output', () => {
+    const { s, state } = setup('a');
+    s.observe([], 'repo');
+    s.observe(['c'], 'repo');
+    vi.advanceTimersByTime(250);
+    expect(state.switches).toEqual(['c']);
+  });
+
+  it('forgets a tab whose output was seen before its turn', () => {
+    const { s, state } = setup('a');
+    s.observe([], 'repo');
+    s.observe(['c'], 'repo');
+    s.observe([], 'repo');
+    vi.advanceTimersByTime(1000);
+    expect(state.switches).toEqual([]);
+  });
+
+  it('reads nothing while there is no answer, then compares with the last one', () => {
+    const { s, state } = setup('a');
+    s.observe([], 'repo');
+    s.observe(['b', 'c'], null);
+    vi.advanceTimersByTime(1000);
+    expect(state.switches).toEqual([]);
+    // Output that came while there was no answer is news once it is back.
+    s.observe(['c'], 'repo');
+    vi.advanceTimersByTime(250);
+    expect(state.switches).toEqual(['c']);
+  });
+
+  it('takes another repository’s first answer as a new baseline, dropping what waited', () => {
+    const { s, state } = setup('a');
+    s.observe([], 'one');
+    s.observe(['b'], 'one');
+    s.observe(['b', 'c'], 'two');
+    vi.advanceTimersByTime(1000);
+    expect(state.switches).toEqual([]);
+  });
+});

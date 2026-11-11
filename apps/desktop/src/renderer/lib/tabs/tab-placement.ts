@@ -11,9 +11,9 @@ export interface Grouping {
 }
 
 /** The pane a tab a reconciliation opened goes to: the pane following
- *  its group; else the focused pane when it holds the group's players,
- *  else the pane holding most of them (the first, on a tie); else the
- *  focused pane. A player is an unpinned member other than the home, so
+ *  its group, unless it is the group's home; else the focused pane when
+ *  it holds the group's players, else the pane holding most of them (the
+ *  first, on a tie); else the focused pane. A player is an unpinned member other than the home, so
  *  a new player of a tiled group joins the players, not the home. */
 export function placeFor(
   ws: Workspace,
@@ -27,7 +27,8 @@ export function placeFor(
   return (tab) => {
     const key = groupOf(tab);
     if (key === null) return focused;
-    const following = followerOf(ws, key);
+    // A home is never followed: it goes where its group's players are.
+    const following = isHome(tab) ? undefined : followerOf(ws, key);
     if (following !== undefined) return following;
     const player = (id: string) => {
       const t = ws.tabs[id];
@@ -43,4 +44,3 @@ export function placeFor(
     return best?.id ?? focused;
   };
 }
-

@@ -223,14 +223,14 @@ type SuperviseAction =
       players: readonly string[];
       edge: Edge;
     }
-  /** Follow group `key` in a new pane on `pane`'s `edge` holding `ids`,
-   *  or in `pane` itself (`edge` null); it shows `show`. */
+  /** Follow group `key` in a new pane on `pane`'s `edge` holding those
+   *  of `ids` in `pane`; it shows `show`. */
   | {
       type: 'follow-group';
       pane: PaneId;
       key: string;
       ids: readonly string[];
-      edge: Edge | null;
+      edge: Edge;
       show: string;
     }
   | { type: 'stop-following'; pane: PaneId }

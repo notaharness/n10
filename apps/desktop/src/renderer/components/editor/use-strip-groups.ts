@@ -18,6 +18,7 @@ import { useRepo } from '../../lib/repo-context.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
 import { affiliationIndex, tabFacts } from '../../lib/tabs/tab-affiliation.js';
 import {
+  expandsOnShow,
   groupOf,
   isCollapsed,
   isHomeTab,
@@ -57,6 +58,9 @@ export interface StripGroups {
   colorOf(group: TabGroup): string | null;
   /** What the strip groups a tab by (`useTabFacts`). */
   factsOf(tab: Tab): TabFacts;
+  /** Which repository's activity `faceOf`'s statuses come from; `null`
+   *  while there is no answer for the open one. */
+  activitySource: string | null;
 }
 
 /**
@@ -188,10 +192,9 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     if (focused) notePresentedOrder(presented ? presented.split('\n') : []);
   }, [presented, focused]);
 
-  // A tab activated from anywhere shows: its group expands. So does a
-  // collapsed group the active tab joins behind its chip (its
-  // affiliation came with a later scan, or it was unpinned). Collapsing
-  // the active tab's group leaves it collapsed until either changes.
+  // A tab activated from anywhere shows: its group expands
+  // (`expandsOnShow`). Only the focused pane's: a follow pane's switch
+  // must not reflow the strip the user is in.
   const active = groupOf(groups, tabs.activeId);
   const activeGroup = active?.key;
   const collapsed = !!active && isCollapsed(active, tabs.collapsed);
@@ -199,12 +202,26 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
   const { activeId, setCollapsed } = tabs;
   const shownFor = useRef({ id: activeId, group: activeGroup });
   useEffect(() => {
-    const before = shownFor.current;
-    if (before.id === activeId && before.group === activeGroup) return;
-    shownFor.current = { id: activeId, group: activeGroup };
-    const expands = before.id !== activeId ? collapsed : hidden;
-    if (activeGroup && expands) setCollapsed([activeGroup], false);
-  }, [activeId, activeGroup, collapsed, hidden, setCollapsed]);
+    const now = { id: activeId, group: activeGroup };
+    const key = expandsOnShow(shownFor.current, now, {
+      collapsed,
+      hidden,
+      focused,
+    });
+    shownFor.current = now;
+    if (key) setCollapsed([key], false);
+  }, [activeId, activeGroup, collapsed, hidden, focused, setCollapsed]);
 
-  return { groups, faceOf, colorOf, factsOf };
+  return {
+    groups,
+    faceOf,
+    colorOf,
+    factsOf,
+    // The activity answer for the repository open now, when there is
+    // one: a placeholder carried over from another is none.
+    activitySource:
+      activity.data !== undefined && !activity.isPlaceholderData
+        ? repo.cwd
+        : null,
+  };
 }

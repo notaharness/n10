@@ -1,20 +1,18 @@
-import {
-  extraHeightOf,
-  followEdge,
-  followerOf,
-  tileEdge,
-} from '../../lib/tabs/supervise.js';
+import { followEdge, followerOf, tileEdge } from '../../lib/tabs/supervise.js';
 import {
   alreadyFollowing,
   followPlan,
   NO_ROOM_TO_FOLLOW,
   NO_ROOM_TO_TILE,
+  NOTHING_TO_FOLLOW,
   tilePlan,
+  TILE_NEEDS_HOME,
 } from '../../lib/tabs/supervise-plan.js';
 import type { TabFacts, TabGroup } from '../../lib/tabs/tab-groups.js';
 import { useRequestAgentView } from '../../lib/tabs/tab-views.js';
 import { useTabs, useWorkspace, type Tab } from '../../lib/tabs/tabs.js';
 import { focusedPaneOf } from '../../lib/tabs/workspace.js';
+import { paneFrame } from './reveal-tab.js';
 import { sayPane } from './use-pane-menus.js';
 import type { TabFace } from './use-strip-groups.js';
 
@@ -24,15 +22,6 @@ export interface SuperviseMenu {
   tile(): void;
   canFollow: boolean;
   follow(): void;
-}
-
-/** The pane frame on screen, strip included. */
-function frameOf(pane: string): DOMRect | null {
-  return (
-    document
-      .querySelector(`[data-pane-id="${CSS.escape(pane)}"]`)
-      ?.getBoundingClientRect() ?? null
-  );
 }
 
 /**
@@ -53,11 +42,7 @@ export function useSupervise(strip: {
   const requestAgentView = useRequestAgentView();
   const pane = tabs.paneId;
   const hasNewOutput = (tab: Tab) => faceOf(tab).status === 'new-output';
-  const at = {
-    order: tabs.tabs.map((t) => t.id),
-    focused: tabs.focused,
-    focusedActive: focusedPaneOf(workspace).activeId,
-  };
+  const focusedActive = focusedPaneOf(workspace).activeId;
 
   const nameOf = (key: string): string => {
     const group = groups.find((g) => !g.pinned && g.key === key);
@@ -67,25 +52,23 @@ export function useSupervise(strip: {
       (group ? labelOf(group) : pinned?.affiliation?.label ?? key)
     );
   };
-  const frame = () => frameOf(pane);
   const tile = (key: string) => {
     const planned = tilePlan(groups, key, factsOf);
     if (!planned.ok) return sayPane(planned.feedback);
-    const box = frame();
-    const edge = box && tileEdge(box);
+    const room = paneFrame(pane);
+    const edge = room && tileEdge(room);
     if (!edge) return sayPane(NO_ROOM_TO_TILE);
     dispatch({ type: 'tile-group', pane, key, edge, ...planned.plan });
   };
   const follow = (key: string) => {
     if (followerOf(workspace, key) !== undefined)
       return sayPane(alreadyFollowing(nameOf(key)));
-    const planned = followPlan(groups, key, at, hasNewOutput);
+    const planned = followPlan(groups, key, focusedActive, hasNewOutput);
     if (!planned.ok) return sayPane(planned.feedback);
-    const { ids, show, inPlace } = planned.plan;
-    const here = inPlace && workspace.follows[pane] === undefined;
-    const box = here ? null : frame();
-    const edge = box && followEdge(box, extraHeightOf(workspace)(pane));
-    if (!here && !edge) return sayPane(NO_ROOM_TO_FOLLOW);
+    const { ids, show } = planned.plan;
+    const room = paneFrame(pane);
+    const edge = room && followEdge(room);
+    if (!edge) return sayPane(NO_ROOM_TO_FOLLOW);
     // Its agent's output, not a pull request's overview.
     if (tabs.tabs.find((t) => t.id === show)?.kind === 'item')
       requestAgentView(show);
@@ -97,20 +80,24 @@ export function useSupervise(strip: {
     return active ? factsOf(active).affiliation?.key ?? null : null;
   };
   return {
+    /** What group `key` is called here. */
+    nameOf,
     menuFor: (group: TabGroup): SuperviseMenu => ({
       canTile: tilePlan(groups, group.key, factsOf).ok,
       tile: () => tile(group.key),
-      canFollow: followPlan(groups, group.key, at, hasNewOutput).ok,
+      canFollow: followPlan(groups, group.key, focusedActive, hasNewOutput).ok,
       follow: () => follow(group.key),
     }),
     /** The palette's: the active tab's group. */
     tileActive: () => {
       const key = activeKey();
-      if (key !== null) tile(key);
+      if (key === null) sayPane(TILE_NEEDS_HOME);
+      else tile(key);
     },
     followActive: () => {
       const key = activeKey();
-      if (key !== null) follow(key);
+      if (key === null) sayPane(NOTHING_TO_FOLLOW);
+      else follow(key);
     },
   };
 }
