@@ -205,6 +205,23 @@ describe('moving between panes', () => {
     expect(ws.focusedPane).toBe('pane-2');
   });
 
+  it('opening a repository focuses the pane holding its tab, rather than blanking this one', () => {
+    const OTHER = '/repos/beta';
+    const ws = then(
+      run(open('branch:a'), {
+        type: 'open-item',
+        repo: OTHER,
+        itemKey: 'branch:b',
+        preview: false,
+      }),
+      split([id('branch:a')], 'pane-1', 'right'),
+      { type: 'focus-pane', pane: 'pane-1' },
+      { type: 'repo-opened', repo: REPO }
+    );
+    expect(ws.focusedPane).toBe('pane-2');
+    expect(shape(ws).map((p) => p.active)).toEqual(['branch:b', 'branch:a']);
+  });
+
   it('opens a new tab in the focused pane', () => {
     const ws = then(twoPanes(), open('branch:d'));
     expect(shape(ws)[1]!.order).toEqual(['branch:c', 'branch:d']);

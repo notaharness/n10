@@ -129,9 +129,34 @@ function namedTab(
     }
     case 'terminal-ended':
       return { id: terminalTabId(action.name), focus: false };
+    case 'repo-opened':
+      return repoTab(ws, action.repo);
     default:
       return null;
   }
+}
+
+/** The tab a repository opened from elsewhere (the picker, recents)
+ *  comes back to, when the focused pane has none of its own: where it
+ *  was left, else its first tab in any pane. That pane takes focus
+ *  rather than the focused one going blank. */
+function repoTab(
+  ws: Workspace,
+  repo: string
+): { id: string | undefined; focus: boolean } | null {
+  const home = (id: string) => {
+    const tab = ws.tabs[id];
+    return tab !== undefined && tabHome(tab) === repo;
+  };
+  if (focusedPaneOf(ws).order.some(home)) return null;
+  const left = ws.lastActiveByRepo[repo];
+  const id =
+    left !== undefined && Object.hasOwn(ws.tabs, left)
+      ? left
+      : panesOf(ws.layout)
+          .flatMap((p) => p.order)
+          .find(home);
+  return id === undefined ? null : { id, focus: true };
 }
 
 /** The pane whose strip `action` runs on, and whether it takes focus:
