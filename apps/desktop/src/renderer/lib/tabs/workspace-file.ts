@@ -16,9 +16,10 @@ import {
 /**
  * The workspace as `workspace.json` holds it, and back.
  *
- * Saved: everything but `unseen`, and a terminal tab only once a listing
- * has told it its session's creation time — the one thing that tells
- * the session apart from a later one under the same name.
+ * Saved: everything but `unseen` and `follows`, and a terminal tab only
+ * once a listing has told it its session's creation time — the one
+ * thing that tells the session apart from a later one under the same
+ * name.
  *
  * Restored: every field is checked, and what does not hold is dropped
  * rather than trusted, so a hand-edited or half-understood file costs a

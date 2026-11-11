@@ -175,13 +175,20 @@ export const SEPARATOR_PX = 4;
 
 /**
  * The least room `node` needs along `axis`, in pixels: a pane its
- * minimum; a split along that axis its children's sum and separators,
- * across it its largest child's.
+ * minimum, and `extraHeight` more for a pane with a line under its
+ * strip (a follow pane); a split along that axis its children's sum and
+ * separators, across it its largest child's.
  */
-export function minExtent(node: LayoutNode, axis: 'width' | 'height'): number {
-  if (node.kind === 'pane') return MIN_PANE[axis];
+export function minExtent(
+  node: LayoutNode,
+  axis: 'width' | 'height',
+  extraHeight: (pane: PaneId) => number = () => 0
+): number {
+  if (node.kind === 'pane') {
+    return MIN_PANE[axis] + (axis === 'height' ? extraHeight(node.id) : 0);
+  }
   const along = (node.direction === 'row') === (axis === 'width');
-  const each = node.children.map((c) => minExtent(c, axis));
+  const each = node.children.map((c) => minExtent(c, axis, extraHeight));
   return along
     ? each.reduce((a, b) => a + b, 0) + SEPARATOR_PX * (each.length - 1)
     : Math.max(...each);

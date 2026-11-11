@@ -196,6 +196,18 @@ export function presentedIds(groups: readonly TabGroup[]): string[] {
   return groups.flatMap((g) => g.tabs.map((t) => t.id));
 }
 
+/** The real tabs the strip shows: a group's home, and its members
+ *  unless it is collapsed. */
+export function shownTabIds(
+  groups: readonly TabGroup[],
+  choices: Readonly<Record<string, boolean>>
+): string[] {
+  return groups.flatMap((g) => {
+    if (!g.chipped || !isCollapsed(g, choices)) return g.tabs.map((t) => t.id);
+    return g.head ? [g.head.id] : [];
+  });
+}
+
 /** The row's one Tab stop: the active tab when it shows, else the
  *  shown tab nearest it in strip order (behind a collapsed chip, its
  *  home or a neighbour), else the first. */

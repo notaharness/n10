@@ -147,11 +147,14 @@ export type TabsAction =
    *  dismissed terminal of any other machine waits.
    *
    *  `groupOf` is the group a tab belongs to (its affiliation key), so a
-   *  tab this opens joins the pane already holding its group. */
+   *  tab this opens joins the pane already holding its group's players
+   *  (`isHome` tells its orchestrator's own tab from them), or the pane
+   *  following it. */
   | ({
       type: 'sync-items';
       repo: string;
       groupOf?: (tab: Tab) => string | null;
+      isHome?: (tab: Tab) => boolean;
     } & SyncListings)
   /** Open (or activate) the tab for a terminal the host just started. */
   | { type: 'open-terminal'; terminal: TerminalEntry }
@@ -205,7 +208,34 @@ type PaneAction =
   /** Close a pane, its tabs going to its neighbour. */
   | { type: 'close-pane'; pane: PaneId }
   /** The user resized the split `key` (`splitKey`). */
-  | { type: 'resize-split'; key: string; sizes: readonly number[] };
+  | { type: 'resize-split'; key: string; sizes: readonly number[] }
+  | SuperviseAction;
+
+/** The supervising layouts (`supervise.ts`). */
+type SuperviseAction =
+  /** Move group `key`'s `players` from pane `pane` to a new pane on its
+   *  `edge`, leaving its `home` there. */
+  | {
+      type: 'tile-group';
+      pane: PaneId;
+      key: string;
+      home: string;
+      players: readonly string[];
+      edge: Edge;
+    }
+  /** Follow group `key` in a new pane on `pane`'s `edge` holding `ids`,
+   *  or in `pane` itself (`edge` null); it shows `show`. */
+  | {
+      type: 'follow-group';
+      pane: PaneId;
+      key: string;
+      ids: readonly string[];
+      edge: Edge | null;
+      show: string;
+    }
+  | { type: 'stop-following'; pane: PaneId }
+  /** A follow pane's own switch: it shows `id`, and focus stays. */
+  | { type: 'follow-show'; pane: PaneId; id: string };
 
 /** Activate a tab, ignoring an id that is no longer on the strip. */
 function activateTab(state: Strip, id: string): Strip {

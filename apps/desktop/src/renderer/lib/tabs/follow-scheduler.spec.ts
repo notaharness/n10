@@ -1,0 +1,133 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { followScheduler } from './follow-scheduler.js';
+
+const ORDER = ['a', 'b', 'c', 'd'];
+
+function setup(shown: string | null = null) {
+  const state = { shown, switches: [] as string[] };
+  const s = followScheduler({
+    rank: (id) => ORDER.indexOf(id),
+    shown: () => state.shown,
+    show: (id) => {
+      state.shown = id;
+      state.switches.push(id);
+    },
+  });
+  return { s, state };
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(0);
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('a follow pane’s switching', () => {
+  it('switches 250 ms after new output, not before', () => {
+    const { s, state } = setup('a');
+    s.note('c');
+    vi.advanceTimersByTime(249);
+    expect(state.switches).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(state.switches).toEqual(['c']);
+  });
+
+  it('takes events within 250 ms as one, ties going to presented order', () => {
+    const { s, state } = setup('a');
+    s.note('d');
+    vi.advanceTimersByTime(100);
+    s.note('b');
+    vi.advanceTimersByTime(200);
+    expect(state.switches).toEqual(['b']);
+  });
+
+  it('switches at most once every 2 s, the latest waiting event winning', () => {
+    const { s, state } = setup('a');
+    s.note('b');
+    vi.advanceTimersByTime(250);
+    expect(state.switches).toEqual(['b']);
+    vi.advanceTimersByTime(250);
+    s.note('c');
+    vi.advanceTimersByTime(600);
+    s.note('d');
+    vi.advanceTimersByTime(1149);
+    // 2 s after the first switch.
+    expect(state.switches).toEqual(['b']);
+    vi.advanceTimersByTime(1);
+    expect(state.switches).toEqual(['b', 'd']);
+    vi.advanceTimersByTime(5000);
+    expect(state.switches).toEqual(['b', 'd']);
+  });
+
+  it('drops an event whose output is no longer new', () => {
+    const { s, state } = setup('a');
+    s.note('c');
+    s.forget('c');
+    vi.advanceTimersByTime(1000);
+    expect(state.switches).toEqual([]);
+  });
+
+  it('falls back on an older event when the latest is forgotten', () => {
+    const { s, state } = setup('a');
+    s.note('b');
+    vi.advanceTimersByTime(250);
+    s.note('c');
+    vi.advanceTimersByTime(500);
+    s.note('d');
+    s.forget('d');
+    vi.advanceTimersByTime(2000);
+    expect(state.switches).toEqual(['b', 'c']);
+  });
+
+  it('does not switch to the tab it already shows', () => {
+    const { s, state } = setup('b');
+    s.note('b');
+    vi.advanceTimersByTime(1000);
+    expect(state.switches).toEqual([]);
+  });
+
+  it('waits while paused, and shows the latest 500 ms after the pause lifts', () => {
+    const { s, state } = setup('a');
+    s.setPaused(true);
+    s.note('b');
+    vi.advanceTimersByTime(300);
+    s.note('c');
+    vi.advanceTimersByTime(5000);
+    expect(state.switches).toEqual([]);
+    s.setPaused(false);
+    vi.advanceTimersByTime(499);
+    expect(state.switches).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(state.switches).toEqual(['c']);
+  });
+
+  it('stays paused when the user comes back within 500 ms', () => {
+    const { s, state } = setup('a');
+    s.setPaused(true);
+    s.note('b');
+    s.setPaused(false);
+    vi.advanceTimersByTime(300);
+    s.setPaused(true);
+    vi.advanceTimersByTime(5000);
+    expect(state.switches).toEqual([]);
+  });
+
+  it('cancels a pending switch when paused', () => {
+    const { s, state } = setup('a');
+    s.note('b');
+    vi.advanceTimersByTime(100);
+    s.setPaused(true);
+    vi.advanceTimersByTime(5000);
+    expect(state.switches).toEqual([]);
+  });
+
+  it('switches nothing once disposed', () => {
+    const { s, state } = setup('a');
+    s.note('b');
+    s.dispose();
+    vi.advanceTimersByTime(5000);
+    expect(state.switches).toEqual([]);
+  });
+});

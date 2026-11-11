@@ -37,3 +37,4 @@ describe('canSplit', () => {
     expect(canSplit({ width: 1000, height: 363 }, 'top')).toBe(false);
   });
 });
+

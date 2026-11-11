@@ -10,6 +10,14 @@ import {
   moveToward,
   splitPane,
 } from './pane-moves.js';
+import {
+  dropGoneFollows,
+  followGroup,
+  followShow,
+  stopFollowing,
+  tileGroup,
+} from './supervise.js';
+import { placeFor } from './tab-placement.js';
 import type { TabsAction } from './tabs-model.js';
 import {
   focusedPaneOf,
@@ -84,6 +92,21 @@ function layoutAction(ws: Workspace, action: TabsAction): Workspace | null {
     }
     case 'move':
       return crossPaneMove(ws, action);
+    default:
+      return superviseAction(ws, action);
+  }
+}
+
+function superviseAction(ws: Workspace, action: TabsAction): Workspace | null {
+  switch (action.type) {
+    case 'tile-group':
+      return tileGroup(ws, action);
+    case 'follow-group':
+      return followGroup(ws, action);
+    case 'stop-following':
+      return stopFollowing(ws, action.pane);
+    case 'follow-show':
+      return followShow(ws, action.pane, action.id);
     default:
       return null;
   }
@@ -197,33 +220,6 @@ function combined(ws: Workspace): Strip {
   return { ...strip, tabs, others: [] };
 }
 
-/** The pane a tab a reconciliation opened goes to: the focused pane
- *  when it holds the tab's group, else the pane holding most of it
- *  (the first, on a tie), else the focused pane. */
-function placeFor(
-  ws: Workspace,
-  groupOf: ((tab: Tab) => string | null) | undefined
-): (tab: Tab) => PaneId {
-  const focused = focusedPaneOf(ws).id;
-  const panes = panesOf(ws.layout);
-  if (!groupOf || panes.length < 2) return () => focused;
-  return (tab) => {
-    const key = groupOf(tab);
-    if (key === null) return focused;
-    let best: { id: PaneId; n: number } | null = null;
-    for (const p of panes) {
-      const n = p.order.filter((id) => {
-        const t = ws.tabs[id];
-        return t !== undefined && groupOf(t) === key;
-      }).length;
-      if (n === 0) continue;
-      if (p.id === focused) return focused;
-      if (!best || n > best.n) best = { id: p.id, n };
-    }
-    return best?.id ?? focused;
-  };
-}
-
 function across(
   ws: Workspace,
   action: TabsAction,
@@ -232,9 +228,12 @@ function across(
   const before = combined(ws);
   const after = reduceStrip(before, action);
   if (after === before) return ws;
-  const groupOf = action.type === 'sync-items' ? action.groupOf : undefined;
+  const grouping =
+    action.type === 'sync-items' && action.groupOf
+      ? { groupOf: action.groupOf, isHome: action.isHome }
+      : undefined;
   const repo = 'repo' in action ? action.repo : undefined;
-  return distribute(ws, after, placeFor(ws, groupOf), repo);
+  return distribute(ws, after, placeFor(ws, grouping), repo);
 }
 
 /** The pane's active tab once its tabs are `order`: the one it had,
@@ -302,12 +301,12 @@ function distribute(
   };
 }
 
-/** What holds after every action: no empty pane but a sole one, focus
- *  on a pane that exists, no pane's active tab still unseen — every
+/** What holds after every action: no empty pane but a sole one, no
+ *  pane following anything once it is gone, focus on a pane that exists, no pane's active tab still unseen — every
  *  pane shows its active tab — and the focused pane's active tab noted
  *  as where its repository was left, however focus got there. */
 function settle(ws: Workspace): Workspace {
-  const next = dropEmptyPanes(ws);
+  const next = dropGoneFollows(dropEmptyPanes(ws));
   const shown = new Set(panesOf(next.layout).map((p) => p.activeId));
   const unseen = next.unseen.filter((id) => !shown.has(id));
   const seen =

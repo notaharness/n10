@@ -20,9 +20,11 @@ import { affiliationIndex, tabFacts } from '../../lib/tabs/tab-affiliation.js';
 import {
   groupOf,
   isCollapsed,
+  isHomeTab,
   present,
   presentedIds,
   statusFromActivity,
+  type TabFacts,
   type TabGroup,
   type TabStatus,
 } from '../../lib/tabs/tab-groups.js';
@@ -53,6 +55,8 @@ export interface StripGroups {
   /** The repository colour a group's chip carries: its home's, else the
    *  one repository every member naming one shares, else none. */
   colorOf(group: TabGroup): string | null;
+  /** What the strip groups a tab by (`useTabFacts`). */
+  factsOf(tab: Tab): TabFacts;
 }
 
 /**
@@ -88,19 +92,31 @@ export function useTabFacts(items: SidebarItem[]) {
   return { index, sessionOf, ownSession, factsOf };
 }
 
-/** The group a tab belongs to as the strip reads it (`useTabFacts`), by
- *  a function that keeps its identity and reads the latest facts: a sync
- *  places the tabs it opens with it without re-running on every render. */
-export function useGroupOf(items: SidebarItem[]) {
+/** Whether `tab` is its parent group's home: the orchestrator's own. */
+export function isHomeIn(tab: Tab, facts: TabFacts): boolean {
+  const a = facts.affiliation;
+  return a?.kind === 'parent' && !!a.home && isHomeTab(tab, facts, a.home);
+}
+
+/** The group a tab belongs to as the strip reads it (`useTabFacts`), and
+ *  whether it is that group's home, by functions that keep their
+ *  identity and read the latest facts: a sync places the tabs it opens
+ *  with them without re-running on every render. */
+export function useGrouping(items: SidebarItem[]) {
   const { factsOf } = useTabFacts(items);
   const latest = useRef(factsOf);
   useEffect(() => {
     latest.current = factsOf;
   });
-  return useCallback(
+  const groupOf = useCallback(
     (tab: Tab) => latest.current(tab).affiliation?.key ?? null,
     []
   );
+  const isHome = useCallback(
+    (tab: Tab) => isHomeIn(tab, latest.current(tab)),
+    []
+  );
+  return useMemo(() => ({ groupOf, isHome }), [groupOf, isHome]);
 }
 
 /**
@@ -190,5 +206,5 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     if (activeGroup && expands) setCollapsed([activeGroup], false);
   }, [activeId, activeGroup, collapsed, hidden, setCollapsed]);
 
-  return { groups, faceOf, colorOf };
+  return { groups, faceOf, colorOf, factsOf };
 }

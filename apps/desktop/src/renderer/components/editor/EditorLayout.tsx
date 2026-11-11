@@ -24,6 +24,7 @@ import {
   runPaneShortcut,
   setPaneCommands,
 } from '../../lib/tabs/pane-commands.js';
+import { extraHeightOf } from '../../lib/tabs/supervise.js';
 import { PaneScopeContext, useWorkspace } from '../../lib/tabs/tabs.js';
 import { usePanes } from '../../lib/tabs/use-panes.js';
 import {
@@ -49,6 +50,9 @@ interface Shared {
   spareOwner: PaneId;
   /** Where each pane's content is placed in the tree (`pane-slots.ts`). */
   slots: PaneSlots;
+  /** How much taller than the minimum each pane must be: a follow
+   *  pane's line. */
+  extraHeight: (pane: PaneId) => number;
 }
 
 /**
@@ -97,6 +101,7 @@ export function EditorLayout({
     split: panes.count > 1,
     spareOwner: hovered ?? panes.focusedPane,
     slots,
+    extraHeight: extraHeightOf(workspace),
   };
   return (
     <div className="h-full min-h-0 min-w-0 overflow-auto bg-background">
@@ -106,7 +111,9 @@ export function EditorLayout({
           minWidth:
             panes.count > 1 ? minExtent(panes.layout, 'width') : undefined,
           minHeight:
-            panes.count > 1 ? minExtent(panes.layout, 'height') : undefined,
+            panes.count > 1
+              ? minExtent(panes.layout, 'height', shared.extraHeight)
+              : undefined,
         }}
       >
         <LayoutView node={panes.layout} shared={shared} />
@@ -237,7 +244,7 @@ function SplitView({ split, shared }: { split: SplitNode; shared: Shared }) {
           )}
           <Panel
             id={ids[i]}
-            minSize={`${minExtent(child, axis)}px`}
+            minSize={`${minExtent(child, axis, shared.extraHeight)}px`}
             defaultSize={`${100 / split.children.length}%`}
             className="min-h-0 min-w-0"
           >
