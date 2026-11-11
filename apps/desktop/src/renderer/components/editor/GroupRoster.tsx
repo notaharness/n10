@@ -12,7 +12,8 @@ import { cn } from '../../lib/utils.js';
 import { PopoverContent } from '../ui/popover.js';
 import { ScrollArea } from '../ui/scroll-area.js';
 import { STATUS_MARK } from './StatusClusters.js';
-import { UnseenDot } from './tab-marks.js';
+import { usePlanCount } from '../../lib/plan/plan.js';
+import { PlanCountBadge, UnseenDot } from './tab-marks.js';
 import { FACE_ICON } from './TabIcon.js';
 import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
@@ -70,6 +71,41 @@ function rowName(
     .join(', ');
 }
 
+/** The row's two lines: its label with its marks, and where it is. */
+function RowText({
+  face,
+  label,
+  home,
+  where,
+}: {
+  face: TabFace;
+  label: string;
+  home: boolean;
+  where: string;
+}) {
+  const planned = usePlanCount(face.item?.pr?.id);
+  return (
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-5">
+        <TabLabel
+          label={label}
+          parts={home ? undefined : face.labelParts}
+          machineLabel={face.machineLabel}
+          preview={face.tab.preview}
+          cut={face.labelSource === 'task' ? 'end' : cutSide(face.labelKind)}
+        />
+        <PlanCountBadge count={planned} />
+        {face.unseen && <UnseenDot />}
+      </span>
+      {where && (
+        <span className="truncate text-[11px] leading-4 text-muted-foreground">
+          {where}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function RosterRow({
   face,
   active,
@@ -84,11 +120,10 @@ export function RosterRow({
   onMenu?: (tab: Tab) => void;
   home: boolean;
 }) {
-  const { labelKind: kind } = face;
   const label = home
     ? ['Orchestrator', face.taskTitle].filter(Boolean).join(' · ')
     : face.label;
-  const Icon = FACE_ICON[kind];
+  const Icon = FACE_ICON[face.labelKind];
   const status = rowStatus(face.status, {
     exited: face.snapshot?.exited ?? false,
     unseen: face.unseen,
@@ -115,23 +150,7 @@ export function RosterRow({
         )}
       >
         <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-5">
-            <TabLabel
-              label={label}
-              parts={home ? undefined : face.labelParts}
-              machineLabel={face.machineLabel}
-              preview={face.tab.preview}
-              cut={face.labelSource === 'task' ? 'end' : cutSide(kind)}
-            />
-            {face.unseen && <UnseenDot />}
-          </span>
-          {where && (
-            <span className="truncate text-[11px] leading-4 text-muted-foreground">
-              {where}
-            </span>
-          )}
-        </span>
+        <RowText face={face} label={label} home={home} where={where} />
         <RowStatus face={face} active={active} status={status} />
       </button>
       <RowBand color={face.repoColor} />

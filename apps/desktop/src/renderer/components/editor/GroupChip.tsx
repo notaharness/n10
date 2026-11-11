@@ -8,7 +8,8 @@ import { cn, errorMessage } from '../../lib/utils.js';
 import { PopoverAnchor } from '../ui/popover.js';
 import { StatusClusters } from './StatusClusters.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
-import { RepoBand } from './tab-marks.js';
+import { usePlanTotal } from '../../lib/plan/plan.js';
+import { PlanCountBadge, RepoBand } from './tab-marks.js';
 import { TabIcon } from './TabIcon.js';
 import { runGroupMenu, type GroupMenu } from './tab-menu.js';
 import type { useSortableTab } from './TabStrip.js';
@@ -110,6 +111,7 @@ export function GroupChip({
   label,
   head,
   statuses,
+  planIds,
   color,
   active,
   setHandle,
@@ -124,6 +126,9 @@ export function GroupChip({
   label: string;
   head: TabFace | null;
   statuses: readonly TabStatus[];
+  /** Its members' pull requests: the chip carries their plans' count,
+   *  which must show wherever the user has gone. */
+  planIds: readonly number[];
   color: string | null;
   /** The pane's active tab, when it is one of the group's. */
   active: TabFace | null;
@@ -138,6 +143,7 @@ export function GroupChip({
   justDropped: () => boolean;
 }) {
   const containsActive = active !== null;
+  const planned = usePlanTotal(planIds);
   return (
     <PopoverAnchor asChild>
       <div
@@ -188,6 +194,7 @@ export function GroupChip({
         )}
         <ChipFolder head={head} open={roster.open} active={containsActive} />
         <ChipLabel label={label} active={active} />
+        <PlanCountBadge count={planned} />
         <span
           data-group-count
           className="rounded bg-muted px-1 text-[11px] leading-4 tabular-nums text-muted-foreground"

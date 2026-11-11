@@ -129,6 +129,7 @@ export function GroupBlock({
           label={label}
           head={head ? faceOf(head) : null}
           statuses={faces.map((f) => f.status)}
+          planIds={faces.flatMap((f) => f.item?.pr?.id ?? [])}
           color={color}
           active={faces.find((f) => f.tab.id === tabs.activeId) ?? null}
           setHandle={setHandle}
