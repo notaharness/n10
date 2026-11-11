@@ -135,4 +135,28 @@ describe('collisionsEndingAt', () => {
     });
     expect(collisions.map((c) => c.id)).toEqual(['a1']);
   });
+
+  it('finds the nearest place in the drag’s own pane: another pane’s only under the pointer', () => {
+    const inPane = (pane: string, index: number): StripDragData => ({
+      kind: 'block',
+      label: '',
+      ids: [`${pane}-${index}`],
+      index,
+      pane,
+    });
+    // Pane 2's block is nearer, but the pointer is over neither.
+    const containers = [
+      container('a0', 0, inPane('pane-1', 0)),
+      container('b0', 400, inPane('pane-2', 0)),
+    ];
+    const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
+    const collisions = collisionsEndingAt({
+      active: { id: 'a1', data: { current: inPane('pane-1', 1) } } as never,
+      collisionRect: { ...rect(380, 50), top: 40, bottom: 70 },
+      droppableRects: rects,
+      droppableContainers: containers,
+      pointerCoordinates: { x: 405, y: 55 },
+    });
+    expect(collisions.map((c) => c.id)).toEqual(['a0']);
+  });
 });

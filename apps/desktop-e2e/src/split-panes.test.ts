@@ -84,6 +84,8 @@ test.describe('Split panes', () => {
     await expect(
       pane(page, 1).locator('[data-pane-drop="right"]')
     ).toBeVisible();
+    // A copy of the tab follows the pointer out of its strip.
+    await expect(page.locator('[data-drag-overlay]')).toHaveText(/^alpha/);
     await page.keyboard.press('Escape');
     await expect(page.locator('[data-pane-drop]')).toHaveCount(0);
     await page.mouse.up();
@@ -127,6 +129,38 @@ test.describe('Split panes', () => {
       .poll(async () => (await tabNames(page)).sort())
       .toEqual(['alpha', 'beta', 'delta', 'gamma']);
     await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
+  test('a tab carried over another pane’s strip opens the slot it lands in', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    for (const branch of ['alpha', 'beta', 'gamma'])
+      await createWorktree(page, branch);
+    await tab(page, /^gamma/).click();
+    await page.keyboard.press('Control+\\');
+    await expect(pane(page, 1).getByRole('tab')).toHaveText([/^gamma/]);
+
+    // Over gamma's near half, the strip opens room before it as wide as
+    // alpha, and a copy of alpha follows the pointer.
+    const gamma = tab(page, /^gamma/);
+    const [from, at] = await Promise.all([
+      tab(page, /^alpha/).boundingBox(),
+      gamma.boundingBox(),
+    ]);
+    await carryTo(page, tab(page, /^alpha/), gamma, 0.25, 0.5);
+    await expect(page.locator('[data-drag-overlay]')).toHaveText(/^alpha/);
+    await expect
+      .poll(async () => ((await gamma.boundingBox())?.x ?? 0) - at!.x)
+      .toBeGreaterThan(from!.width);
+    // Where it showed, it lands.
+    await page.mouse.up();
+    await expect(page.locator('[data-drag-overlay]')).toHaveCount(0);
+    await expect(pane(page, 1).getByRole('tab')).toHaveText([
+      /^alpha/,
+      /^gamma/,
+    ]);
+    await expect(pane(page, 0).getByRole('tab')).toHaveText([/^beta/]);
   });
 
   test('comes back split, at the sizes it was left at, after a restart', async ({

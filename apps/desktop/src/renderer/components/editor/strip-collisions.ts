@@ -42,8 +42,8 @@ function keyboardRow(
 
 /** A place's pane and index on the strip, as its data says
  *  (`StripDragData`). */
-function placeOf(container: { data: { current?: unknown } }) {
-  const data = container.data.current;
+function placeOf(container: { data?: { current?: unknown } }) {
+  const data = container.data?.current;
   return isStripDragData(data)
     ? { pane: data.pane ?? '', index: data.index }
     : { pane: '', index: -1 };
@@ -80,9 +80,14 @@ export const collisionsEndingAt: CollisionDetection = (args) => {
     return last ? [{ id: last.id }] : [];
   }
   if (within.length > 0) return within;
+  // Nearest goes by the strip the drag is in: another pane's places are
+  // a target only under the pointer.
+  const own = places.filter(
+    (c) => placeOf(c).pane === placeOf(args.active).pane
+  );
   return closestCenter({
     ...args,
     droppableContainers:
-      args.pointerCoordinates === null ? keyboardRow(args, places) : places,
+      args.pointerCoordinates === null ? keyboardRow(args, own) : own,
   });
 };

@@ -93,6 +93,31 @@ describe('strip drag', () => {
       side: 'before',
     });
   });
+  it('lets a member land in another pane’s strip, beside a block or its own group', () => {
+    const tab = { ...member('g', 1), pane: 'pane-1' };
+    const there = { ...block(['c', 'd'], 0), pane: 'pane-2' };
+    expect(acceptsDrop(there, tab)).toBe(true);
+    expect(acceptsDrop({ ...there, pane: 'pane-1' }, tab)).toBe(false);
+    expect(acceptsDrop({ ...there, pinned: true }, tab)).toBe(false);
+    expect(acceptsDrop({ ...member('h', 0), pane: 'pane-2' }, tab)).toBe(false);
+    expect(dropMove('a', tab, 'block:h', there, [], 'after')).toEqual({
+      kind: 'move',
+      ids: ['a'],
+      targetId: 'd',
+      side: 'after',
+    });
+    // Beside its own group's member there, on the pointer's side.
+    expect(
+      dropMove(
+        'a',
+        tab,
+        'x',
+        { ...member('g', 3), pane: 'pane-2' },
+        [],
+        'before'
+      )
+    ).toEqual({ kind: 'move', ids: ['a'], targetId: 'x', side: 'before' });
+  });
   it('makes no move onto itself or another group’s member', () => {
     expect(dropMove('a', member('g', 0), 'a', member('g', 0), [])).toBeNull();
     expect(dropMove('a', member('g', 0), 'x', member('h', 0), [])).toBeNull();

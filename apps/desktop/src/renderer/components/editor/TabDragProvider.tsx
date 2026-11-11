@@ -6,15 +6,13 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import {
-  restrictToHorizontalAxis,
-  restrictToParentElement,
-} from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { setStripDragging } from '../../lib/tabs/tab-switching.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
+import { CarriedBlock } from './CarriedBlock.js';
+import { holdInStrip } from './drag-preview.js';
 import { stripAnnouncements } from './strip-announcements.js';
 import { StripBlocksReport } from './strip-blocks.js';
 import { collisionsEndingAt } from './strip-collisions.js';
@@ -88,12 +86,9 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
       // would widen the nearest scrolling box (the strip, scrolled; the
       // editor column, wrapped), which auto-scroll then scrolls after
       // the pointer, carrying the tab further: the box grows for as long
-      // as the pointer stays there.
-      modifiers={
-        wrap
-          ? [restrictToParentElement]
-          : [restrictToHorizontalAxis, restrictToParentElement]
-      }
+      // as the pointer stays there. A block carried out of the strip
+      // leaves the tab in its place and shows a copy (`CarriedBlock`).
+      modifiers={[holdInStrip(wrap)]}
       accessibility={{
         announcements: stripAnnouncements,
         screenReaderInstructions,
@@ -110,6 +105,7 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
       }}
     >
       <PaneDropFollower follow={paneDrop.follow} />
+      <CarriedBlock />
       <StripBlocksReport.Provider value={reportBlocks}>
         {children}
       </StripBlocksReport.Provider>
@@ -118,15 +114,19 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
 }
 
 /** Hands the drag context's every change to the pane drop: what is
- *  dragged, and what it is over. */
+ *  dragged, what it is over, and the strip it started in. */
 function PaneDropFollower({
   follow,
 }: {
   follow: ReturnType<typeof usePaneDrop>['follow'];
 }) {
-  const { active, over } = useDndContext();
+  const { active, over, activeNode } = useDndContext();
   useEffect(() => {
-    follow(active ? { active, over } : null);
+    const strip = activeNode?.closest('[role="tablist"]');
+    follow(
+      active ? { active, over } : null,
+      strip?.getBoundingClientRect() ?? null
+    );
   });
   return null;
 }

@@ -15,6 +15,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
+import { useSlotStyle } from './drag-preview.js';
 import { groupEndId, stripEndId } from './strip-collisions.js';
 import { StripBlocksReport } from './strip-blocks.js';
 import { StripScrollArrows } from './StripScrollArrows.js';
@@ -235,6 +236,7 @@ export function useSortableTab({
   const reducedMotion = usePrefersReducedMotion();
   const pane = useContext(PaneScopeContext);
   const dragging = useDndContext().active?.data.current;
+  const slot = useSlotStyle(id);
   const {
     attributes,
     listeners,
@@ -251,7 +253,10 @@ export function useSortableTab({
       draggable: fixed,
       droppable:
         fixed ||
-        !acceptsDrop(data, isStripDragData(dragging) ? dragging : undefined),
+        !acceptsDrop(
+          inPane(data, pane),
+          isStripDragData(dragging) ? dragging : undefined
+        ),
     },
     attributes: {
       role,
@@ -290,7 +295,10 @@ export function useSortableTab({
     /** The element pressed to move it, which carries `handle`. */
     setHandle: setActivatorNodeRef,
     handle,
-    style: { transform: CSS.Translate.toString(transform), transition },
+    style: {
+      transform: CSS.Translate.toString(transform),
+      ...slot(isDragging, transition),
+    },
     isDragging,
   };
 }

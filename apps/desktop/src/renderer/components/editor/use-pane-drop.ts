@@ -1,5 +1,10 @@
 import { useEffect } from 'react';
-import { useDndContext, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+import {
+  useDndContext,
+  useDroppable,
+  type ClientRect,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 import {
   setPaneDropTarget,
   type PaneDropTarget,
@@ -14,6 +19,7 @@ import {
 import type { Edge } from '../../lib/tabs/layout.js';
 import { NO_ROOM } from '../../lib/tabs/pane-commands.js';
 import { rebuildsLayout } from '../../lib/tabs/pane-moves.js';
+import { showPreview } from './drag-preview.js';
 import { canSplit, zoneAt } from './pane-drop.js';
 import { paneFrame, revealFocusedPane } from './reveal-tab.js';
 import { draggedIds, isStripDragData } from './strip-drag.js';
@@ -36,10 +42,11 @@ export function isPaneZone(id: unknown): boolean {
 type Drag = Pick<DragEndEvent, 'active' | 'over'>;
 
 /**
- * Where the pointer is, and the drag it carries. The strip's modifiers
- * keep a dragged tab inside its strip, so neither the drag's `delta`
- * nor its move events follow the pointer out over a pane: the pointer's
- * own events do, and each one re-reads the zone under it.
+ * Where the pointer is, and the drag it carries. The strip's modifier
+ * keeps a dragged tab inside its strip until it is carried out
+ * (`drag-preview.ts`), so the drag's own move events do not follow the
+ * pointer everywhere: the pointer's own events do, and each one re-reads
+ * the zone under it and what the drag shows.
  */
 let pointer: { x: number; y: number } | null = null;
 
@@ -51,11 +58,18 @@ export function pointerSide(rect: {
 }): 'before' | 'after' {
   return pointer && pointer.x > rect.left + rect.width / 2 ? 'after' : 'before';
 }
-let following: { drag: Drag; ws: Workspace } | null = null;
+let following: {
+  drag: Drag;
+  ws: Workspace;
+  /** The box of the strip the drag started in. */
+  strip: ClientRect | null;
+} | null = null;
 
 function followPointer(e: PointerEvent) {
   pointer = { x: e.clientX, y: e.clientY };
-  if (following) show(dropAt(following.drag, following.ws));
+  if (!following) return;
+  show(dropAt(following.drag, following.ws));
+  showPreview(following.drag, following.strip, pointer, pointerSide);
 }
 
 type DropAt = (PaneDropTarget & { ids: readonly string[] }) | null;
@@ -120,10 +134,12 @@ export function usePaneDrop() {
     };
   }, []);
   return {
-    /** The drag context changed: what is dragged, and over what. */
-    follow(drag: Drag | null) {
-      following = drag && { drag, ws: workspace };
+    /** The drag context changed: what is dragged, over what, and the
+     *  box of the strip it started in. */
+    follow(drag: Drag | null, strip: ClientRect | null) {
+      following = drag && { drag, ws: workspace, strip };
       show(drag && dropAt(drag, workspace));
+      showPreview(drag, strip, pointer, pointerSide);
     },
     /** Whether the drop was onto a pane's content: then it is the
      *  pane's, done or refused, and no strip move. */
@@ -140,6 +156,7 @@ export function usePaneDrop() {
     clear() {
       following = null;
       show(null);
+      showPreview(null, null, null, pointerSide);
     },
   };
 }

@@ -354,16 +354,16 @@ test.describe('Tab groups', () => {
     await chipOf(page, CLAUDE).locator('[data-group-disclosure]').click();
     const player = tab(page, new RegExp(first));
     await expect(player).toBeVisible();
-    const from = await player.boundingBox();
-    // Down off the strip, out of the group's box.
-    await page.mouse.move(
-      from!.x + from!.width / 2,
-      from!.y + from!.height / 2
-    );
+    const [from, onto] = await Promise.all([
+      player.boundingBox(),
+      tab(page, /alpha/).boundingBox(),
+    ]);
+    // Along the strip, out of the group's box onto alpha. (Off the strip
+    // it is carried to a pane instead, `split-panes.test.ts`.)
+    const y = from!.y + from!.height / 2;
+    await page.mouse.move(from!.x + from!.width / 2, y);
     await page.mouse.down();
-    await page.mouse.move(from!.x + from!.width / 2, from!.y + 160, {
-      steps: 15,
-    });
+    await page.mouse.move(onto!.x + onto!.width / 2, y, { steps: 15 });
     await expect(page.locator('[data-group-drag-hint]')).toHaveText(
       'Tabs stay in their group'
     );
