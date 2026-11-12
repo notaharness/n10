@@ -246,9 +246,10 @@ export async function switchRepo(page: Page, cwd: string): Promise<void> {
  * "Create branch…" row for a name git doesn't know yet, and a plain
  * checkout row under "Check out branch" for one that already exists.
  * Both end in the same worktree, so this takes whichever is on offer.
- * Until its branch list loads, the palette offers "Create branch…" for
- * an existing branch too, then swaps in its checkout row; the click
- * takes whichever row is there when it lands.
+ * Until its branch list is loaded and current, the palette offers
+ * "Create branch…" for a branch it does not list yet, then swaps in
+ * its checkout row; the click takes whichever row is there when it
+ * lands.
  */
 export async function createWorktree(
   page: Page,
@@ -261,8 +262,7 @@ export async function createWorktree(
     name: new RegExp(`Create branch\\s*${branch}\\s*and open a worktree`),
   });
   const exact = { name: new RegExp(`^${branch}$`) };
-  const checkoutRow = page.getByRole('option', exact).first();
-  const target = createRow.or(checkoutRow).first();
+  const target = createRow.or(page.getByRole('option', exact)).first();
   await target.waitFor({ state: 'visible', timeout: 15_000 });
   // Creating a branch, or checking out one listed under "Check out
   // branch", makes a worktree; a row for an existing worktree is a jump.
