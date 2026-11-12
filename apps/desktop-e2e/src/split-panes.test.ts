@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab, visibleText } from './setup/app.js';
+import { createWorktree, sidebar, tab, visibleText } from './setup/app.js';
 import {
   confirmNewTerminal,
   openNewTerminalDialog,
@@ -161,6 +161,23 @@ test.describe('Split panes', () => {
       /^gamma/,
     ]);
     await expect(pane(page, 0).getByRole('tab')).toHaveText([/^beta/]);
+  });
+
+  test('a tab let go of outside every strip and pane stays where it was', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    for (const branch of ['alpha', 'beta', 'gamma'])
+      await createWorktree(page, branch);
+    await expect.poll(() => tabNames(page)).toEqual(['alpha', 'beta', 'gamma']);
+
+    // Over the sidebar the drag is over nothing: letting go abandons it,
+    // rather than dropping gamma on the place nearest the pointer.
+    await carryTo(page, tab(page, /^gamma/), sidebar(page), 0.5, 0.5);
+    await expect(page.locator('[data-drag-overlay]')).toHaveText(/^gamma/);
+    await page.mouse.up();
+    await expect(page.locator('[data-drag-overlay]')).toHaveCount(0);
+    await expect.poll(() => tabNames(page)).toEqual(['alpha', 'beta', 'gamma']);
   });
 
   test('comes back split, at the sizes it was left at, after a restart', async ({

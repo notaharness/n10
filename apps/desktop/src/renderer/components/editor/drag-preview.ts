@@ -68,8 +68,9 @@ const inside = (rect: ClientRect, p: Point) =>
   p.y <= rect.bottom;
 
 /** Whether a strip drag with the pointer at `pointer` is out of the
- *  strip it started in. */
-function carriedOut(data: unknown, pointer: Point | null): boolean {
+ *  strip it started in. A keyboard drag never is: it has no pointer, and
+ *  no strip box (`TabDragProvider`). */
+export function carriedOut(data: unknown, pointer: Point | null): boolean {
   return (
     isStripDragData(data) && !!strip && !!pointer && !inside(strip, pointer)
   );

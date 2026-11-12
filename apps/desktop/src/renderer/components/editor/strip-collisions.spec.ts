@@ -1,5 +1,6 @@
 import type { ClientRect, DroppableContainer } from '@dnd-kit/core';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { showPreview } from './drag-preview.js';
 import {
   collisionsEndingAt,
   groupEndId,
@@ -51,7 +52,7 @@ describe('collisionsEndingAt', () => {
     };
     const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
     const collisions = collisionsEndingAt({
-      active: { id: 'active' } as never,
+      active: { id: 'active', data: { current: undefined } } as never,
       collisionRect: { ...rect(1000, 200), top: 36, bottom: 66 },
       droppableRects: rects,
       droppableContainers: containers,
@@ -70,7 +71,7 @@ describe('collisionsEndingAt', () => {
     ];
     const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
     const collisions = collisionsEndingAt({
-      active: { id: 'b0' } as never,
+      active: { id: 'b0', data: { current: undefined } } as never,
       collisionRect: rect(400, 10),
       droppableRects: rects,
       droppableContainers: containers,
@@ -97,7 +98,7 @@ describe('collisionsEndingAt', () => {
     containers[3]!.rect.current = { ...rect(100, 300), top: 30, bottom: 60 };
     const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
     const collisions = collisionsEndingAt({
-      active: { id: 'm0' } as never,
+      active: { id: 'm0', data: { current: undefined } } as never,
       collisionRect: { ...rect(300, 100), top: 30, bottom: 60 },
       droppableRects: rects,
       droppableContainers: containers,
@@ -127,7 +128,7 @@ describe('collisionsEndingAt', () => {
       c.rect.current = { ...c.rect.current!, top: 300, bottom: 330 };
     const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
     const collisions = collisionsEndingAt({
-      active: { id: 'a0' } as never,
+      active: { id: 'a0', data: { current: undefined } } as never,
       collisionRect: rect(400, 10),
       droppableRects: rects,
       droppableContainers: containers,
@@ -158,5 +159,40 @@ describe('collisionsEndingAt', () => {
       pointerCoordinates: { x: 405, y: 55 },
     });
     expect(collisions.map((c) => c.id)).toEqual(['a0']);
+  });
+
+  describe('a pointer drag carried out of its strip', () => {
+    const own: StripDragData = {
+      kind: 'block',
+      label: '',
+      ids: ['t1'],
+      index: 1,
+      pane: 'pane-1',
+    };
+    const active = { id: 't1', data: { current: own } } as never;
+    const containers = [container('t0', 0, { ...own, ids: ['t0'], index: 0 })];
+    const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
+    /** The drag under way started in a strip 600 wide and 30 high. */
+    const startedIn = (pointer: { x: number; y: number }) =>
+      showPreview({ active, over: null }, rect(0, 600), pointer, () => 'after');
+    const at = (pointer: { x: number; y: number }) =>
+      collisionsEndingAt({
+        active,
+        collisionRect: { ...rect(pointer.x, 50), top: pointer.y },
+        droppableRects: rects,
+        droppableContainers: containers,
+        pointerCoordinates: pointer,
+      });
+    afterEach(() => showPreview(null, null, null, () => 'after'));
+
+    it('is over nothing where nothing legal is under the pointer, so letting go abandons it', () => {
+      startedIn({ x: 300, y: 200 });
+      expect(at({ x: 300, y: 200 })).toEqual([]);
+    });
+
+    it('still finds the nearest place while the pointer is inside the strip', () => {
+      startedIn({ x: 300, y: 15 });
+      expect(at({ x: 300, y: 15 }).map((c) => c.id)).toEqual(['t0']);
+    });
   });
 });

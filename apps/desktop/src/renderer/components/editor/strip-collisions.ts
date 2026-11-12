@@ -3,6 +3,7 @@ import {
   pointerWithin,
   type CollisionDetection,
 } from '@dnd-kit/core';
+import { carriedOut } from './drag-preview.js';
 import { isStripDragData } from './strip-drag.js';
 import { isPaneZone } from './use-pane-drop.js';
 
@@ -52,7 +53,9 @@ function placeOf(container: { data?: { current?: unknown } }) {
 /**
  * What the pointer is over, or, where it is over no legal place (a
  * keyboard drag, a border, another group), the legal place nearest the
- * dragged one. Keyboard drags choose the nearest row before a place in
+ * dragged one. A pointer carried out of its strip over nothing legal
+ * (the sidebar, the title or status bar) is over nothing: let go there,
+ * the drag is abandoned, not dropped where it was nearest. Keyboard drags choose the nearest row before a place in
  * it, so a row ending far left cannot lose to a tab on the old row.
  * A member dragged out of its group opens the slot at that end of its
  * group. Only legal places are enabled droppables (`strip-drag.ts`), so
@@ -80,6 +83,7 @@ export const collisionsEndingAt: CollisionDetection = (args) => {
     return last ? [{ id: last.id }] : [];
   }
   if (within.length > 0) return within;
+  if (carriedOut(args.active.data.current, args.pointerCoordinates)) return [];
   // Nearest goes by the strip the drag is in: another pane's places are
   // a target only under the pointer.
   const own = places.filter(
