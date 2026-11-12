@@ -427,6 +427,8 @@ describe('observeTmuxSessions', () => {
       persisted: new Set(),
       terminals: [],
       held: expect.any(Set),
+      // Foreign sessions are not ours to derive anything from.
+      listed: [],
     });
   });
 
@@ -438,6 +440,7 @@ describe('observeTmuxSessions', () => {
       persisted: new Set(),
       terminals: [],
       held: expect.any(Set),
+      listed: [expect.objectContaining({ name: 'feat-a', repo: '/other' })],
     });
   });
 
@@ -536,6 +539,7 @@ describe('observeTmuxSessions', () => {
       persisted: new Set(),
       terminals: [],
       held: expect.any(Set),
+      listed: expect.any(Array),
     });
   });
 
@@ -616,6 +620,7 @@ describe('observeTmuxSessions', () => {
       persisted: new Set([worktreeSessionKey(dirOf('feat-a'), '/repo')]),
       terminals: [],
       held: new Set([worktreeSessionKey(dirOf('feat-a'), '/repo')]),
+      listed: expect.any(Array),
     });
   });
 });

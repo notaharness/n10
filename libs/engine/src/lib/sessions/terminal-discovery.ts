@@ -8,6 +8,7 @@ import {
   type DiscoveredTerminal,
   type DiscoveryDelta,
   type DiscoveryScan,
+  type TaggedSession,
 } from '@n10/core';
 
 /** The machine a registry name lives on. */
@@ -52,6 +53,8 @@ export interface MachineScanPorts {
   forgetFailures(machine: string, present: ReadonlySet<string>): void;
   adopt(terminal: DiscoveredTerminal): Promise<boolean>;
   onChanged(delta: DiscoveryDelta): void;
+  /** Handed the machine's whole listing. */
+  listed?(machine: string, sessions: readonly TaggedSession[]): void;
 }
 
 const EMPTY_SCAN: DiscoveryScan = {
@@ -76,7 +79,10 @@ export function createMachineScans(ports: MachineScanPorts) {
     const before = heldTerminals(machine);
     let terminals: DiscoveredTerminal[];
     try {
-      terminals = await observeRemoteTerminals(machine);
+      terminals = await observeRemoteTerminals(
+        machine,
+        ports.listed && ((sessions) => ports.listed?.(machine, sessions))
+      );
     } catch (error) {
       log('warn', 'discovery', `could not list ${machine}'s sessions`, {
         error: String(error),

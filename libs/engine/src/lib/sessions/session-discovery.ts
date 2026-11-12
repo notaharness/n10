@@ -19,6 +19,7 @@ import {
   type DiscoveredWorktree,
   type DiscoveryDelta,
   type DiscoveryScan,
+  type TaggedSession,
 } from '@n10/core';
 import {
   createMachineScans,
@@ -83,6 +84,8 @@ export interface SessionDiscoveryOptions {
    *  the beam peerIds the fleet says are connected. */
   remoteMachines?: () => readonly string[];
   onChanged: (delta: DiscoveryDelta) => void;
+  /** Handed each machine's whole listing as a scan reads it. */
+  listed?: (machine: string, sessions: readonly TaggedSession[]) => void;
   /** Abandon work between awaits when selection changes, before attaching a stale repo's sessions. */
   isCurrent?: () => boolean;
   /** What an earlier scanner of this repository last saw (`lastScan()`).
@@ -136,6 +139,7 @@ export function startSessionDiscovery(
     // sessions, it would end every terminal and release every exited
     // agent, and the next scan would not bring them back.
     if (!seen) throw new Error('tmux could not list its sessions');
+    opts.listed?.(LOCAL_MACHINE, seen.listed);
     // Stays stranded while its agent runs and git does not list it, even
     // if something recreates the directory.
     const listed = new Set(worktrees.map((wt) => wt.name));
@@ -239,6 +243,7 @@ export function startSessionDiscovery(
     forgetFailures,
     adopt: (terminal) => adoptOne(terminal, adoptTerminal ?? (() => undefined)),
     onChanged,
+    listed: opts.listed,
   });
 
   async function runScan(): Promise<void> {

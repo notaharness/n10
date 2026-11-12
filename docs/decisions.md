@@ -786,57 +786,94 @@ connecting), leaving the order and any walk as they were. Nothing pushes config 
 renderer, so the bindings are read again when the window comes to the front
 and when Settings → Keyboard opens; a read begun before a write is dropped.
 
-### Orchestrator tabs
+### Tab groups
 
-An Orchestra orchestrator's tab carries the Brain icon, and its players' tabs
-stand under it rather than beside it. Which session is an orchestrator, and
-whose players, comes from tags alone (core `discovery/orchestrator-groups.ts`).
-A player's `@session-x-orchestra-orchestrator` of `tmux:<session>` names its session.
-`claude:<id>` and `codex:<thread>` name a conversation, which the tmux server
-cannot tie to a session. Orchestra closes that gap explicitly: `spawn.sh` and
-`adopt.sh`, run inside tmux with the orchestrator's own identity as the
-target, write it as `@session-x-orchestra-target` on the session they run in, and take
-it off every other session of that server. That is how a terminal tab where
-`claude` was run by hand becomes an orchestrator. n10 does not infer the link
-from process trees, Claude's session registry or transcripts. Repositories
-play no part: a player in another repository, open or not, or a dir player
-in a directory of its own, groups like any other. The host lists this
-machine's server only. So a `beam:` target (an orchestrator on another
-machine), a player on another machine, and an orchestrator outside tmux
-(Claude Desktop, a daemon) group nothing; such a player keeps its own tab,
-and its launch context still shows where it reports. A session marked with a
-target is an orchestrator with or without players. A fresh agent launch
-clears the mark with the other supervisor tags.
+The strip groups tabs by what they belong to, their affiliation: the parent
+a session reports to, else its place. Membership is derived, never stored
+or chosen.
 
-The strip changes how tabs are shown, not what they are
-(`lib/tabs/orchestrator-tabs.ts`). Player tabs open, close and activate as
-before and stay in `TabsState`; the strip leaves out each one whose
-orchestrator has a tab. A tab matches a session by its registry key, or, from
-another repository, by repository and checkout. An orchestrator that is
-another's player keeps its place, so its own players stay reachable. Where an
-orchestrator tab's close button sits, it shows the count of its player tabs,
-and keeps the X when it has none; middle click, Delete and its menu still
-close it. The tab carries what its hidden players would show: it is the
-strip's selection while one of them is active, and takes their unseen dot.
-A hidden player's attention blink moves to the count, in the primary colour:
-the tab's own blink shades toward the selected tab's background, so it would
-not show while the orchestrator or another of its players is selected. Hovering the tab opens a Radix hover card listing the player
-tabs as tab rows, with each tab's marks, repository band and hover-revealed
-X. Resting on a row holds its pane ready as resting on a strip tab does, and
-a press chooses it. A row's X is that tab's own close, with its confirmation
-and agent stop. The list holds tabs, not sessions: a player whose tab was
-closed is not listed and not reopened from here. The card is pointer-only, so
-the trigger cancels Radix's open on keyboard focus, and the tab's native menu
-lists the same players under a disabled "Players" heading (the contract's
-menus have no submenus). The tab is one element from its first player to its
-last, so the card's coming and going never remounts it.
+- **Parent.** A session's `@session-x-orchestra-orchestrator` (core
+  `affiliation.ts` `parentTarget`). `claude:<id>` and `codex:<thread>` are
+  global: any `beam:<peer>/` qualifier goes, so the parent is one group
+  whether it runs in tmux, in the Codex app or on another machine. A
+  `tmux:<session>` name is only unique on its server: it names a session on
+  the qualifier's machine, else on the reporter's own, and its key carries
+  that machine (`beam:<peer>/tmux:<session>` unless it is this one; the fleet
+  supplies this machine's peerId). Its home is the session whose
+  `@session-x-orchestra-target` is that key, or the session the `tmux:` key
+  names. `claude:<id>` and
+  `codex:<thread>` name a conversation, which tmux cannot tie to a session;
+  Orchestra closes that gap by writing the target on the session it runs in
+  (`spawn.sh`, `adopt.sh`) and taking it off every other one. n10 does not
+  infer the link from process trees, Claude's registry or transcripts. A home
+  heads its group, keyed by its target (else `tmux:<name>`), so players naming
+  it either way are one group; a marked session heads one with or without
+  players. A home that reports to another parent heads its own group, shown
+  right after its parent's (`follows`): groups do not nest. Every member of a
+  group carries the same affiliation, `follows` included. A parent with no
+  home here is labelled by harness and its players' common place
+  (`Codex · skolakerfi`).
+- **Inheritance.** A terminal anywhere in a player's checkout, its
+  subdirectories included, takes the player's parent; of checkouts nested
+  in one another, the innermost holding it decides (`enclosingCheckout`).
+  So does any tab whose session, or checkout, is the player's.
+- **Place.** Everything else: a worktree session's main checkout, a
+  directory's repository main checkout, else the directory. A terminal no
+  listing names yet is grouped by these same rules from where it was
+  launched, so it starts in the group it stays in. A tab no session describes (a pull
+  request with no agent) takes its repository. Settings belongs to nothing.
 
-Positional keyboard switching (Ctrl+PgDn/PgUp, and Ctrl+Tab without
-most-recently-used order) walks the order the strip presents: each tab it
-shows, an orchestrator's followed by its player tabs, which the strip notes in
-`tab-switching.ts`. Close Others on an orchestrator's tab keeps its player
-tabs, which the strip shows as part of it; from any other tab, and Close All,
-they close like every tab.
+Core `discovery/affiliations.ts` derives them over a listing, pure. The
+engine's affiliation service holds each machine's last discovery listing
+(local and connected machines, kept while a peer is unreachable and dropped
+once the fleet no longer lists it or revokes it), so a remote player joins its parent when
+both are listed, and the session and terminal services stamp `affiliation`
+onto their rows; the desktop also stamps its foreign-session listing.
+Orchestra tags a player without an event, so a change shows at the next
+discovery scan. Repositories play no part in parent membership.
+
+The strip derives groups from `TabsState.tabs` on every render
+(`lib/tabs/tab-groups.ts` `present`): one per affiliation, in the order of
+each group's first tab, members in their relative order, the home's tab
+first. Contiguity is derived, never an invariant: nothing re-sorts the tabs
+on sync and no move is refused. Every parent group shows a chip, and a place
+group of two or more; a lone place tab is an ordinary tab. The chip is three
+sibling controls: its one icon, a folder closed or open, which collapses and
+expands it; a body (the home's own tab, or a label that opens the roster for
+a stand-in parent or a place); and the roster button
+with the group's tab count and the count of each state present. Status comes
+from the activity snapshot only: `flashing` is new output, `active` working.
+Nothing yet says blocked, failed or done, and none is inferred from silence,
+an exit or a pull request; the status type keeps those states for a source
+(tmux's pane program state). The roster (`GroupRoster.tsx`) is a controlled
+popover anchored to the chip: resting on the chip opens it without focus,
+a press pins it, Alt+ArrowDown opens it on the active row, Escape returns
+focus to its button and keeps hover from reopening it until the pointer
+leaves.
+
+Collapse is in `TabsState.collapsed`, an explicit choice per group over one
+rule by affiliation kind (`initiallyCollapsed`: a parent group starts
+collapsed, its players behind the chip, and a place group expanded),
+kept for the run. A collapsed group shows its chip alone; activating a tab in
+it from anywhere expands it, while collapsing the group the active tab is in
+leaves the active content as it is. A collapsed group the active tab joins
+behind its chip, when a later scan gives it its parent, expands too. Collapse others is on the native menus.
+Positional keyboard switching walks the presented order, collapsed members
+included (`tab-switching.ts`). Close Others closes every other tab.
+
+Drag (`strip-drag.ts`): a member moves only among its group's members, and a
+group, dragged by its chip body, or a lone tab moves only between blocks.
+Illegal places are disabled droppables (`useSortable`'s `disabled.droppable`),
+so pointer and keyboard drags meet only legal slots and the slot the strip
+opens is the one the drop takes. A block's drop arranges the whole strip in
+its presented order with the block moved, since the stored order may
+interleave groups; a group shown behind the one it follows moves with it as
+one block. The room after the last tab, the strip's or a wrapped group's, is
+the last legal place by index, not by dnd-kit's mount order. A member
+carried outside its group is told "Tabs stay in their group", and drags
+announce "Moving", "Position n of m", "Moved" and "Move cancelled". A home's
+tab selects on click, not on press, so dragging its group does not activate
+it.
 
 ## Plans and auto-fixing
 

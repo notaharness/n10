@@ -30,6 +30,7 @@ export type { ForeignSessionEntry } from './tab-foreign.js';
 import { closeRemovedWorktrees, closeTab } from './tab-close.js';
 import { openForeign, type ForeignSessionEntry } from './tab-foreign.js';
 import { pinLive, rekey } from './tab-sync.js';
+import { arrangeTabs, moveTabs, setCollapsed } from './tab-order.js';
 import {
   openTerminal,
   syncTerminals,
@@ -73,6 +74,10 @@ export interface TabsState {
    *  the app while the user was looking at something else — and not
    *  activated since. The strip marks them until they are first seen. */
   unseen: readonly string[];
+  /** Each group the user collapsed (`true`) or expanded (`false`), by
+   *  affiliation key; a group with no entry takes `initiallyCollapsed`
+   *  (`tab-groups.ts`). Kept for this run only. */
+  collapsed: Readonly<Record<string, boolean>>;
 }
 
 /** The repository the active tab belongs to, if it belongs to one. A
@@ -89,6 +94,7 @@ export const EMPTY_TABS: TabsState = {
   autoOpened: [],
   lastActiveByRepo: {},
   unseen: [],
+  collapsed: {},
 };
 
 export type TabsAction =
@@ -97,11 +103,22 @@ export type TabsAction =
   | { type: 'pin'; id: string }
   | { type: 'activate'; id: string }
   | { type: 'close'; id: string; repo?: string }
-  /** Close every tab but `id` and those in `keep`: an orchestrator's
-   *  tab keeps the player tabs it shows. */
-  | { type: 'close-others'; id: string; keep?: readonly string[] }
+  | { type: 'close-active' }
+  | { type: 'close-others'; id: string }
   | { type: 'close-all' }
-  | { type: 'move'; id: string; targetId: string; side: 'before' | 'after' }
+  /** Place `ids`, in their order, before or after `targetId`: one tab,
+   *  or a whole group dragged by its chip. */
+  | {
+      type: 'move';
+      ids: readonly string[];
+      targetId: string;
+      side: 'before' | 'after';
+    }
+  /** Put the tabs `ids` name in that order, the rest after them: the
+   *  strip as presented, with a dragged block in its new place. */
+  | { type: 'arrange'; ids: readonly string[] }
+  /** Collapse (or expand) these groups. */
+  | { type: 'set-collapsed'; keys: readonly string[]; collapsed: boolean }
   /** The one reconciliation dispatched from Workspace's effect: the
    *  repo's sidebar items *and* the host's terminal listing, applied as
    *  one pure step. Terminals ride along on every sync rather than
@@ -168,14 +185,9 @@ function activateTab(state: TabsState, id: string): TabsState {
 }
 
 /** Keep only `id`; whatever survives becomes active. */
-function closeOtherTabs(
-  state: TabsState,
-  id: string,
-  keep: readonly string[] = []
-): TabsState {
-  const tabs = state.tabs.filter((t) => t.id === id || keep.includes(t.id));
-  const kept = tabs.some((t) => t.id === id) ? id : null;
-  return { ...state, tabs, activeId: kept ?? tabs[0]?.id ?? null };
+function closeOtherTabs(state: TabsState, id: string): TabsState {
+  const tabs = state.tabs.filter((t) => t.id === id);
+  return { ...state, tabs, activeId: tabs[0]?.id ?? null };
 }
 
 export function reduce(state: TabsState, action: TabsAction): TabsState {
@@ -245,6 +257,7 @@ type CloseAction = Extract<
       | 'close'
       | 'close-others'
       | 'close-all'
+      | 'close-active'
       | 'terminal-ended'
       | 'worktrees-removed';
   }
@@ -254,6 +267,7 @@ const CLOSE_ACTIONS: ReadonlySet<TabsAction['type']> = new Set<
   CloseAction['type']
 >([
   'close',
+  'close-active',
   'close-others',
   'close-all',
   'terminal-ended',
@@ -268,12 +282,16 @@ function applyClose(state: TabsState, action: CloseAction): TabsState {
   switch (action.type) {
     case 'close':
       return closeTab(state, action.id, action.repo);
+    case 'close-active':
+      return state.activeId
+        ? closeTab(state, state.activeId, undefined)
+        : state;
     case 'terminal-ended':
       return closeTab(state, terminalTabId(action.name), action.repo);
     case 'worktrees-removed':
       return closeRemovedWorktrees(state, action.repo, action.worktrees);
     case 'close-others':
-      return closeOtherTabs(state, action.id, action.keep);
+      return closeOtherTabs(state, action.id);
     case 'close-all':
       // `autoOpened` survives on purpose: closing every tab is a manual
       // act, and re-opening the running agents on the next sidebar poll
@@ -323,7 +341,11 @@ function applyStrip(state: TabsState, action: StripAction): TabsState {
     case 'activate':
       return activateTab(state, action.id);
     case 'move':
-      return moveTab(state, action.id, action.targetId, action.side);
+      return moveTabs(state, action.ids, action.targetId, action.side);
+    case 'arrange':
+      return arrangeTabs(state, action.ids);
+    case 'set-collapsed':
+      return setCollapsed(state, action.keys, action.collapsed);
     case 'sync-items':
       return pinLive(
         autoOpenRunning(
@@ -417,23 +439,6 @@ function openSettings(state: TabsState): TabsState {
 }
 
 /** Drag-reorder: lift a tab out of the strip and drop it beside another. */
-function moveTab(
-  state: TabsState,
-  id: string,
-  targetId: string,
-  side: 'before' | 'after'
-): TabsState {
-  if (id === targetId) return state;
-  const from = state.tabs.findIndex((t) => t.id === id);
-  if (from < 0) return state;
-  const tabs = [...state.tabs];
-  const [moved] = tabs.splice(from, 1);
-  const at = tabs.findIndex((t) => t.id === targetId);
-  if (at < 0) return state;
-  tabs.splice(side === 'after' ? at + 1 : at, 0, moved);
-  return { ...state, tabs };
-}
-
 /**
  * Every running agent gets a tab: restores the tabs for tmux sessions
  * that survived a restart, and surfaces sessions started elsewhere.

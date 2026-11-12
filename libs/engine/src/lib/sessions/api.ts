@@ -17,3 +17,5 @@ export type {
   BranchSessions,
   BranchTerminal,
 } from './branch-sessions.js';
+export { createAffiliationService } from './affiliation-service.js';
+export type { AffiliationService, FleetMember } from './affiliation-service.js';

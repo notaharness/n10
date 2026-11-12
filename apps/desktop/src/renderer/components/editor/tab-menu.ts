@@ -1,9 +1,7 @@
 import type { ContextMenuItem, TabOverflow } from '../../../host/contract.js';
 import { updateDesktopPrefs } from '../../lib/desktop-prefs.js';
-import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import type { Tab, useTabs } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
-import type { PlayerRow } from './OrchestratorPlayers.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
 
@@ -13,32 +11,56 @@ const OVERFLOW: Record<string, TabOverflow> = {
   'overflow-scroll': 'scroll',
 };
 
-/** Prefix of a player item's id; the rest is its tab's id. */
-const PLAYER = 'player:';
+/** What a group offers in a native menu: its chip's, and below a
+ *  member's own items. */
+export interface GroupMenu {
+  collapsed: boolean;
+  /** Another group could collapse. */
+  canCollapseOthers: boolean;
+  showTabs(): void;
+  setCollapsed(collapsed: boolean): void;
+  collapseOthers(): void;
+}
 
-/** An orchestrator tab's players, the keyboard's way to the tabs its
- *  hover card lists: a heading, then one item per player tab. Native
- *  menus here have no submenus. */
-function playerItems(players: readonly PlayerRow[]): ContextMenuItem[] {
-  if (players.length === 0) return [];
+function groupItems(group: GroupMenu): ContextMenuItem[] {
   return [
-    { type: 'separator' },
-    { id: 'players', label: 'Players', enabled: false },
-    ...players.map((row) => ({
-      id: PLAYER + row.tab.id,
-      label: tabPresentation(row.tab, row.item, row.machineLabel).label,
-    })),
+    { id: 'group-show', label: 'Show tabs' },
+    group.collapsed
+      ? { id: 'group-expand', label: 'Expand group' }
+      : { id: 'group-collapse', label: 'Collapse group' },
+    {
+      id: 'group-collapse-others',
+      label: 'Collapse others',
+      enabled: group.canCollapseOthers,
+    },
   ];
 }
 
+/** Run a group's own choice; false for any other. */
+function runGroupChoice(chosen: string | null, group?: GroupMenu): boolean {
+  if (!group) return false;
+  if (chosen === 'group-show') group.showTabs();
+  else if (chosen === 'group-expand') group.setCollapsed(false);
+  else if (chosen === 'group-collapse') group.setCollapsed(true);
+  else if (chosen === 'group-collapse-others') group.collapseOthers();
+  else return false;
+  return true;
+}
+
+/** The native menu of a chip with no tab of its own (a stand-in, a
+ *  place): the group's actions alone. */
+export async function runGroupMenu(group: GroupMenu): Promise<void> {
+  runGroupChoice(await window.n10.showContextMenu(groupItems(group)), group);
+}
+
 /** The native context menu a tab offers: closing, keeping a preview,
- *  an orchestrator's players, and what the whole strip does when its
- *  tabs overflow. */
+ *  its group's actions, and what the whole strip does when its tabs
+ *  overflow. */
 function tabMenuItems(
   tab: Tab,
   tabCount: number,
   overflow: TabOverflow,
-  players: readonly PlayerRow[]
+  group: GroupMenu | undefined
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = [
     { id: 'close', label: 'Close' },
@@ -48,7 +70,7 @@ function tabMenuItems(
   if (tab.preview) {
     items.push({ type: 'separator' }, { id: 'pin', label: 'Keep Open' });
   }
-  items.push(...playerItems(players));
+  if (group) items.push({ type: 'separator' }, ...groupItems(group));
   items.push(
     { type: 'separator' },
     {
@@ -70,18 +92,14 @@ export async function runTabMenu(
   tabs: ReturnType<typeof useTabs>,
   closer: Closer,
   overflow: TabOverflow,
-  players: readonly PlayerRow[] = []
+  group?: GroupMenu
 ): Promise<void> {
   const chosen = await window.n10.showContextMenu(
-    tabMenuItems(tab, tabs.tabs.length, overflow, players)
+    tabMenuItems(tab, tabs.tabs.length, overflow, group)
   );
-  if (chosen?.startsWith(PLAYER)) tabs.activate(chosen.slice(PLAYER.length));
-  else if (chosen === 'close') closer.close(tab.id);
-  else if (chosen === 'close-others')
-    closer.closeOthers(
-      tab.id,
-      players.map((row) => row.tab.id)
-    );
+  if (runGroupChoice(chosen, group)) return;
+  if (chosen === 'close') closer.close(tab.id);
+  else if (chosen === 'close-others') closer.closeOthers(tab.id);
   else if (chosen === 'close-all') closer.closeAll();
   else if (chosen === 'pin') tabs.pin(tab.id);
   else if (chosen && chosen in OVERFLOW) {

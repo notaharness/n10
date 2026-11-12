@@ -118,12 +118,13 @@ Every rule below has its reasoning in `docs/decisions.md`.
   it exits or is stopped.
   `TabsProvider` sits above the repo gate in `App.tsx`.
   `tabs.properties.spec.ts` holds the invariants.
-- Orchestra players' tabs stand under their orchestrator's tab
-  (`lib/tabs/orchestrator-tabs.ts`, over core's `orchestratorGroups` via
-  `listOrchestratorGroups`): presentation only. The strip omits them; they stay
-  ordinary tabs in `TabsState`, listed in the orchestrator tab's hover card
-  (`OrchestratorPlayers.tsx`) and its context menu. Positional tab switching
-  walks the order the strip presents (`presentedOrder`), not `TabsState`'s.
+- The strip groups tabs by affiliation, the parent a session reports to
+  else its place, which the engine stamps on session, terminal and foreign
+  rows (`lib/tabs/tab-affiliation.ts`). Groups are presentation only:
+  `present` (`lib/tabs/tab-groups.ts`) derives them from `TabsState.tabs`
+  every render, and positional switching walks its order. Collapse is
+  `TabsState.collapsed`; drag legality is `components/editor/strip-drag.ts`.
+  Rules and reasoning: decisions.md "Tab groups".
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Sessions · Files) beside one content pane that
   swaps between Overview, diff, a session's terminal (mounted only while shown) and
@@ -286,9 +287,10 @@ Every rule below has its reasoning in `docs/decisions.md`.
   nothing but components; otherwise it re-runs it, reminting any context
   in it under a provider still mounted. New and touched modules keep
   contexts, hooks and helpers out of component modules
-  (`lib/fleet/fleet-context.ts` beside `fleet-provider.tsx`); older ones
-  that still mix them (`lib/tabs/tabs.tsx`, `lib/repo-context.tsx`, …)
-  are accepted until they are next changed.
+  (`lib/fleet/fleet-context.ts` beside `fleet-provider.tsx`,
+  `lib/tabs/tabs.ts` beside `tabs-provider.tsx`); older ones that still
+  mix them (`lib/repo-context.tsx`, …) are accepted until they are next
+  changed.
 - The theme painted is the host's (`services/theme.ts`), which main
   posts from `nativeTheme`; `lib/theme.ts` gives the UI class and every
   terminal that one value. Do not paint from `prefers-color-scheme`. Only

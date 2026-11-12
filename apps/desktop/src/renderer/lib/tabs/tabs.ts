@@ -1,20 +1,11 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useReducer,
-  type ReactNode,
-} from 'react';
-import {
-  EMPTY_TABS,
-  reduce,
-  type ForeignSessionEntry,
-  type ItemEntry,
-  type Tab,
-  type TabsState,
-  type TerminalEntry,
+import { createContext, useContext, useMemo, type Dispatch } from 'react';
+import type {
+  ForeignSessionEntry,
+  ItemEntry,
+  Tab,
+  TabsAction,
+  TabsState,
+  TerminalEntry,
 } from './tabs-model.js';
 import { useRepo } from '../repo-context.js';
 import { tabOpening } from './tab-identity.js';
@@ -59,12 +50,20 @@ interface TabsApi extends TabsState {
   activate: (id: string) => void;
   /** `repo` is the one in view: focus never leaves it on a close. */
   close: (id: string, repo?: string) => void;
-  /** `keep`: tabs spared besides `id` (an orchestrator's players). */
-  closeOthers: (id: string, keep?: readonly string[]) => void;
+  closeOthers: (id: string) => void;
   closeAll: () => void;
   closeActive: () => void;
-  /** Drag-reorder: place `id` before/after `targetId`. */
-  moveTab: (id: string, targetId: string, side: 'before' | 'after') => void;
+  /** Drag-reorder within a group: place `ids` before or after
+   *  `targetId`. */
+  moveTabs: (
+    ids: readonly string[],
+    targetId: string,
+    side: 'before' | 'after'
+  ) => void;
+  /** Drag-reorder among blocks: the strip's tabs in this order. */
+  arrangeTabs: (ids: readonly string[]) => void;
+  /** Collapse or expand the groups `keys` name. */
+  setCollapsed: (keys: readonly string[], collapsed: boolean) => void;
   /**
    * Reconcile the strip with the current sidebar items *and* the host's
    * terminal listing, in one step: follow re-keyed items, open a tab
@@ -97,130 +96,42 @@ interface TabsApi extends TabsState {
   forgetAutoOpened: (keys: string[]) => void;
 }
 
-const TabsContext = createContext<TabsApi | null>(null);
+export const TabsContext = createContext<TabsApi | null>(null);
 
-export function TabsProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reduce, EMPTY_TABS);
+export type TabsActions = Omit<TabsApi, keyof TabsState>;
 
-  // A removed worktree takes its tabs with it, whoever removed it: n10,
-  // `git worktree remove` or `rm -rf`. Heard here, above the repo gate,
-  // because the strip spans repositories and the workspace remounts per
-  // repository — a scan landing mid-switch would find no listener there.
-  useEffect(
-    () =>
-      window.n10.onDiscoveryChanged(({ repo, removedWorktrees }) => {
-        if (removedWorktrees.length === 0) return;
-        dispatch({
-          type: 'worktrees-removed',
-          repo,
-          worktrees: removedWorktrees,
-        });
-      }),
-    []
-  );
-
-  const openItem = useCallback(
-    (repo: string, itemKey: string, opts?: { preview?: boolean }) =>
+/** The strip's actions over its reducer's `dispatch`, none reading
+ *  state: made once, they keep their identity for as long as `dispatch`
+ *  does, whatever the state does. */
+export function tabsActions(dispatch: Dispatch<TabsAction>): TabsActions {
+  return {
+    openItem: (repo, itemKey, opts) =>
       dispatch({
         type: 'open-item',
         repo,
         itemKey,
         preview: opts?.preview ?? false,
       }),
-    []
-  );
-  const openSettings = useCallback(
-    () => dispatch({ type: 'open-settings' }),
-    []
-  );
-  const pin = useCallback((id: string) => dispatch({ type: 'pin', id }), []);
-  const activate = useCallback(
-    (id: string) => dispatch({ type: 'activate', id }),
-    []
-  );
-  const close = useCallback(
-    (id: string, repo?: string) => dispatch({ type: 'close', id, repo }),
-    []
-  );
-  const closeOthers = useCallback(
-    (id: string, keep?: readonly string[]) =>
-      dispatch({ type: 'close-others', id, keep }),
-    []
-  );
-  const closeAll = useCallback(() => dispatch({ type: 'close-all' }), []);
-  const closeActive = useCallback(() => {
-    if (state.activeId) dispatch({ type: 'close', id: state.activeId });
-  }, [state.activeId]);
-  const moveTab = useCallback(
-    (id: string, targetId: string, side: 'before' | 'after') =>
-      dispatch({ type: 'move', id, targetId, side }),
-    []
-  );
-  const syncItems = useCallback(
-    (
-      repo: string,
-      entries: ItemEntry[],
-      terminals: TerminalEntry[] | undefined,
-      foreign: ForeignSessionEntry[] | undefined
-    ) => dispatch({ type: 'sync-items', repo, entries, terminals, foreign }),
-    []
-  );
-  const repoOpened = useCallback(
-    (repo: string) => dispatch({ type: 'repo-opened', repo }),
-    []
-  );
-  const openTerminal = useCallback(
-    (terminal: TerminalEntry) => dispatch({ type: 'open-terminal', terminal }),
-    []
-  );
-  const terminalEnded = useCallback(
-    (name: string, repo?: string) =>
+    openSettings: () => dispatch({ type: 'open-settings' }),
+    pin: (id) => dispatch({ type: 'pin', id }),
+    activate: (id) => dispatch({ type: 'activate', id }),
+    close: (id, repo) => dispatch({ type: 'close', id, repo }),
+    closeOthers: (id) => dispatch({ type: 'close-others', id }),
+    closeAll: () => dispatch({ type: 'close-all' }),
+    closeActive: () => dispatch({ type: 'close-active' }),
+    moveTabs: (ids, targetId, side) =>
+      dispatch({ type: 'move', ids, targetId, side }),
+    arrangeTabs: (ids) => dispatch({ type: 'arrange', ids }),
+    setCollapsed: (keys, collapsed) =>
+      dispatch({ type: 'set-collapsed', keys, collapsed }),
+    syncItems: (repo, entries, terminals, foreign) =>
+      dispatch({ type: 'sync-items', repo, entries, terminals, foreign }),
+    repoOpened: (repo) => dispatch({ type: 'repo-opened', repo }),
+    openTerminal: (terminal) => dispatch({ type: 'open-terminal', terminal }),
+    terminalEnded: (name, repo) =>
       dispatch({ type: 'terminal-ended', name, repo }),
-    []
-  );
-  const forgetAutoOpened = useCallback(
-    (keys: string[]) => dispatch({ type: 'forget-auto-opened', keys }),
-    []
-  );
-
-  const api = useMemo<TabsApi>(
-    () => ({
-      ...state,
-      openItem,
-      openSettings,
-      pin,
-      activate,
-      close,
-      closeOthers,
-      closeAll,
-      closeActive,
-      moveTab,
-      syncItems,
-      repoOpened,
-      openTerminal,
-      terminalEnded,
-      forgetAutoOpened,
-    }),
-    [
-      state,
-      openItem,
-      openSettings,
-      pin,
-      activate,
-      close,
-      closeOthers,
-      closeAll,
-      closeActive,
-      moveTab,
-      syncItems,
-      repoOpened,
-      openTerminal,
-      terminalEnded,
-      forgetAutoOpened,
-    ]
-  );
-
-  return <TabsContext.Provider value={api}>{children}</TabsContext.Provider>;
+    forgetAutoOpened: (keys) => dispatch({ type: 'forget-auto-opened', keys }),
+  };
 }
 
 export function useTabs(): TabsApi {

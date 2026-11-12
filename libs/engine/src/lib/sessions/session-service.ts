@@ -1,6 +1,10 @@
 import { paneDimension } from '../kernel/terminal-size.js';
 import { createPlanCommands } from '../plans/api.js';
 import { createSessionConnections } from './session-connections.js';
+import {
+  createAffiliationService,
+  type AffiliationService,
+} from './affiliation-service.js';
 import { isDeepStrictEqual } from 'node:util';
 import {
   canonicalWorktreePath,
@@ -10,6 +14,7 @@ import {
   launchSession,
   LOCAL_MACHINE,
   onSessionExit,
+  placeAffiliation,
   strandedSessionRows,
   worktreeSessionRow,
 } from '@n10/core';
@@ -62,10 +67,23 @@ export function createSessionService(options: {
    *  reopened repository's scanner starts from it, so worktrees removed
    *  while another repository was open are reported removed. */
   lastScans?: Map<string, DiscoveryScan>;
+  /** Process-wide: what every session belongs to. Rows are stamped
+   *  with it, and discovery's listings feed it. */
+  affiliations?: AffiliationService;
 }) {
   const { config, worktrees, isCurrent } = options;
   const lastScans = options.lastScans ?? new Map<string, DiscoveryScan>();
   const connections = options.connections ?? createSessionConnections();
+  const affiliations = options.affiliations ?? createAffiliationService();
+  /** A row's agent's affiliation, else its checkout's, else the
+   *  repository's place. */
+  const affiliated = (row: AgentSession): AgentSession => ({
+    ...row,
+    affiliation:
+      affiliations.of(row.name) ??
+      (row.path ? affiliations.ofCheckout(row.path) : undefined) ??
+      placeAffiliation(config.repo),
+  });
   let discovery: SessionDiscovery | undefined;
   let stopWatch: (() => void) | undefined;
   let snapshot: SessionSnapshot = { sessions: [], error: null };
@@ -92,7 +110,7 @@ export function createSessionService(options: {
           isSessionAlive,
           (name) => stranded.has(name) && !listed.has(name)
         ),
-      ],
+      ].map(affiliated),
       error: worktrees.getSnapshot().error,
     };
     scanUnseen();
@@ -119,6 +137,7 @@ export function createSessionService(options: {
     if (listed.some((wt) => !paths.has(wt.path))) void discovery?.scanNow();
   }
   worktrees.subscribe(publish);
+  affiliations.subscribe(publish);
   async function refresh(): Promise<AgentSession[]> {
     await worktrees.refresh();
     publish();
@@ -232,6 +251,7 @@ export function createSessionService(options: {
         adopt: (wt) => adopt(wt, ports, live),
         adoptTerminal: ports.adoptTerminal,
         remoteMachines: ports.remoteMachines,
+        listed: affiliations.observe,
         onChanged(delta) {
           void refresh();
           ports.changed?.(delta);

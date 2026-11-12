@@ -71,7 +71,6 @@ export function useHostEvents(
       // may be another repository's agent too.
       void qc.invalidateQueries({ queryKey: keys.terminals });
       void qc.invalidateQueries({ queryKey: keys.foreignSessions });
-      void qc.invalidateQueries({ queryKey: keys.orchestratorGroups });
       // A worktree added from outside usually brought a branch with it.
       void qc.invalidateQueries({ queryKey: keys.branches(cwd) });
     });

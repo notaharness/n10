@@ -44,9 +44,11 @@ export function resolvePickedFolder(
  * is a repository root, `null` otherwise.
  *
  * Only `cwd` is asked about. A folder inside a checkout is a plain
- * folder — nothing walks up to find the root — so a terminal opened
- * in `repo/apps/x` sits in the repo-less group rather than being
- * quietly filed under `repo`.
+ * folder — nothing walks up to find the root — so a terminal opened in
+ * `repo/apps/x` is no tab of `repo`'s: it opens no repository and
+ * carries no repository colour. The strip still groups it with `repo`'s
+ * place (`docs/decisions.md`, "Tab groups"), from the affiliation its
+ * listing carries.
  */
 export function terminalRepo(
   cwd: string,

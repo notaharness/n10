@@ -37,7 +37,7 @@ export async function expectNothingLifted(page: Page) {
   for (const t of await tabs(page).all()) {
     expect(await motion(t)).toMatchObject({ transform: '' });
   }
-  await expect(page.getByText(/^Picked up /)).toHaveCount(0);
+  await expect(page.getByText(/^Moving /)).toHaveCount(0);
 }
 
 /** Focus `name`'s tab, lift it with the chord and step it right, until

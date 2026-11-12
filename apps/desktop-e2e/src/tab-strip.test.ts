@@ -179,9 +179,9 @@ test.describe('Tab strip overflow', () => {
         /^translate3d\(-?[\d.]+px, [1-9]/
       );
     }).toPass();
-    // Dropped once the strip has taken it to be over another tab.
+    // Dropped once the strip has taken it to another tab's place.
     await expect(
-      page.getByText(new RegExp(`^${name} is over (?!${name}\\.)`))
+      page.getByText(new RegExp(`^Position (?!${end + 1} )\\d+ of \\d+\\.$`))
     ).toBeAttached();
     await page.keyboard.press('Space');
     await expect

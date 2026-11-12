@@ -1,6 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { listLiveWorktreeSessions } from '@n10/core';
 import type { ForeignSessionSummary } from '../contract.js';
+import { affiliations } from './affiliations.js';
 import { ensureRecent } from './recent-repos.js';
 import { requireRepo } from './repo.js';
 
@@ -46,6 +47,7 @@ export function listForeignSessions(): ForeignSessionSummary[] {
       branch: live.branch,
       worktree: live.path,
       sessionName: live.sessionName,
+      ...affiliationOf(live.sessionName),
     });
   }
   noteRepositories(out);
@@ -63,4 +65,11 @@ function noteRepositories(foreign: ForeignSessionSummary[]): void {
   if (answered === lastAnswered) return;
   lastAnswered = answered;
   for (const repo of new Set(foreign.map((s) => s.repo))) ensureRecent(repo);
+}
+
+function affiliationOf(
+  sessionName: string
+): Pick<ForeignSessionSummary, 'affiliation'> {
+  const affiliation = affiliations.of(sessionName);
+  return affiliation ? { affiliation } : {};
 }

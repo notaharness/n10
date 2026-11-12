@@ -112,7 +112,8 @@ export * from './lib/auto-fix/auto-fix-model.js';
 export * from './lib/auto-fix/auto-fix-prompt.js';
 export * from './lib/discovery/worktree-origin.js';
 export * from './lib/discovery/live-worktree-sessions.js';
-export * from './lib/discovery/orchestrator-groups.js';
+export * from './lib/discovery/affiliations.js';
+export * from './lib/affiliation.js';
 
 // ── Host environment ─────────────────────────────────────────────
 export * from './lib/environment/wsl.js';

@@ -326,15 +326,20 @@ export function fileTreeFolder(page: Page, name: string): Locator {
   return fileTree(page).getByRole('button', { name, exact: true });
 }
 
-/** Two tabs of the strip sit edge to edge: nothing — no gap, no
- *  divider — between `left`'s right edge and `right`'s left. */
-export async function expectAdjoining(
+/** The room between two blocks on the strip (groups, or tabs standing
+ *  alone); a group's members sit 1px apart. */
+export const BLOCK_GAP_PX = 8;
+
+/** Two neighbouring blocks of the strip, one row: `right` starts the
+ *  block gap after `left` ends, with nothing else between them. */
+export async function expectNextBlock(
   left: Locator,
   right: Locator
 ): Promise<void> {
   const [a, b] = await Promise.all([left.boundingBox(), right.boundingBox()]);
   if (!a || !b) throw new Error('tab is not laid out');
-  expect(b.x).toBeCloseTo(a.x + a.width, 0);
+  expect(b.y).toBeCloseTo(a.y, 0);
+  expect(b.x - (a.x + a.width)).toBeCloseTo(BLOCK_GAP_PX, 0);
 }
 
 /** Open the session menu from the agent card's native menu. */

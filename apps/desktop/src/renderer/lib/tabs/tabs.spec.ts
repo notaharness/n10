@@ -437,7 +437,7 @@ describe('open-item after re-key', () => {
     it('drops a tab after its target', () => {
       const state = reduce(three(), {
         type: 'move',
-        id: id('a'),
+        ids: [id('a')],
         targetId: id('c'),
         side: 'after',
       });
@@ -447,7 +447,7 @@ describe('open-item after re-key', () => {
     it('drops a tab before its target', () => {
       const state = reduce(three(), {
         type: 'move',
-        id: id('c'),
+        ids: [id('c')],
         targetId: id('a'),
         side: 'before',
       });
@@ -461,7 +461,7 @@ describe('open-item after re-key', () => {
       // lands after its target instead of before it.
       const state = reduce(three(), {
         type: 'move',
-        id: id('a'),
+        ids: [id('a')],
         targetId: id('c'),
         side: 'before',
       });
@@ -473,7 +473,7 @@ describe('open-item after re-key', () => {
       // which is exactly where an off-by-one would land.
       const state = reduce(three(), {
         type: 'move',
-        id: id('b'),
+        ids: [id('b')],
         targetId: id('c'),
         side: 'after',
       });
@@ -484,7 +484,7 @@ describe('open-item after re-key', () => {
       const before = three();
       const after = reduce(before, {
         type: 'move',
-        id: id('b'),
+        ids: [id('b')],
         targetId: id('b'),
         side: 'after',
       });
@@ -496,7 +496,7 @@ describe('open-item after re-key', () => {
       const before = three();
       const after = reduce(before, {
         type: 'move',
-        id: id('a'),
+        ids: [id('a')],
         targetId: id('missing'),
         side: 'after',
       });
@@ -507,7 +507,7 @@ describe('open-item after re-key', () => {
       const before = three();
       const after = reduce(before, {
         type: 'move',
-        id: before.activeId as string,
+        ids: [before.activeId as string],
         targetId: id('a'),
         side: 'before',
       });
@@ -618,23 +618,6 @@ describe('tabs across repositories', () => {
 
     s = reduce(s, { type: 'close', id: id('branch:main', OTHER) });
     expect(s.tabs).toEqual([]);
-  });
-
-  it('close-others spares the tabs it is told to keep', () => {
-    // An orchestrator's tab keeps the player tabs it shows.
-    let s = open(empty, 'branch:orch');
-    s = open(s, 'branch:player');
-    s = open(s, 'branch:stranger');
-    s = reduce(s, {
-      type: 'close-others',
-      id: id('branch:orch'),
-      keep: [id('branch:player')],
-    });
-    expect(s.tabs.map((t) => t.id)).toEqual([
-      id('branch:orch'),
-      id('branch:player'),
-    ]);
-    expect(s.activeId).toBe(id('branch:orch'));
   });
 });
 
@@ -1238,5 +1221,51 @@ describe('agents alive in other repositories', () => {
   it('leaves every tab alone with no listing', () => {
     const s = open(empty, 'branch:x');
     expect(foreign(s, undefined)).toBe(s);
+  });
+});
+
+describe('moving a group and collapsing', () => {
+  it('moves a group’s tabs as one block, in their order, past another tab', () => {
+    let s = open(empty, 'branch:a');
+    s = open(s, 'branch:b');
+    s = open(s, 'branch:c');
+    s = open(s, 'branch:d');
+    s = reduce(s, {
+      type: 'move',
+      ids: [id('branch:a'), id('branch:c')],
+      targetId: id('branch:d'),
+      side: 'after',
+    });
+    expect(s.tabs.map((t) => t.id)).toEqual([
+      id('branch:b'),
+      id('branch:d'),
+      id('branch:a'),
+      id('branch:c'),
+    ]);
+  });
+
+  it('changes nothing for a target among the moved tabs', () => {
+    const s = open(open(empty, 'branch:a'), 'branch:b');
+    expect(
+      reduce(s, {
+        type: 'move',
+        ids: [id('branch:a'), id('branch:b')],
+        targetId: id('branch:b'),
+        side: 'before',
+      }).tabs
+    ).toBe(s.tabs);
+  });
+
+  it('remembers each group the user collapsed or expanded', () => {
+    let s = reduce(empty, {
+      type: 'set-collapsed',
+      keys: ['g1', 'g2'],
+      collapsed: true,
+    });
+    s = reduce(s, { type: 'set-collapsed', keys: ['g2'], collapsed: false });
+    expect(s.collapsed).toEqual({ g1: true, g2: false });
+    expect(
+      reduce(s, { type: 'set-collapsed', keys: ['g1'], collapsed: true })
+    ).toBe(s);
   });
 });

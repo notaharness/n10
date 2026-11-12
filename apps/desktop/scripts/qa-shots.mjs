@@ -88,10 +88,14 @@ const args = useXvfb
 // defaulting to tmux, opening the repo reattaches every persisted agent
 // — adopting them into a throwaway screenshot run and reflowing their
 // panes to its window size. `$TMUX` beats TMUX_TMPDIR, so it is removed
-// rather than overridden, and the socket points at an empty scratch dir.
+// rather than overridden, and the socket points at an empty scratch dir —
+// or at N10_QA_TMUX_TMPDIR, a fixture's own socket dir seeded with the
+// sessions a scenario needs (never the developer's default one).
 const qaEnv = {
   ...process.env,
-  TMUX_TMPDIR: mkdtempSync(join(tmpdir(), 'n10-qa-tmux-')),
+  TMUX_TMPDIR:
+    process.env.N10_QA_TMUX_TMPDIR ??
+    mkdtempSync(join(tmpdir(), 'n10-qa-tmux-')),
 };
 delete qaEnv.TMUX;
 delete qaEnv.TMUX_PANE;

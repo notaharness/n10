@@ -80,6 +80,9 @@ export interface TmuxObservation {
    *  the server still has, its pane live or dead, whether or not git
    *  still lists the checkout. */
   held: Set<string>;
+  /** Every one of our sessions the server listed, for what is derived
+   *  over the whole listing (`affiliations`). */
+  listed: TaggedSession[];
 }
 
 /**
@@ -138,7 +141,7 @@ export function observeTmuxSessions(
     if (found.kind === 'terminal') terminals.push(found.terminal);
     else persisted.add(found.name);
   }
-  return { persisted, terminals, held };
+  return { persisted, terminals, held, listed };
 }
 
 interface ClassifyContext {
@@ -211,12 +214,15 @@ function discoveredTerminal(
  * that failed or timed out — which says nothing about its sessions.
  */
 export async function observeRemoteTerminals(
-  machineId: string
+  machineId: string,
+  /** Handed the whole listing those terminals come from. */
+  listed?: (sessions: TaggedSession[]) => void
 ): Promise<DiscoveredTerminal[]> {
   const sessions = await listOurSessionsWith(
     requireMachine(machineId).executor,
     machineId
   );
+  listed?.(sessions);
   return sessions.flatMap((session) =>
     isTerminalSession(session) && session.path
       ? [discoveredTerminal(session, session.type)]

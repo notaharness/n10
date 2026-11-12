@@ -44,8 +44,6 @@ export const keys = {
   /** Not repo-scoped either: agents alive in *other* repositories, the
    *  same answer whichever repository is open. */
   foreignSessions: ['foreign-sessions'] as const,
-  /** Not repo-scoped: orchestrators and players span repositories. */
-  orchestratorGroups: ['orchestrator-groups'] as const,
   /** Not repo-scoped: machines belong to this app instance, not to a
    *  repository. */
   machines: ['machines'] as const,
