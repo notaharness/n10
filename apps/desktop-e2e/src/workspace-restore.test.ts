@@ -155,6 +155,20 @@ test.describe('Workspace restore', () => {
     await expect.poll(() => tabNames(page)).toEqual([gamma, repo, shellName]);
     await desktop.relaunch();
     const next = desktop.page;
+    // The notice is a toast that leaves after a few seconds: note any,
+    // from the start, to ask about once the tabs have settled.
+    await next.evaluate(() => {
+      const w = window as { goneNotice?: boolean };
+      const look = () => {
+        if (document.body.textContent?.includes('no longer available'))
+          w.goneNotice = true;
+      };
+      look();
+      new MutationObserver(look).observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    });
 
     await expect(stripTab(next, /gamma/)).toHaveAttribute(
       'data-pinned',
@@ -179,6 +193,13 @@ test.describe('Workspace restore', () => {
     await restored.click();
     await expect(next.locator('[data-terminal-reconnecting]')).toHaveCount(0);
     await expect(shownTerminal(next)).toContainText(SHELL_READY);
+    // Bound, not given up and opened again at the end of the strip: no
+    // notice said it went.
+    expect(
+      await next.evaluate(
+        () => (window as { goneNotice?: boolean }).goneNotice ?? false
+      )
+    ).toBe(false);
   });
 
   // tmux reuses a name once its session has gone: the tab saved for the
