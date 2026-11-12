@@ -59,6 +59,17 @@ describe('rosterEntries', () => {
     ]);
   });
 
+  it('puts a tab under the innermost checkout it works in', () => {
+    const main = {
+      tab: { ...player('main').tab, worktree: '/r' } as Tab,
+    };
+    expect(rows(rosterEntries([main, a, aShell], undefined, true))).toEqual([
+      ['item:main', 0],
+      ['item:a', 0],
+      ['terminal:a-shell', 1],
+    ]);
+  });
+
   it('does not take a sibling directory sharing a prefix for the worktree', () => {
     const other = shell('ab', '/r/.claude/worktrees/ab');
     expect(rows(rosterEntries([a, other], undefined, true))).toEqual([

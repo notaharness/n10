@@ -47,7 +47,14 @@ export function rosterEntries<F extends { tab: Tab }>(
   const playerOf = (face: F): F | undefined => {
     const dir = workDir(face.tab);
     if (dir === null || roots.includes(face)) return undefined;
-    return roots.find((p) => within(dir, playerRoot(p.tab)!));
+    // The innermost checkout: worktrees can sit inside another's.
+    let best: F | undefined;
+    for (const p of roots) {
+      const root = playerRoot(p.tab)!;
+      if (!within(dir, root)) continue;
+      if (!best || root.length > playerRoot(best.tab)!.length) best = p;
+    }
+    return best;
   };
   const under = new Map<F, F[]>();
   const tops: F[] = [];
