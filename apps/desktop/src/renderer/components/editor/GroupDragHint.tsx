@@ -1,5 +1,6 @@
 import { useDndMonitor, type Active } from '@dnd-kit/core';
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCarriedOut } from './drag-preview.js';
 import { isStripDragData } from './strip-drag.js';
 
 interface Point {
@@ -41,6 +42,8 @@ export function GroupDragHint({
     onDragEnd: stop,
     onDragCancel: stop,
   });
+  // Out of the strip, a copy follows the pointer instead.
+  const carriedOut = useCarriedOut();
   const shown = useRef(false);
   useEffect(() => {
     if (!dragging) return;
@@ -57,7 +60,7 @@ export function GroupDragHint({
       shown.current = false;
     };
   }, [dragging, node]);
-  if (!at) return null;
+  if (!at || carriedOut) return null;
   return (
     <div
       role="status"

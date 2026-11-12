@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 
 /** Scroll position and overflow of the strip's one-row track. */
 export function useStripScrollEdges(blockKey: string, wrap: boolean) {
@@ -34,4 +40,45 @@ export function useStripScrollEdges(blockKey: string, wrap: boolean) {
     return () => observer.disconnect();
   }, [blockKey, wrap, update]);
   return { track, edges, update };
+}
+
+/** Keep the active tab (or its collapsed group's home) in view on the
+ *  strip, which scrolls sideways in its one row, or down past its row cap
+ *  when wrapped: when it changes, when the blocks around it do
+ *  (`blockKey`), and when the strip's room does (a split, a resize). */
+export function useActiveTabInView(
+  track: RefObject<HTMLDivElement | null>,
+  wrap: boolean,
+  activeId: string | null,
+  blockKey: string
+) {
+  useEffect(() => {
+    const el = track.current;
+    if (!el || activeId === null) return;
+    const reveal = () => {
+      const key = CSS.escape(activeId);
+      const tab = el.querySelector(
+        `[data-tab-id="${key}"], [data-home-tab="${key}"]`
+      );
+      if (!tab) return;
+      const by = past(tab.getBoundingClientRect(), el.getBoundingClientRect());
+      if (wrap && by.y) el.scrollBy({ top: by.y });
+      if (!wrap && by.x) el.scrollBy({ left: by.x });
+    };
+    const observer = new ResizeObserver(reveal);
+    observer.observe(el);
+    reveal();
+    return () => observer.disconnect();
+  }, [track, wrap, activeId, blockKey]);
+}
+
+/** How far `row` lies outside `box` on each axis: negative before its
+ *  start, positive past its end, 0 inside. */
+function past(row: DOMRect, box: DOMRect) {
+  const by = (start: number, end: number, from: number, to: number) =>
+    Math.min(0, start - from) || Math.max(0, end - to);
+  return {
+    x: by(row.left, row.right, box.left, box.right),
+    y: by(row.top, row.bottom, box.top, box.bottom),
+  };
 }

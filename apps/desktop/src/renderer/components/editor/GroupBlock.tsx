@@ -9,7 +9,7 @@ import { Popover } from '../ui/popover.js';
 import { GroupChip } from './GroupChip.js';
 import { GroupDragHint } from './GroupDragHint.js';
 import { GroupRoster } from './GroupRoster.js';
-import { blockId } from './strip-blocks.js';
+import { chipBlockId } from './strip-blocks.js';
 import { GroupEnd, GroupMembers, useSortableTab } from './TabStrip.js';
 import type { GroupMenu } from './tab-menu.js';
 import { TabButton } from './TabButton.js';
@@ -87,7 +87,7 @@ export function GroupBlock({
     collapsed,
     showTabs: roster.openByKeyboard,
   };
-  const id = blockId(group.key);
+  const id = chipBlockId(tabs.paneId, group.key);
   const { setNode, setHandle, handle, style, isDragging } = useSortableTab({
     id,
     data: { kind: 'block', label, ids: ids ?? [], index },

@@ -8,13 +8,19 @@ import {
   openTerminal,
   type DesktopTerminal,
 } from '../../lib/terminals/xterm.js';
-import { usePaneShown } from '../../lib/tabs/pane-shown.js';
+import { usePaneFocused, usePaneShown } from '../../lib/tabs/pane-shown.js';
 import { demoMayFocus } from '../../lib/demo-focus.js';
 import { getResolvedTheme, useTheme } from '../../lib/theme.js';
 import { errorMessage } from '../../lib/utils.js';
 
 /** The grid that fills the pane, by `FitAddon`'s reckoning; null
  *  before the pane has a box. */
+/** Whether focus is already somewhere in the editor pane `el` is in. */
+function focusInOwnPane(el: HTMLElement | null): boolean {
+  const at = document.activeElement;
+  return !!at && !!el?.closest('[data-pane-id]')?.contains(at);
+}
+
 function paneGrid(el: HTMLElement, xterm: DesktopTerminal) {
   const rect = el.getBoundingClientRect();
   if (rect.width < 2 || rect.height < 2) return null;
@@ -67,6 +73,8 @@ export function SessionTerminal({
   const [xterm, setXterm] = useState<DesktopTerminal | null>(null);
   const { resolved } = useTheme();
   const shown = usePaneShown();
+  // Shown in another pane than the focused one: on screen, not typed in.
+  const focusedPane = usePaneFocused();
 
   // Terminal responses and user input can race a session ending. Keep
   // the host's refusal visible without throwing an unhandled rejection
@@ -214,18 +222,25 @@ export function SessionTerminal({
   // spare pane is inert and cannot hold it; being swapped on screen
   // gives it — a frame later, once the press that swapped it has
   // finished moving focus itself (a tab's lets go of it, a sidebar
-  // row's takes it).
+  // row's takes it). A pane that became the focused one because focus
+  // moved into it (Tab onto its strip) leaves that focus where it is.
+  const wasFocusedPane = useRef(focusedPane);
   useEffect(() => {
+    const gained = focusedPane && !wasFocusedPane.current;
+    wasFocusedPane.current = focusedPane;
     if (!xterm) return undefined;
-    if (!blocked && shown && demoMayFocus()) {
-      const raf = requestAnimationFrame(() => xterm.term.focus());
+    if (!blocked && shown && focusedPane && demoMayFocus()) {
+      const raf = requestAnimationFrame(() => {
+        if (gained && focusInOwnPane(wrapRef.current)) return;
+        xterm.term.focus();
+      });
       return () => cancelAnimationFrame(raf);
     }
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && wrapRef.current?.contains(focused))
       focused.blur();
     return undefined;
-  }, [xterm, blocked, shown]);
+  }, [xterm, blocked, shown, focusedPane]);
 
   // Fit the terminal grid to its pane whenever the pane's box changes.
   //

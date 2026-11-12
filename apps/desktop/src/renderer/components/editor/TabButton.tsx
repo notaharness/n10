@@ -1,30 +1,19 @@
 import type { KeyboardEvent } from 'react';
 import { toast } from 'sonner';
-import type { SidebarItem } from '../../../host/contract.js';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
-import { usePlanCount } from '../../lib/plan/plan.js';
 import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
-import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
-import { cutSide, tabPresentation } from '../../lib/tabs/tab-presentation.js';
+import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
-import { cn, errorMessage } from '../../lib/utils.js';
+import { errorMessage } from '../../lib/utils.js';
 import { pressWithoutFocus } from './tab-keyboard.js';
 import { blockId } from './strip-blocks.js';
 import type { StripDragData, StripPlace } from './strip-drag.js';
 import { runTabMenu, type GroupMenu } from './tab-menu.js';
+import { usePaneMenus } from './use-pane-menus.js';
 import type { TabFace } from './use-strip-groups.js';
-import { FACE_ICON, TabIcon } from './TabIcon.js';
-import {
-  PlanCountBadge,
-  RemovedMark,
-  PinnedMark,
-  RepoBand,
-  TabCloseButton,
-  tabStateClassName,
-  UnseenDot,
-} from './tab-marks.js';
-import { TabLabel } from './TabLabel.js';
+import { tabClassName } from './tab-look-class.js';
+import { TabLook } from './TabLook.js';
 import { useSortableTab } from './TabStrip.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
@@ -35,72 +24,6 @@ type Closer = ReturnType<typeof useCloseTabs>;
 function tabTitle(tab: Tab, foreignRepo: string | null): string | undefined {
   if (foreignRepo) return foreignRepo;
   return tab.kind === 'terminal' ? tab.cwd : undefined;
-}
-
-function tabClassName({
-  active,
-  unseen,
-  dragging,
-  flashing,
-  wrap,
-  pinned,
-}: {
-  active: boolean;
-  unseen: boolean;
-  dragging: boolean;
-  flashing: boolean;
-  wrap: boolean;
-  pinned: boolean;
-}): string {
-  return cn(
-    'group relative flex h-9 min-w-28 cursor-default items-center gap-2 border-r border-border px-3 text-base transition-colors select-none',
-    // A pin is narrower, 112–176px, wrapped or not, and its mark sits in
-    // the close button's place, so it needs no room for one. Wrapped, the
-    // other tabs of a full row share its width (TabStrip's end, or a
-    // group's, takes the last row's room); in one row, each keeps its own.
-    pinned ? 'max-w-44 shrink-0 pr-1.5' : wrap ? 'grow' : 'max-w-56 shrink-0',
-    // Lifted above the tabs it slides over.
-    dragging && 'z-10',
-    tabStateClassName({ active, unseen, flashing })
-  );
-}
-
-/** What follows the label: the plan count, the removed and unseen
- *  marks, and the close button (none on a group's home, whose chip is
- *  no tab to close) — or, on a pinned tab, its pin mark. */
-export function TabEnd({
-  item,
-  unseen,
-  pinned = false,
-  onClose,
-}: {
-  item: SidebarItem | undefined;
-  unseen: boolean;
-  pinned?: boolean;
-  onClose?: () => void;
-}) {
-  // A plan is built inside a tab and then navigated away from, so the
-  // count has to be visible from wherever the user ends up.
-  const planCount = usePlanCount(item?.pr?.id);
-  return (
-    <>
-      <PlanCountBadge count={planCount} />
-      <RemovedMark item={item} />
-      {unseen && <UnseenDot />}
-      {pinned ? (
-        <PinnedMark />
-      ) : (
-        onClose && (
-          <TabCloseButton
-            onClose={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-          />
-        )
-      )}
-    </>
-  );
 }
 
 export function TabButton({
@@ -132,8 +55,9 @@ export function TabButton({
    *  group's roster). */
   onKeyDown?: (e: KeyboardEvent<HTMLElement>) => void;
 }) {
-  const { tab, item, snapshot, foreignRepo, machineLabel, repoColor } = face;
+  const { tab, item, snapshot, foreignRepo, machineLabel } = face;
   const tabs = useTabs();
+  const { tabMenu } = usePaneMenus();
   const { tabOverflow } = useDesktopPrefs();
   const { label, face: kind } = tabPresentation(tab, item, machineLabel);
   // Resting on a tab renders its pane ahead of the press, another
@@ -178,7 +102,7 @@ export function TabButton({
       onDoubleClick={() => tabs.keep(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
-        runTabMenu(tab, tabs, closer, tabOverflow, menu, rename).catch(
+        runTabMenu(tab, tabs, closer, tabOverflow, menu, rename, tabMenu).catch(
           (err: unknown) => toast.error(errorMessage(err))
         );
       }}
@@ -196,26 +120,12 @@ export function TabButton({
         pinned,
       })}
     >
-      <TabIcon
-        Icon={FACE_ICON[kind]}
-        running={item ? itemRunning(item) : face.running}
-        snapshot={snapshot}
+      <TabLook
+        face={face}
         active={active}
-      />
-      <TabLabel
-        label={label}
-        preview={tab.preview}
-        foreignRepo={foreignRepo}
-        cut={cutSide(kind)}
-      />
-      <TabEnd
-        item={item}
-        unseen={face.unseen}
         pinned={pinned}
         onClose={() => closer.close(tab.id)}
       />
-      {/* After the close button, so its cover leaves the band whole. */}
-      <RepoBand color={repoColor} />
     </div>
   );
 }

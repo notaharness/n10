@@ -1,144 +1,37 @@
-import {
-  DndContext,
-  PointerSensor,
-  useDndContext,
-  useDroppable,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  restrictToHorizontalAxis,
-  restrictToParentElement,
-} from '@dnd-kit/modifiers';
+import { useDndContext, useDroppable } from '@dnd-kit/core';
 import {
   horizontalListSortingStrategy,
   rectSortingStrategy,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  createContext,
-  useCallback,
   useContext,
   useLayoutEffect,
   useMemo,
-  useRef,
   type KeyboardEvent,
   type PointerEvent,
   type ReactNode,
 } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
-import { collisionsEndingAt, END_ID, groupEndId } from './strip-collisions.js';
-import { stripAnnouncements } from './strip-announcements.js';
+import { useSlotStyle } from './drag-preview.js';
+import { groupEndId, stripEndId } from './strip-collisions.js';
+import { StripBlocksReport } from './strip-blocks.js';
 import { StripScrollArrows } from './StripScrollArrows.js';
-import { useStripScrollEdges } from './use-strip-scroll-edges.js';
+import {
+  useActiveTabInView,
+  useStripScrollEdges,
+} from './use-strip-scroll-edges.js';
 import {
   acceptsDrop,
-  dropMove,
   isStripDragData,
-  type StripBlocks,
   type StripDragData,
 } from './strip-drag.js';
-import { useTabs } from '../../lib/tabs/tabs.js';
-import { setStripDragging } from '../../lib/tabs/tab-switching.js';
+import { PaneScopeContext, useTabs } from '../../lib/tabs/tabs.js';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
 import { cn } from '../../lib/utils.js';
-import {
-  ChordKeyboardSensor,
-  handleTabKey,
-  screenReaderInstructions,
-  type TabKeyActions,
-} from './tab-keyboard.js';
-
-/** How far the pointer travels before a press becomes a drag, so
- *  clicks and double clicks on a tab stay clicks. */
-const DRAG_THRESHOLD_PX = 5;
-
-/** Where the strip tells the drag what its blocks are, as presented. */
-const StripBlocksReport = createContext<(blocks: StripBlocks) => void>(
-  () => undefined
-);
-
-/**
- * The drag and drop the tab strip sorts in, by pointer and by keyboard
- * (see `tab-keyboard.ts`: a chord lifts, so Enter and Space still
- * activate). The other tabs slide aside while one is dragged; the order
- * only changes in the model on drop.
- *
- * Above the repository gate, beside the tabs it sorts: a tab is chosen
- * on press, choosing another repository's tab opens that repository,
- * and the workspace, strip included, remounts under the new one. Out
- * here, the sensor watching the press outlives that remount, and lifts
- * the remounted tab by its id once the pointer has travelled
- * `DRAG_THRESHOLD_PX`.
- */
-export function TabDragProvider({ children }: { children: ReactNode }) {
-  const tabs = useTabs();
-  const wrap = useDesktopPrefs().tabOverflow === 'wrap';
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: DRAG_THRESHOLD_PX },
-    }),
-    useSensor(ChordKeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-  // The strip's blocks as last rendered: a block's drop arranges them.
-  const blocks = useRef<StripBlocks>([]);
-  const reportBlocks = useCallback((next: StripBlocks) => {
-    blocks.current = next;
-  }, []);
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
-    const dragged = active.data.current;
-    const target = over?.data.current;
-    if (!over || !isStripDragData(dragged) || !isStripDragData(target)) return;
-    const drop = dropMove(
-      String(active.id),
-      dragged,
-      String(over.id),
-      target,
-      blocks.current
-    );
-    if (drop?.kind === 'move')
-      tabs.moveTabs(drop.ids, drop.targetId, drop.side);
-    else if (drop) tabs.arrangeTabs(drop.ids);
-  };
-
-  return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={collisionsEndingAt}
-      autoScroll={{ threshold: { x: 0.08, y: 0.2 }, acceleration: 6 }}
-      // The dragged tab stays inside the strip. Carried past its end, it
-      // would widen the nearest scrolling box (the strip, scrolled; the
-      // editor column, wrapped), which auto-scroll then scrolls after
-      // the pointer, carrying the tab further: the box grows for as long
-      // as the pointer stays there.
-      modifiers={
-        wrap
-          ? [restrictToParentElement]
-          : [restrictToHorizontalAxis, restrictToParentElement]
-      }
-      accessibility={{
-        announcements: stripAnnouncements,
-        screenReaderInstructions,
-      }}
-      onDragStart={() => setStripDragging(true)}
-      onDragCancel={() => setStripDragging(false)}
-      onDragEnd={(event) => {
-        setStripDragging(false);
-        onDragEnd(event);
-      }}
-    >
-      <StripBlocksReport.Provider value={reportBlocks}>
-        {children}
-      </StripBlocksReport.Provider>
-    </DndContext>
-  );
-}
+import { handleTabKey, type TabKeyActions } from './tab-keyboard.js';
 
 /**
  * The tab row, sortable in `TabDragProvider`: its blocks (a group, or a
@@ -154,18 +47,31 @@ export function TabStrip({
   blocks,
   children,
   controls,
+  onBlankMenu,
 }: {
   /** Each block's sortable id and its tabs, in strip order. */
   blocks: readonly { id: string; ids: readonly string[] }[];
   children: ReactNode;
   controls: ReactNode;
+  /** The native menu of the strip's blank room, past and between tabs:
+   *  a tab's own menu has already been shown for a press on a tab. */
+  onBlankMenu?: () => void;
 }) {
   const wrap = useDesktopPrefs().tabOverflow === 'wrap';
+  const pane = useContext(PaneScopeContext) ?? '';
   const report = useContext(StripBlocksReport);
-  useLayoutEffect(() => report(blocks.map((b) => b.ids)), [report, blocks]);
+  useLayoutEffect(
+    () =>
+      report(
+        pane,
+        blocks.map((b) => b.ids)
+      ),
+    [report, pane, blocks]
+  );
   const blockKey = blocks.map((block) => block.id).join('\n');
   const blockIds = useMemo(() => blockKey.split('\n'), [blockKey]);
   const { track, edges, update } = useStripScrollEdges(blockKey, wrap);
+  useActiveTabInView(track, wrap, useTabs().activeId, blockKey);
   return (
     <SortableContext
       items={blockIds}
@@ -181,10 +87,19 @@ export function TabStrip({
             'flex min-w-0 flex-1 items-stretch gap-2 bg-tab',
             wrap
               ? // Every row but the last is ruled off from the one below.
-                'flex-wrap [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
+                // At most ten rows, or 70% of the pane if less: past
+                // that the strip scrolls and the pane keeps some content.
+                // The last row's rule sits in the track's bottom pixel,
+                // laid over the strip's own, so one row never scrolls.
+                '-mb-px max-h-[min(calc(10*2.25rem+9*0.5rem+1px),70cqh)] flex-wrap overflow-y-auto pb-px [scrollbar-width:thin] [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
               : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           )}
           onScroll={update}
+          onContextMenu={(e) => {
+            if (e.defaultPrevented || !onBlankMenu) return;
+            e.preventDefault();
+            onBlankMenu();
+          }}
         >
           {children}
           <StripEnd />
@@ -233,8 +148,9 @@ export function GroupMembers({
  */
 function StripEnd() {
   const { active, activatorEvent } = useDndContext();
+  const pane = useContext(PaneScopeContext) ?? '';
   const { setNodeRef } = useDroppable({
-    id: END_ID,
+    id: stripEndId(pane),
     disabled:
       activatorEvent instanceof KeyboardEvent ||
       !isStripDragData(active?.data.current),
@@ -248,9 +164,10 @@ function StripEnd() {
  */
 export function GroupEnd({ group }: { group: string }) {
   const { active, activatorEvent } = useDndContext();
+  const pane = useContext(PaneScopeContext) ?? '';
   const dragged = active?.data.current;
   const { setNodeRef } = useDroppable({
-    id: groupEndId(group),
+    id: groupEndId(pane, group),
     disabled:
       activatorEvent instanceof KeyboardEvent ||
       !isStripDragData(dragged) ||
@@ -258,6 +175,12 @@ export function GroupEnd({ group }: { group: string }) {
       dragged.group !== group,
   });
   return <div ref={setNodeRef} aria-hidden className="grow-[9999] basis-0" />;
+}
+
+/** A place's data with the pane whose strip it is on, outside the
+ *  panes none. */
+function inPane(data: StripDragData, pane: string | null): StripDragData {
+  return pane === null ? data : { ...data, pane };
 }
 
 /** A press that selects a tab as it goes down: the primary button
@@ -285,8 +208,8 @@ const roleDescriptionOf = (data: StripDragData) =>
  * down, the way browsers' and editors' tabs do, rather than on release.
  * It runs after the pointer sensor's own `onPointerDown`, which only
  * starts watching the pointer: the tab lifts once it has travelled
- * `DRAG_THRESHOLD_PX`, so a press that becomes a drag has selected the
- * tab it drags. A group's home tab, whose drag moves the whole group,
+ * `DRAG_THRESHOLD_PX` (`TabDragProvider`), so a press that becomes a
+ * drag has selected the tab it drags. A group's home tab, whose drag moves the whole group,
  * selects on click instead.
  */
 export function useSortableTab({
@@ -311,7 +234,9 @@ export function useSortableTab({
   role?: 'tab' | 'button';
 }) {
   const reducedMotion = usePrefersReducedMotion();
+  const pane = useContext(PaneScopeContext);
   const dragging = useDndContext().active?.data.current;
+  const slot = useSlotStyle(id);
   const {
     attributes,
     listeners,
@@ -323,12 +248,15 @@ export function useSortableTab({
     active,
   } = useSortable({
     id,
-    data,
+    data: inPane(data, pane),
     disabled: {
       draggable: fixed,
       droppable:
         fixed ||
-        !acceptsDrop(data, isStripDragData(dragging) ? dragging : undefined),
+        !acceptsDrop(
+          inPane(data, pane),
+          isStripDragData(dragging) ? dragging : undefined
+        ),
     },
     attributes: {
       role,
@@ -367,7 +295,7 @@ export function useSortableTab({
     /** The element pressed to move it, which carries `handle`. */
     setHandle: setActivatorNodeRef,
     handle,
-    style: { transform: CSS.Translate.toString(transform), transition },
+    style: slot(isDragging, CSS.Translate.toString(transform), transition),
     isDragging,
   };
 }

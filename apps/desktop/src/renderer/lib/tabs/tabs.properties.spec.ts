@@ -16,6 +16,7 @@ import {
 import { dismissKeyOf } from './tab-identity.js';
 import type { SyncListings } from './tabs-model.js';
 import { restoreWorkspace, toSaved } from './workspace-file.js';
+import { splitKey } from './layout.js';
 import {
   focusedPaneOf,
   panesOf,
@@ -114,7 +115,104 @@ const IDS = [
   ...TERMINALS.map((t) => terminalTabId(t.name)),
 ];
 
-const action: fc.Arbitrary<TabsAction> = fc.oneof(
+/**
+ * What the user does to the panes. None of them may open, close or
+ * change a tab. Their tabs and panes are picks — `#n`, the nth tab open
+ * or pane in the layout as the sequence reaches it (`picked`) — since
+ * ids drawn blind would rarely name a tab that is open, and sequences
+ * would almost never split.
+ */
+const EDGES = ['left', 'right', 'top', 'bottom'] as const;
+const pick = fc.nat({ max: 9 }).map((n) => `#${n}`);
+const picks = fc.uniqueArray(pick, { minLength: 1, maxLength: 3 });
+
+const splitAction = fc.record({
+  type: fc.constant('split' as const),
+  ids: picks,
+  target: pick,
+  edge: fc.constantFrom(...EDGES),
+  activate: fc.option(pick, { nil: undefined }),
+});
+
+const paneAction: fc.Arbitrary<TabsAction> = fc.oneof(
+  { arbitrary: splitAction, weight: 4 },
+  fc.record({
+    type: fc.constant('move-to-pane' as const),
+    ids: picks,
+    pane: pick,
+    anchor: fc.option(
+      fc.record({
+        targetId: pick,
+        side: fc.constantFrom<'before' | 'after'>('before', 'after'),
+      }),
+      { nil: undefined }
+    ),
+  }),
+  fc.record({ type: fc.constant('close-pane' as const), pane: pick }),
+  fc.record({ type: fc.constant('focus-pane' as const), pane: pick }),
+  fc.record({
+    type: fc.constant('focus-toward' as const),
+    edge: fc.constantFrom(...EDGES),
+  }),
+  fc.record({
+    type: fc.constant('move-toward' as const),
+    edge: fc.constantFrom(...EDGES),
+  }),
+  fc.record({
+    type: fc.constant('resize-split' as const),
+    key: pick,
+    sizes: fc.array(fc.double({ min: 0.05, max: 1, noNaN: true }), {
+      minLength: 2,
+      maxLength: 3,
+    }),
+  })
+);
+
+/** `a` with its picks (`#n`) read against `ws`: the nth open tab, pane
+ *  or split, wrapping. Anything else is left as it is. */
+function picked(ws: Workspace, a: TabsAction): TabsAction {
+  const tabs = Object.keys(ws.tabs);
+  const panes = panesOf(ws.layout).map((p) => p.id);
+  const splits: string[] = [];
+  const walk = (n: LayoutNode) => {
+    if (n.kind === 'split') {
+      splits.push(splitKey(n));
+      n.children.forEach(walk);
+    }
+  };
+  walk(ws.layout);
+  const from = (list: string[]) => (v: string) => {
+    const n = /^#(\d+)$/.exec(v);
+    return n && list.length > 0 ? list[Number(n[1]) % list.length]! : v;
+  };
+  const tab = from(tabs);
+  const pane = from(panes);
+  switch (a.type) {
+    case 'split':
+      return {
+        ...a,
+        ids: a.ids.map(tab),
+        target: pane(a.target),
+        activate: a.activate && tab(a.activate),
+      };
+    case 'move-to-pane':
+      return {
+        ...a,
+        ids: a.ids.map(tab),
+        pane: pane(a.pane),
+        anchor: a.anchor && { ...a.anchor, targetId: tab(a.anchor.targetId) },
+      };
+    case 'close-pane':
+    case 'focus-pane':
+      return { ...a, pane: pane(a.pane) };
+    case 'resize-split':
+      return { ...a, key: from(splits)(a.key) };
+    default:
+      return a;
+  }
+}
+
+const stripAction: fc.Arbitrary<TabsAction> = fc.oneof(
   fc.record({
     type: fc.constant('open-item' as const),
     repo: fc.constantFrom(...REPOS),
@@ -256,6 +354,13 @@ const action: fc.Arbitrary<TabsAction> = fc.oneof(
     }))
 );
 
+// Strip actions as often as before, a pane action in between now and
+// then, so sequences run across every shape of layout.
+const action: fc.Arbitrary<TabsAction> = fc.oneof(
+  { arbitrary: stripAction, weight: 3 },
+  { arbitrary: paneAction, weight: 1 }
+);
+
 /** The focused pane's strip: what every property below reads. */
 const view = (ws: Workspace): Strip => stripOf(ws, focusedPaneOf(ws).id);
 
@@ -293,7 +398,7 @@ const replayWorkspace = (
   let ws = from;
   for (const a of actions) {
     if (a.type === 'repo-opened') inView = a.repo;
-    ws = reduceWorkspace(ws, inViewOf(a, inView));
+    ws = reduceWorkspace(ws, picked(ws, inViewOf(a, inView)));
   }
   return { ws, inView };
 };
@@ -305,7 +410,44 @@ const replay = (actions: TabsAction[]): { state: Strip; inView: string } => {
 
 const run = (actions: TabsAction[]): Strip => replay(actions).state;
 
-const sequence = fc.array(action, { maxLength: 25 });
+/**
+ * Most sequences start from a workspace worth splitting: tabs open in
+ * both repositories, then a few splits of one tab each. Left to chance,
+ * a strip rarely holds the two tabs a split needs, and the layout
+ * properties would see a multi-pane tree in one sequence in twenty.
+ */
+const openIn = (repo: string) => (itemKey: string) =>
+  ({ type: 'open-item', repo, itemKey, preview: false } as const);
+const seed: fc.Arbitrary<TabsAction[]> = fc
+  .tuple(
+    fc.shuffledSubarray([...KEYS], { minLength: 3, maxLength: 4 }),
+    fc.shuffledSubarray([...KEYS], { minLength: 2, maxLength: 4 }),
+    fc.array(
+      fc.record({
+        type: fc.constant('split' as const),
+        ids: pick.map((p) => [p]),
+        target: pick,
+        edge: fc.constantFrom(...EDGES),
+      }),
+      { minLength: 2, maxLength: 4 }
+    )
+  )
+  .map(([here, there, splits]) => [
+    ...here.map(openIn(REPOS[0])),
+    { type: 'repo-opened', repo: REPOS[1] } as const,
+    ...there.map(openIn(REPOS[1])),
+    ...splits,
+  ]);
+
+const sequence = fc.oneof(
+  {
+    arbitrary: fc
+      .tuple(seed, fc.array(action, { maxLength: 20 }))
+      .map(([start, rest]) => [...start, ...rest]),
+    weight: 3,
+  },
+  { arbitrary: fc.array(action, { maxLength: 25 }), weight: 1 }
+);
 
 describe('tab reducer invariants', () => {
   it('never holds two tabs for the same item', () => {
@@ -364,25 +506,29 @@ describe('tab reducer invariants', () => {
     );
   });
 
-  it('marks unseen only tabs on the strip, once each, and never the active one', () => {
+  it('marks unseen only open tabs, once each, and never one a pane shows', () => {
     fc.assert(
       fc.property(sequence, (actions) => {
-        const { tabs, activeId, unseen } = run(actions);
-        const ids = new Set(tabs.map((t) => t.id));
-        expect(new Set(unseen).size).toBe(unseen.length);
-        for (const id of unseen) {
-          expect(ids.has(id)).toBe(true);
-          expect(id).not.toBe(activeId);
+        const { ws } = replayWorkspace(actions);
+        const shown = new Set(panesOf(ws.layout).map((p) => p.activeId));
+        expect(new Set(ws.unseen).size).toBe(ws.unseen.length);
+        for (const id of ws.unseen) {
+          expect(ws.tabs[id]).toBeDefined();
+          expect(shown.has(id)).toBe(false);
         }
       }),
       { numRuns: 500 }
     );
   });
 
-  it('goes without an active tab only when the repo in view has none', () => {
+  it('a sole pane goes without an active tab only when the repo in view has none', () => {
     fc.assert(
       fc.property(sequence, (actions) => {
-        const { state, inView } = replay(actions);
+        const { ws, inView } = replayWorkspace(actions);
+        // With panes, focus moving onto a pane keeps the selection it had,
+        // none included (docs/decisions.md, "A pane keeps its selection").
+        if (panesOf(ws.layout).length !== 1) return;
+        const state = view(ws);
         if (state.activeId !== null) return;
         // Nothing active is legitimate in exactly one situation: the
         // repository in view has no tab on the strip, so the editor
@@ -395,6 +541,56 @@ describe('tab reducer invariants', () => {
       }),
       { numRuns: 500 }
     );
+  });
+
+  // Counterexample seed -162001443, path 326:4:3:3:3:6:0:3:3:2:1:4:2:2:7.
+  // Focus returning to a pane keeps its blank selection, even when it
+  // still holds a tab of the repository in view.
+  it('keeps a focused pane blank after a repo switch and close', () => {
+    const open = (repo: string, itemKey: string): TabsAction => ({
+      type: 'open-item',
+      repo,
+      itemKey,
+      preview: false,
+    });
+    const split = (edge: 'left' | 'bottom'): TabsAction => ({
+      type: 'split',
+      ids: ['#0'],
+      target: '#0',
+      edge,
+    });
+    const actions: TabsAction[] = [
+      open(REPOS[0], 'branch:b'),
+      open(REPOS[0], 'branch:a'),
+      open(REPOS[0], 'pr:2'),
+      { type: 'repo-opened', repo: REPOS[1] },
+      open(REPOS[1], 'pr:2'),
+      open(REPOS[1], 'branch:b'),
+      split('left'),
+      split('left'),
+      {
+        type: 'open-terminal',
+        terminal: {
+          name: 'n10-shell-2',
+          kind: 'shell',
+          cwd: REPOS[1],
+          displayPath: REPOS[1],
+          repo: REPOS[1],
+        },
+      },
+      { type: 'close', id: 'terminal:n10-shell-2', repo: REPOS[0] },
+      split('bottom'),
+      { type: 'repo-opened', repo: REPOS[0] },
+      { type: 'focus-pane', pane: '#0' },
+    ];
+    const { ws, inView } = replayWorkspace(actions);
+    const focused = focusedPaneOf(ws);
+    expect(focused.activeId).toBeNull();
+    expect(
+      focused.order.some(
+        (id) => ws.tabs[id]?.kind === 'item' && ws.tabs[id]?.repo === inView
+      )
+    ).toBe(true);
   });
 
   it('activates one of a repository’s own tabs when it comes into view', () => {
@@ -530,9 +726,12 @@ describe('closing never hands focus to another repository', () => {
     id: string,
     repo: string
   ): Strip | null => {
-    const before = run(actions);
-    const after = reduce(before, { type: 'close', id, repo });
-    return after.activeId === before.activeId ? null : after;
+    const { ws } = replayWorkspace(actions);
+    const after = reduceWorkspace(ws, { type: 'close', id, repo });
+    // A pane its last tab left goes, and focus with it: that is the
+    // neighbour's own tab, not a choice the close made.
+    if (after.focusedPane !== ws.focusedPane) return null;
+    return view(after).activeId === view(ws).activeId ? null : view(after);
   };
 
   it('never moves focus onto a tab outside the repo the close named', () => {
@@ -573,6 +772,36 @@ describe('closing never hands focus to another repository', () => {
           expect(own).toEqual([]);
         }
       ),
+      { numRuns: 500 }
+    );
+  });
+});
+
+describe('a reconciliation never hands focus to another repository', () => {
+  it('leaves the focused pane on its repository, or on nothing', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const { ws, inView } = replayWorkspace(actions);
+        const after = reduceWorkspace(ws, {
+          type: 'sync-items',
+          repo: inView,
+          entries: [],
+          terminals: [],
+          scanned: ['local', 'peer'],
+        });
+        // A pane its last tab left goes, and focus with it.
+        if (after.focusedPane !== ws.focusedPane) return;
+        const before = view(ws).activeId;
+        const now = view(after);
+        if (before === null || now.activeId === before) return;
+        if (now.tabs.some((t) => t.id === before)) return;
+        const active = now.tabs.find((t) => t.id === now.activeId);
+        if (active === undefined || active.kind === 'settings') return;
+        if (active.kind === 'terminal' && active.repo === null) return;
+        // Its active tab closed in the background: what replaces it is
+        // of the repository in view, or the pane shows nothing.
+        expect(active.repo).toBe(inView);
+      }),
       { numRuns: 500 }
     );
   });
@@ -855,12 +1084,17 @@ describe('agents alive in other repositories', () => {
 describe('the workspace', () => {
   const sequenceWs = (actions: TabsAction[]) => replayWorkspace(actions).ws;
 
-  /** Every split well formed, at any depth: two or more children, and
-   *  sizes that sum to one, one per child. */
+  /** Every split well formed, at any depth: two or more children, none
+   *  a split running its way, and positive sizes that sum to one, one
+   *  per child. */
   const wellFormed = (node: LayoutNode): boolean =>
     node.kind === 'pane' ||
     (node.children.length >= 2 &&
+      node.children.every(
+        (c) => c.kind === 'pane' || c.direction !== node.direction
+      ) &&
       node.sizes.length === node.children.length &&
+      node.sizes.every((size) => size > 0) &&
       Math.abs(node.sizes.reduce((a, b) => a + b, 0) - 1) < 1e-9 &&
       node.children.every(wellFormed));
 
@@ -882,6 +1116,17 @@ describe('the workspace', () => {
         const ws = sequenceWs(actions);
         const panes = panesOf(ws.layout);
         expect(wellFormed(ws.layout)).toBe(true);
+        expect(new Set(panes.map((p) => p.id)).size).toBe(panes.length);
+        // Every split named, each name once: React keys panes by them.
+        const splits: (string | undefined)[] = [];
+        const walk = (n: LayoutNode) => {
+          if (n.kind === 'pane') return;
+          splits.push(n.id);
+          n.children.forEach(walk);
+        };
+        walk(ws.layout);
+        expect(splits.every((id) => id !== undefined)).toBe(true);
+        expect(new Set(splits).size).toBe(splits.length);
         expect(panes.some((p) => p.id === ws.focusedPane)).toBe(true);
         const empties = panes.filter((p) => p.order.length === 0);
         expect(empties.length === 0 || panes.length === 1).toBe(true);
@@ -890,6 +1135,19 @@ describe('the workspace', () => {
             true
           );
         }
+      }),
+      { numRuns: 500 }
+    );
+  });
+
+  it('never opens, closes or changes a tab for what is done to the panes', () => {
+    fc.assert(
+      fc.property(sequence, paneAction, (actions, a) => {
+        const ws = sequenceWs(actions);
+        const after = reduceWorkspace(ws, picked(ws, a));
+        expect(after.tabs).toEqual(ws.tabs);
+        expect(after.pinned).toEqual(ws.pinned);
+        expect(after.dismissed).toEqual(ws.dismissed);
       }),
       { numRuns: 500 }
     );
@@ -1037,12 +1295,27 @@ describe('the workspace', () => {
           const t = ws.tabs[id];
           return t.kind !== 'terminal' || t.created !== undefined;
         };
-        const before = view(ws);
-        const kept = before.tabs.filter((t) => saved(t.id)).map((t) => t.id);
-        expect(view(back).tabs.map((t) => t.id)).toEqual(kept);
-        expect(view(back).activeId).toBe(
-          before.activeId && saved(before.activeId) ? before.activeId : null
+        // Each pane with a saved tab comes back with its saved tabs in
+        // order, showing the one it showed; a pane left without goes.
+        const panes = panesOf(ws.layout)
+          .map((p) => ({
+            id: p.id,
+            order: p.order.filter(saved),
+            activeId: p.activeId && saved(p.activeId) ? p.activeId : null,
+          }))
+          .filter((p) => p.order.length > 0);
+        const restored = panesOf(back.layout).map((p) => ({
+          id: p.id,
+          order: p.order,
+          activeId: p.activeId,
+        }));
+        expect(restored).toEqual(
+          panes.length > 0
+            ? panes
+            : [{ id: 'pane-1', order: [], activeId: null }]
         );
+        const focusKept = panes.some((p) => p.id === ws.focusedPane);
+        expect(back.focusedPane === ws.focusedPane || !focusKept).toBe(true);
         expect(back.pinned).toEqual(ws.pinned.filter(saved));
         expect(back.collapsed).toEqual(ws.collapsed);
         expect(back.groupNames).toEqual(ws.groupNames);

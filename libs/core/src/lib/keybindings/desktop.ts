@@ -17,7 +17,27 @@ export type DesktopActionId =
   | 'desktop.tabs.cycle-previous'
   | 'desktop.tabs.attention'
   | 'desktop.groups.collapse-others'
-  | 'desktop.tabs.toggle-pin';
+  | 'desktop.tabs.toggle-pin'
+  | `desktop.tabs.select-${TabOrdinal}`
+  | 'desktop.panes.split-right'
+  | 'desktop.panes.split-down'
+  | `desktop.panes.focus-${PaneDirection}`
+  | `desktop.panes.move-${PaneDirection}`
+  | 'desktop.panes.close';
+
+type TabOrdinal = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type PaneDirection = 'left' | 'right' | 'up' | 'down';
+
+const ORDINALS: readonly TabOrdinal[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const DIRECTIONS: readonly {
+  dir: PaneDirection;
+  word: string;
+}[] = [
+  { dir: 'left', word: 'left' },
+  { dir: 'right', word: 'right' },
+  { dir: 'up', word: 'up' },
+  { dir: 'down', word: 'down' },
+];
 
 export const DESKTOP_ACTIONS: readonly {
   id: DesktopActionId;
@@ -59,6 +79,41 @@ export const DESKTOP_ACTIONS: readonly {
     label: 'Pin tab / Unpin tab',
     description: 'The active tab. Pinned tabs sit at the start of the strip.',
   },
+  ...ORDINALS.map((n) => ({
+    id: `desktop.tabs.select-${n}` as const,
+    label: `Open tab ${n}`,
+    description:
+      n === 9
+        ? 'The last tab in the focused pane, pinned tabs first.'
+        : `Tab ${n} in the focused pane, pinned tabs first.`,
+  })),
+  {
+    id: 'desktop.panes.split-right',
+    label: 'Split right',
+    description: 'Move the active tab into a new pane on the right.',
+  },
+  {
+    id: 'desktop.panes.split-down',
+    label: 'Split down',
+    description: 'Move the active tab into a new pane below.',
+  },
+  ...DIRECTIONS.map(({ dir, word }) => ({
+    id: `desktop.panes.focus-${dir}` as const,
+    label: `Focus pane ${word}`,
+    description: `The pane ${
+      dir === 'up' ? 'above' : dir === 'down' ? 'below' : `to the ${word}`
+    }.`,
+  })),
+  ...DIRECTIONS.map(({ dir, word }) => ({
+    id: `desktop.panes.move-${dir}` as const,
+    label: `Move tab ${word}`,
+    description: 'The active tab, into the pane that way.',
+  })),
+  {
+    id: 'desktop.panes.close',
+    label: 'Close pane',
+    description: 'Move its tabs to a neighbouring pane.',
+  },
 ];
 
 export type DesktopBindings = Record<DesktopActionId, KeyDescriptor[]>;
@@ -73,7 +128,44 @@ export const DESKTOP_DEFAULT_BINDINGS: DesktopBindings = {
   'desktop.tabs.attention': [{ ctrl: true, input: 'A' }],
   'desktop.groups.collapse-others': [{ ctrl: true, input: 'J' }],
   'desktop.tabs.toggle-pin': [{ ctrl: true, meta: true, input: 'p' }],
+  ...(Object.fromEntries(
+    ORDINALS.map((n) => [
+      `desktop.tabs.select-${n}`,
+      [{ ctrl: true, input: String(n) }],
+    ])
+  ) as Record<`desktop.tabs.select-${TabOrdinal}`, KeyDescriptor[]>),
+  'desktop.panes.split-right': [{ ctrl: true, input: '\\' }],
+  // Shift+\ types | on the keyboards it is drawn on: the chord is what
+  // the key event carries.
+  'desktop.panes.split-down': [{ ctrl: true, shift: true, input: '|' }],
+  // Unbound: GNOME and other desktops take Ctrl+Alt+arrows (with Shift)
+  // for workspaces before the app sees them. The palette and the strip's
+  // menus reach them, and Settings → Keyboard binds them.
+  ...(Object.fromEntries(
+    DIRECTIONS.flatMap(({ dir }) => [
+      [`desktop.panes.focus-${dir}`, [] as KeyDescriptor[]],
+      [`desktop.panes.move-${dir}`, [] as KeyDescriptor[]],
+    ])
+  ) as Record<
+    `desktop.panes.${'focus' | 'move'}-${PaneDirection}`,
+    KeyDescriptor[]
+  >),
+  'desktop.panes.close': [{ ctrl: true, meta: true, input: 'w' }],
 };
+
+/** Actions whose defaults came after users could rebind: a chord a user
+ *  already chose for something else stays theirs. */
+const NEWER_DEFAULTS: readonly DesktopActionId[] = DESKTOP_ACTIONS.map(
+  (a) => a.id
+).filter(
+  (id) =>
+    ![
+      'desktop.tabs.next',
+      'desktop.tabs.previous',
+      'desktop.tabs.cycle-next',
+      'desktop.tabs.cycle-previous',
+    ].includes(id)
+);
 
 export function isDesktopActionId(id: string): id is DesktopActionId {
   return DESKTOP_ACTIONS.some((action) => action.id === id);
@@ -249,10 +341,7 @@ export function desktopBindings(
   const resolved = { ...DESKTOP_DEFAULT_BINDINGS, ...custom };
   // Persisted user choices win when a newly introduced default uses
   // their chord. The new action stays visible, without a binding.
-  for (const id of [
-    'desktop.tabs.attention',
-    'desktop.groups.collapse-others',
-  ] as const) {
+  for (const id of NEWER_DEFAULTS) {
     if (id in custom) continue;
     if (
       resolved[id].some((binding) =>

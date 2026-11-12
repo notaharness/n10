@@ -25,10 +25,14 @@ import { EditorPane } from './EditorPane.js';
 import { AllTabs } from './AllTabs.js';
 import { EmptyState } from './EmptyState.js';
 import { GroupBlock } from './GroupBlock.js';
+import { revealTab } from './reveal-tab.js';
 import { groupBlockId, stripRuns } from './strip-blocks.js';
 import { TabButton } from './TabButton.js';
+import { CarriedOverlay } from './CarriedOverlay.js';
 import { TabStrip } from './TabStrip.js';
 import { useEditorPanes } from './use-editor-panes.js';
+import { PaneDropZone } from './PaneDropZone.js';
+import { usePaneMenus } from './use-pane-menus.js';
 import { derivedLabel, useGroupRename } from './use-group-rename.js';
 import { useStripGroups } from './use-strip-groups.js';
 
@@ -62,9 +66,12 @@ function shownTabIds(
 export function EditorArea({
   items,
   onOpenPalette,
+  ownsSpare = true,
 }: {
   items: SidebarItem[];
   onOpenPalette: () => void;
+  /** This pane may hold the window's one spare (`EditorLayout`). */
+  ownsSpare?: boolean;
 }) {
   const { repo } = useRepo();
   const tabs = useTabs();
@@ -85,6 +92,7 @@ export function EditorArea({
     faceOf
   );
   const pins = groups.filter((g) => g.pinned).length;
+  const { stripMenu } = usePaneMenus();
 
   const tabStopId = tabStopOf(
     presentedIds(groups),
@@ -108,19 +116,6 @@ export function EditorArea({
     );
     if (activeGroup?.chipped) tabs.setCollapsed([activeGroup.key], false);
     announce(activeGroup ? 'Other groups collapsed' : 'Groups collapsed');
-  };
-  const revealTab = (id: string) => {
-    requestAnimationFrame(() => {
-      const key = CSS.escape(id);
-      const target = document.querySelector<HTMLElement>(
-        `[data-home-tab="${key}"], [data-tab-id="${key}"]`
-      );
-      target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      const terminal = document.querySelector<HTMLElement>(
-        '[data-editor-panes] > :not([data-spare-pane]) .xterm-helper-textarea'
-      );
-      (terminal ?? target)?.focus();
-    });
   };
   const attention = () => {
     const faces = groups.flatMap((group) => group.tabs.map(faceOf));
@@ -157,9 +152,11 @@ export function EditorArea({
       unseen: target.unseen,
     });
     announce(`${label}, ${status}, ${step.index} of ${step.total}`);
-    revealTab(target.tab.id);
+    revealTab(tabs.paneId, target.tab.id);
   };
+  // The focused pane's strip answers the shortcuts and the palette.
   useEffect(() => {
+    if (!tabs.focused) return;
     setStripCommands({
       attention,
       collapseOthers,
@@ -174,7 +171,7 @@ export function EditorArea({
 
   const runs = stripRuns(groups);
   const blocks = runs.map((run) => ({
-    id: groupBlockId(run.lead),
+    id: groupBlockId(run.lead, tabs.paneId),
     ids: run.ids,
   }));
   /** A group on the strip; `ids` null for one carried by another's. */
@@ -185,7 +182,7 @@ export function EditorArea({
     followers?: ReactNode
   ) => (
     <GroupBlock
-      key={groupBlockId(group)}
+      key={groupBlockId(group, tabs.paneId)}
       group={group}
       index={at}
       ids={ids}
@@ -210,7 +207,8 @@ export function EditorArea({
   // in the first frame.
   const { activePane, paneActiveId, panes } = useEditorPanes(
     tabs.tabs,
-    tabs.activeId
+    tabs.activeId,
+    { ownsSpare, others: tabs.others ?? [] }
   );
 
   if (tabs.tabs.length === 0) {
@@ -225,6 +223,7 @@ export function EditorArea({
     <div className="flex h-full min-w-0 flex-col bg-background">
       <TabStrip
         blocks={blocks}
+        onBlankMenu={stripMenu}
         controls={
           <AllTabs
             groups={groups}
@@ -238,7 +237,7 @@ export function EditorArea({
               const group = groupOf(groups, tab.id);
               if (group?.chipped) tabs.setCollapsed([group.key], false);
               tabs.activate(tab.id);
-              revealTab(tab.id);
+              revealTab(tabs.paneId, tab.id);
             }}
           />
         }
@@ -255,7 +254,7 @@ export function EditorArea({
               )
             : run.lead.tabs.map((tab) => (
                 <TabButton
-                  key={groupBlockId(run.lead)}
+                  key={groupBlockId(run.lead, tabs.paneId)}
                   face={faceOf(tab)}
                   data={{
                     kind: 'block',
@@ -275,29 +274,44 @@ export function EditorArea({
       <div aria-live="polite" className="sr-only">
         {announced}
       </div>
-      <div className="relative min-h-0 flex-1" data-editor-panes>
-        {/* Another repository's tab renders against that repository
+      <div className="relative min-h-0 flex-1">
+        <div className="absolute inset-0" data-editor-panes>
+          {/* Another repository's tab renders against that repository
             (EditorPane), so it can be held ready like any other. */}
-        {panes.map((tab) => (
-          <EditorPane
-            key={tab.id}
-            tab={tab}
-            items={items}
-            index={index}
-            shown={tab.id === activePane?.id}
-            menuActive={tab.id === activePane?.id && tab.id === tabs.activeId}
-            onKeep={() => tabs.keep(tab.id)}
-          />
-        ))}
-        {paneActiveId === null && (
-          // Tabs on the strip, none of them active.
-          <div className="absolute inset-0 flex min-h-0 flex-col">
-            <EmptyState
-              onOpenPalette={onOpenPalette}
-              hasItems={items.length > 0}
+          {panes.map((tab) => (
+            <EditorPane
+              key={tab.id}
+              tab={tab}
+              items={items}
+              index={index}
+              shown={tab.id === activePane?.id}
+              menuActive={
+                tabs.focused &&
+                tab.id === activePane?.id &&
+                tab.id === tabs.activeId
+              }
+              onKeep={() => tabs.keep(tab.id)}
             />
-          </div>
-        )}
+          ))}
+          {paneActiveId === null && (
+            // Tabs on the strip, none of them active.
+            <div className="absolute inset-0 flex min-h-0 flex-col">
+              <EmptyState
+                onOpenPalette={onOpenPalette}
+                hasItems={items.length > 0}
+              />
+            </div>
+          )}
+        </div>
+        {/* Beside the panes, not among them: tests and the reveal read
+            `[data-editor-panes]`' children as the panes. */}
+        <PaneDropZone />
+        <CarriedOverlay
+          groups={groups}
+          faceOf={faceOf}
+          labelOf={labelOf}
+          colorOf={colorOf}
+        />
       </div>
       {confirmDialog}
       {dialog}

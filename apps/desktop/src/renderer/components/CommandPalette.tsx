@@ -17,6 +17,7 @@ import { useAllBranches, useMachines } from '../lib/data/queries.js';
 import { useCreateWorktree, useRefreshRemote } from '../lib/data/mutations.js';
 import { isMachineSelectable } from '../lib/machines/machine-model.js';
 import { OpenTerminalOnMachineItems } from './machines/OpenTerminalOnMachineItems.js';
+import { PaneCommandItems } from './PaneCommandItems.js';
 import { StripCommandItems } from './StripCommandItems.js';
 import { useRepo } from '../lib/repo-context.js';
 import {
@@ -112,12 +113,12 @@ export function CommandPalette({
     const existing = items.find((i) => itemBranch(i) === branch);
     const key = existing ? itemKey(existing) : `branch:${branch}`;
     // Whether this checkout is what put the tab on screen, decided
-    // before opening it — `tabs.tabs` inside the callbacks below is the
+    // before opening it — `tabs.allTabs` inside the callbacks below is the
     // array from this render, which does not include the tab we are
     // about to add.
-    const tabId = tabIdFor(tabs.tabs, repo.cwd, key);
+    const tabId = tabIdFor(tabs.allTabs, repo.cwd, key);
     const wasOpen =
-      existing != null || tabs.tabs.some((t) => standsFor(t, repo.cwd, key));
+      existing != null || tabs.allTabs.some((t) => standsFor(t, repo.cwd, key));
     tabs.openItem(key);
     create.mutate(branch, {
       onSuccess: () => {
@@ -165,6 +166,7 @@ export function CommandPalette({
 
         <CommandGroup heading="Commands">
           <StripCommandItems close={close} />
+          <PaneCommandItems close={close} />
           <CommandItem
             value="command settings preferences"
             onSelect={() => {

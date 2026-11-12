@@ -3,20 +3,29 @@ import {
   pointerWithin,
   type CollisionDetection,
 } from '@dnd-kit/core';
+import { leftStripRow } from './drag-preview.js';
 import { isStripDragData } from './strip-drag.js';
+import { isPaneZone } from './use-pane-drop.js';
 
-/** The room after the last tab: over it, a drag is over the last place
- *  it may land. */
-export const END_ID = 'tab-strip-end';
+const END_PREFIX = 'tab-strip-end:';
 
-/** The room after a wrapped group's last tab, which is its members'
- *  end as `END_ID` is the strip's. */
-export function groupEndId(key: string): string {
-  return `${END_ID}:${key}`;
+/** The room after a pane's last tab: over it, a drag is over the last
+ *  place it may land in that pane. */
+export function stripEndId(pane: string): string {
+  return `${END_PREFIX}${pane}`;
 }
 
-const isEnd = (id: unknown) =>
-  id === END_ID || String(id).startsWith(`${END_ID}:`);
+/** The room after a wrapped group's last tab in `pane`, which is its
+ *  members' end as `stripEndId` is the strip's. */
+export function groupEndId(pane: string, key: string): string {
+  return `${END_PREFIX}${pane}:${key}`;
+}
+
+const isEnd = (id: unknown) => String(id).startsWith(END_PREFIX);
+
+/** The pane an end room belongs to: pane ids hold no colon. */
+const endPane = (id: unknown) =>
+  String(id).slice(END_PREFIX.length).split(':')[0];
 
 /** Keyboard coordinates name a row first. A far-left tab on the next
  * row must beat a horizontally nearby tab on the old row. */
@@ -32,38 +41,60 @@ function keyboardRow(
   return places.filter((place) => distance(place.id) <= nearest + 1);
 }
 
-/** A place's index on the strip, as its data says (`StripDragData`). */
-function indexOf(container: { data: { current?: unknown } }): number {
-  const data = container.data.current;
-  return isStripDragData(data) ? data.index : -1;
+/** A place's pane and index on the strip, as its data says
+ *  (`StripDragData`). */
+function placeOf(container: { data?: { current?: unknown } }) {
+  const data = container.data?.current;
+  return isStripDragData(data)
+    ? { pane: data.pane ?? '', index: data.index }
+    : { pane: '', index: -1 };
 }
 
 /**
  * What the pointer is over, or, where it is over no legal place (a
  * keyboard drag, a border, another group), the legal place nearest the
- * dragged one. Keyboard drags choose the nearest row before a place in
+ * dragged one. A pointer carried out of its strip's row over nothing
+ * legal (the sidebar, the title or status bar) is over nothing: let go
+ * there, the drag is abandoned, not dropped where it was nearest. Past
+ * the strip's ends in its own row, nearest is its first or last place.
+ * Keyboard drags choose the nearest row before a place in
  * it, so a row ending far left cannot lose to a tab on the old row.
- * A member dragged out of its group opens the slot at that
- * end of its group. Only legal places are enabled droppables
- * (`strip-drag.ts`), so nothing else is ever a candidate. The room after
- * the last tab, the strip's or a wrapped group's, counts as the last
- * legal place by index, not by when it registered: dnd-kit lists
- * containers in mount order.
+ * A member dragged out of its group opens the slot at that end of its
+ * group. Only legal places are enabled droppables (`strip-drag.ts`), so
+ * nothing else is ever a candidate. The room after the last tab, a pane
+ * strip's or a wrapped group's, counts as the last legal place in that
+ * pane by index, not by when it registered: dnd-kit lists containers in
+ * mount order. Over a pane's content the pane itself is the target
+ * (`use-pane-drop.ts`); it is never the nearest place to anything.
  */
 export const collisionsEndingAt: CollisionDetection = (args) => {
-  const places = args.droppableContainers.filter((c) => !isEnd(c.id));
+  const places = args.droppableContainers.filter(
+    (c) => !isEnd(c.id) && !isPaneZone(c.id)
+  );
   const within = pointerWithin(args);
-  if (within.some((c) => isEnd(c.id))) {
-    const last = places.reduce<(typeof places)[number] | undefined>(
-      (best, c) => (!best || indexOf(c) > indexOf(best) ? c : best),
-      undefined
-    );
+  const end = within.find((c) => isEnd(c.id));
+  if (end) {
+    const pane = endPane(end.id);
+    const last = places
+      .filter((c) => placeOf(c).pane === pane)
+      .reduce<(typeof places)[number] | undefined>(
+        (best, c) =>
+          !best || placeOf(c).index > placeOf(best).index ? c : best,
+        undefined
+      );
     return last ? [{ id: last.id }] : [];
   }
   if (within.length > 0) return within;
+  if (leftStripRow(args.active.data.current, args.pointerCoordinates))
+    return [];
+  // Nearest goes by the strip the drag is in: another pane's places are
+  // a target only under the pointer.
+  const own = places.filter(
+    (c) => placeOf(c).pane === placeOf(args.active).pane
+  );
   return closestCenter({
     ...args,
     droppableContainers:
-      args.pointerCoordinates === null ? keyboardRow(args, places) : places,
+      args.pointerCoordinates === null ? keyboardRow(args, own) : own,
   });
 };

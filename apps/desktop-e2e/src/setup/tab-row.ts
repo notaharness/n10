@@ -40,9 +40,11 @@ export async function expectNothingLifted(page: Page) {
   await expect(page.getByText(/^Moving /)).toHaveCount(0);
 }
 
-/** Focus `name`'s tab, lift it with the chord and step it right, until
- *  `neighbour` has slid aside. The sensor starts listening for arrows
- *  a task after the lift, so an early press can go unheard. */
+/** Focus `name`'s tab, lift it with the chord and step it right once,
+ *  until `neighbour` has slid aside. The lift is announced first, so the
+ *  sensor is listening; the step is then pressed once and given time to
+ *  render, and pressed again only if it went unheard. Pressing on every
+ *  poll overshoots under load: the first step lands after the check. */
 export async function liftRightOver(
   page: Page,
   name: RegExp,
@@ -50,12 +52,21 @@ export async function liftRightOver(
 ) {
   await tab(page, name).focus();
   await page.keyboard.press(LIFT);
-  await expect(async () => {
+  // The lift's announcement, or the first place it is over, which
+  // replaces it at once.
+  await expect(page.getByText(/^(Moving |Position \d)/).first()).toBeAttached();
+  const aside = async () =>
+    /^translate3d\(-\d/.test((await motion(tab(page, neighbour))).transform);
+  for (let tries = 0; tries < 3; tries++) {
     await page.keyboard.press('ArrowRight');
-    expect(await motion(tab(page, neighbour))).toMatchObject({
-      transform: expect.stringMatching(/^translate3d\(-\d/),
-    });
-  }).toPass();
+    try {
+      await expect.poll(aside, { timeout: 3000 }).toBe(true);
+      return;
+    } catch {
+      // Unheard: the sensor had not attached yet. Step again.
+    }
+  }
+  throw new Error(`${String(neighbour)} never slid aside`);
 }
 
 /** The inline motion the sortable strip puts on a tab. */

@@ -15,3 +15,22 @@ export const PaneShownContext = createContext(true);
 export function usePaneShown(): boolean {
   return useContext(PaneShownContext);
 }
+
+/**
+ * Whether the editor pane a component sits in is the focused one. Every
+ * pane shows its active tab, but only the focused one takes the keyboard:
+ * a terminal focuses itself, and window keys apply, there alone. Outside
+ * the editor, and with one pane, it is.
+ */
+export const PaneFocusedContext = createContext(true);
+
+export function usePaneFocused(): boolean {
+  return useContext(PaneFocusedContext);
+}
+
+/** On screen and in the focused pane: where keys go. */
+export function usePaneTakesKeys(): boolean {
+  const shown = usePaneShown();
+  const focused = usePaneFocused();
+  return shown && focused;
+}

@@ -46,11 +46,11 @@ export function AttentionRail({
   const openKeys = useMemo(
     () =>
       new Set(
-        tabs.tabs.flatMap((t) =>
+        tabs.allTabs.flatMap((t) =>
           t.kind === 'item' && t.repo === repo.cwd ? [t.itemKey] : []
         )
       ),
-    [tabs.tabs, repo.cwd]
+    [tabs.allTabs, repo.cwd]
   );
   const model = useMemo(
     () => buildAttentionModel(items, openKeys),

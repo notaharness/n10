@@ -1,4 +1,10 @@
-import { DESKTOP_ACTIONS } from '@n10/core/ui';
+import {
+  DESKTOP_ACTIONS,
+  DESKTOP_DEFAULT_BINDINGS,
+  keyDescriptorToString,
+  type DesktopActionId,
+  type DesktopBindings,
+} from '@n10/core/ui';
 import { APP_SHORTCUTS } from '../../host/app-shortcuts.js';
 import { chordKeys, useDesktopBindings } from '../lib/keybindings.js';
 import { MOD } from '../lib/utils.js';
@@ -17,6 +23,45 @@ const ROWS: [string, string[]][] = APP_SHORTCUTS.map((s) => [
   [MOD, ...(s.shift ? ['⇧'] : []), s.key === 'Enter' ? '↵' : s.key],
 ]);
 
+/** Actions that read as one row while every one keeps its default: the
+ *  nine tab positions. Unbound actions (focusing and moving to a pane,
+ *  by default) have no row. */
+const FOLDS: readonly {
+  label: string;
+  ids: readonly DesktopActionId[];
+  keys: string[];
+}[] = [
+  {
+    label: 'Open tab 1…9',
+    ids: [1, 2, 3, 4, 5, 6, 7, 8, 9].map(
+      (n) => `desktop.tabs.select-${n}` as DesktopActionId
+    ),
+    keys: ['Ctrl', '1…9'],
+  },
+];
+
+const isDefault = (bindings: DesktopBindings, id: DesktopActionId) => {
+  const chords = (b: DesktopBindings) =>
+    b[id].map((d) => keyDescriptorToString(d)).join(',');
+  return chords(bindings) === chords(DESKTOP_DEFAULT_BINDINGS);
+};
+
+/** The rebindable actions as rows, folded where they keep defaults. */
+function actionRows(bindings: DesktopBindings): [string, string[]][] {
+  const folded = FOLDS.filter((f) =>
+    f.ids.every((id) => isDefault(bindings, id))
+  );
+  const skip = new Set(folded.flatMap((f) => f.ids));
+  return DESKTOP_ACTIONS.flatMap(({ id, label }): [string, string[]][] => {
+    const fold = folded.find((f) => f.ids[0] === id);
+    if (fold) return [[fold.label, fold.keys]];
+    if (skip.has(id)) return [];
+    const first = bindings[id][0];
+    if (!first) return [];
+    return [[label, chordKeys(first)]];
+  });
+}
+
 export function ShortcutsDialog({
   open,
   onOpenChange,
@@ -27,14 +72,7 @@ export function ShortcutsDialog({
   const bindings = useDesktopBindings();
   // The tab shortcuts are rebindable (Settings → Keyboard), so they
   // read from the live bindings rather than a fixed table.
-  const rows: [string, string[]][] = [
-    ...ROWS,
-    ...DESKTOP_ACTIONS.flatMap(({ id, label }): [string, string[]][] => {
-      const first = bindings[id][0];
-      if (!first) return [];
-      return [[label, chordKeys(first)]];
-    }),
-  ];
+  const rows: [string, string[]][] = [...ROWS, ...actionRows(bindings)];
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">

@@ -77,6 +77,55 @@ describe('strip drag', () => {
       ])
     ).toBeNull();
   });
+  it('moves a block onto another pane’s block beside it there', () => {
+    const left = { ...block(['a', 'b'], 0), pane: 'pane-1' };
+    const right = { ...block(['c', 'd'], 2), pane: 'pane-2' };
+    // On the side of it the pointer is on, whatever either index.
+    expect(
+      dropMove('block:g', left, 'block:h', right, [['a', 'b']], 'after')
+    ).toEqual({ kind: 'move', ids: ['a', 'b'], targetId: 'd', side: 'after' });
+    expect(
+      dropMove('block:g', left, 'block:h', right, [['a', 'b']], 'before')
+    ).toEqual({
+      kind: 'move',
+      ids: ['a', 'b'],
+      targetId: 'c',
+      side: 'before',
+    });
+  });
+  it('lets a member land in another pane’s strip, beside a block or its own group', () => {
+    const tab = { ...member('g', 1), pane: 'pane-1' };
+    const there: StripDragData = {
+      kind: 'block',
+      label: 'b',
+      ids: ['c', 'd'],
+      index: 0,
+      pane: 'pane-2',
+    };
+    expect(acceptsDrop(there, tab)).toBe(true);
+    expect(acceptsDrop({ ...there, pane: 'pane-1' }, tab)).toBe(false);
+    expect(acceptsDrop({ ...there, pinned: true } as StripDragData, tab)).toBe(
+      false
+    );
+    expect(acceptsDrop({ ...member('h', 0), pane: 'pane-2' }, tab)).toBe(false);
+    expect(dropMove('a', tab, 'block:h', there, [], 'after')).toEqual({
+      kind: 'move',
+      ids: ['a'],
+      targetId: 'd',
+      side: 'after',
+    });
+    // Beside its own group's member there, on the pointer's side.
+    expect(
+      dropMove(
+        'a',
+        tab,
+        'x',
+        { ...member('g', 3), pane: 'pane-2' },
+        [],
+        'before'
+      )
+    ).toEqual({ kind: 'move', ids: ['a'], targetId: 'x', side: 'before' });
+  });
   it('makes no move onto itself or another group’s member', () => {
     expect(dropMove('a', member('g', 0), 'a', member('g', 0), [])).toBeNull();
     expect(dropMove('a', member('g', 0), 'x', member('h', 0), [])).toBeNull();

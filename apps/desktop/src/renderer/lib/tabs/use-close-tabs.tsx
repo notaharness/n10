@@ -144,7 +144,7 @@ export function useCloseTabs(items: SidebarItem[]): {
 
   const close = useCallback(
     (id: string) => {
-      const tab = tabs.tabs.find((t) => t.id === id);
+      const tab = tabs.allTabs.find((t) => t.id === id);
       if (!tab) return;
       requestClose([tab], () => tabs.close(id, repo.cwd));
     },

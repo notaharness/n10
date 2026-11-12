@@ -1,11 +1,15 @@
 import { createContext, useContext, useMemo, type Dispatch } from 'react';
 import type {
+  PaneId,
   Strip,
   SyncListings,
   Tab,
   TabsAction,
   TerminalEntry,
+  Workspace,
+  WorkspaceAction,
 } from './tabs-model.js';
+import { stripOf } from './workspace.js';
 import { useRepo } from '../repo-context.js';
 import { tabOpening } from './tab-identity.js';
 
@@ -21,6 +25,12 @@ export type {
   Workspace,
 } from './tabs-model.js';
 export { activeTabRepo } from './tabs-model.js';
+
+/** A sync's listings, and the group a tab it opens belongs to: such a
+ *  tab joins the pane already holding its group. */
+export type SyncRequest = SyncListings & {
+  groupOf?: (tab: Tab) => string | null;
+};
 export {
   foreignRepoOf,
   isForeignTab,
@@ -39,10 +49,18 @@ export {
  * action is about the repo that happens to be open. Components inside
  * a repo workspace use `useRepoTabs`, which fills the repo in.
  *
- * Its fields are the focused pane's strip (`Strip`): that pane's tabs
- * in order and its active tab, beside the workspace-wide sets.
+ * Its fields are one pane's strip (`Strip`): that pane's tabs in order
+ * and its active tab, beside the workspace-wide sets. Inside a pane
+ * (`PaneScopeContext`) it is that pane's, and what it does starts there;
+ * everywhere else, the focused pane's.
  */
-interface TabsApi extends Strip {
+export interface TabsApi extends Strip {
+  /** The pane this is, and whether it has focus. */
+  paneId: PaneId;
+  focused: boolean;
+  /** Every pane's tabs, this pane's first: for what asks whether a tab
+   *  is open anywhere. */
+  allTabs: readonly Tab[];
   openItem: (
     repo: string,
     itemKey: string,
@@ -86,7 +104,7 @@ interface TabsApi extends Strip {
    * in other repositories, each given a tab in its own group unless
    * dismissed.
    */
-  syncItems: (repo: string, listings: SyncListings) => void;
+  syncItems: (repo: string, listings: SyncRequest) => void;
   /** Tell the strip a repository is now the one in view. */
   repoOpened: (repo: string) => void;
   /** Open (or activate) the tab for a terminal the host just started. */
@@ -100,14 +118,38 @@ interface TabsApi extends Strip {
   undismiss: (keys: readonly string[]) => void;
 }
 
-export const TabsContext = createContext<TabsApi | null>(null);
+/** The workspace and its reducer's `dispatch`, from `TabsProvider`. */
+export interface WorkspaceStore {
+  workspace: Workspace;
+  dispatch: Dispatch<WorkspaceAction>;
+}
 
-export type TabsActions = Omit<TabsApi, keyof Strip>;
+export type TabsActions = Omit<
+  TabsApi,
+  keyof Strip | 'paneId' | 'focused' | 'allTabs'
+>;
 
-/** The strip's actions over its reducer's `dispatch`, none reading
- *  state: made once, they keep their identity for as long as `dispatch`
- *  does, whatever the state does. */
-export function tabsActions(dispatch: Dispatch<TabsAction>): TabsActions {
+export const WorkspaceContext = createContext<WorkspaceStore | null>(null);
+
+/** The pane a subtree draws; `null` outside the editor's panes. */
+export const PaneScopeContext = createContext<PaneId | null>(null);
+
+export function useWorkspace(): WorkspaceStore {
+  const ctx = useContext(WorkspaceContext);
+  if (!ctx) throw new Error('useWorkspace must be used within TabsProvider');
+  return ctx;
+}
+
+/** The strip's actions over its reducer's `dispatch`, sent from pane
+ *  `scope` (the focused pane for `null`), none reading state: made once,
+ *  they keep their identity for as long as `dispatch` and the pane do,
+ *  whatever the state does. */
+export function tabsActions(
+  send: Dispatch<WorkspaceAction>,
+  scope: PaneId | null = null
+): TabsActions {
+  const dispatch = (action: TabsAction) =>
+    send(scope === null ? action : { ...action, scope });
   return {
     openItem: (repo, itemKey, opts) =>
       dispatch({
@@ -140,10 +182,26 @@ export function tabsActions(dispatch: Dispatch<TabsAction>): TabsActions {
   };
 }
 
+/** One pane's strip with its actions: the scoped pane's inside a pane,
+ *  else the focused pane's. Actions keep their identity across state. */
 export function useTabs(): TabsApi {
-  const ctx = useContext(TabsContext);
-  if (!ctx) throw new Error('useTabs must be used within TabsProvider');
-  return ctx;
+  const { workspace, dispatch } = useWorkspace();
+  const scope = useContext(PaneScopeContext);
+  const actions = useMemo(
+    () => tabsActions(dispatch, scope),
+    [dispatch, scope]
+  );
+  const paneId = scope ?? workspace.focusedPane;
+  return useMemo(() => {
+    const strip = stripOf(workspace, paneId);
+    return {
+      ...strip,
+      paneId,
+      focused: workspace.focusedPane === paneId,
+      allTabs: [...strip.tabs, ...(strip.others ?? [])],
+      ...actions,
+    };
+  }, [workspace, paneId, actions]);
 }
 
 /** Repo-scoped api for everything rendered inside a repo workspace: the
@@ -157,8 +215,8 @@ export function useRepoTabs(): RepoTabsApi {
       ...tabs,
       openItem: (itemKey: string, opts?: { preview?: boolean }) =>
         tabs.openItem(cwd, itemKey, opts),
-      tabOpening: (itemKey: string) => tabOpening(tabs.tabs, cwd, itemKey),
-      syncItems: (listings: SyncListings) => tabs.syncItems(cwd, listings),
+      tabOpening: (itemKey: string) => tabOpening(tabs.allTabs, cwd, itemKey),
+      syncItems: (listings: SyncRequest) => tabs.syncItems(cwd, listings),
       close: (id: string) => tabs.close(id, cwd),
       terminalEnded: (name: string) => tabs.terminalEnded(name, cwd),
     }),
@@ -171,6 +229,6 @@ export interface RepoTabsApi
   openItem: (itemKey: string, opts?: { preview?: boolean }) => void;
   /** The tab a single click on `itemKey` would show. */
   tabOpening: (itemKey: string) => Tab;
-  syncItems: (listings: SyncListings) => void;
+  syncItems: (listings: SyncRequest) => void;
   terminalEnded: (name: string) => void;
 }

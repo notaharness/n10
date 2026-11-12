@@ -11,6 +11,13 @@ const OVERFLOW: Record<string, TabOverflow> = {
   'overflow-scroll': 'scroll',
 };
 
+/** A pane's entries on a tab's menu (`use-pane-menus.ts`). */
+export interface PaneMenu {
+  items(tab: Tab): ContextMenuItem[];
+  /** Run a pane entry; false for any other choice. */
+  run(chosen: string | null, tab: Tab): boolean;
+}
+
 /** What a group offers in a native menu: its chip's, and below a
  *  member's own items. */
 export interface GroupMenu {
@@ -92,17 +99,19 @@ function ownItems(
   return items;
 }
 
-/** The native context menu a tab offers: its own items, its group's
- *  actions — or, for a tab alone in its place, Rename group — and what
- *  the whole strip does when its tabs overflow. */
+/** The native context menu a tab offers: its own items, its pane's,
+ *  its group's actions — or, for a tab alone in its place, Rename
+ *  group — and what the whole strip does when its tabs overflow. */
 function tabMenuItems(
   tab: Tab,
   tabs: ReturnType<typeof useTabs>,
   overflow: TabOverflow,
   group: GroupMenu | undefined,
-  rename: (() => void) | undefined
+  rename: (() => void) | undefined,
+  panes: PaneMenu | undefined
 ): ContextMenuItem[] {
   const items = ownItems(tab, tabs);
+  if (panes) items.push({ type: 'separator' }, ...panes.items(tab));
   if (group) items.push({ type: 'separator' }, ...groupItems(group));
   else if (rename) items.push({ id: 'group-rename', label: 'Rename group…' });
   items.push(
@@ -144,11 +153,13 @@ export async function runTabMenu(
   closer: Closer,
   overflow: TabOverflow,
   group?: GroupMenu,
-  rename?: () => void
+  rename?: () => void,
+  panes?: PaneMenu
 ): Promise<void> {
   const chosen = await window.n10.showContextMenu(
-    tabMenuItems(tab, tabs, overflow, group, rename)
+    tabMenuItems(tab, tabs, overflow, group, rename, panes)
   );
+  if (panes?.run(chosen, tab)) return;
   if (runGroupChoice(chosen, group)) return;
   if (chosen === 'group-rename') rename?.();
   else if (runOwnChoice(chosen, tab, tabs, closer)) return;

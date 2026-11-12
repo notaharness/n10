@@ -79,6 +79,25 @@ describe('shownIdFor', () => {
   });
 });
 
+describe('shownIdFor, across editor panes', () => {
+  it('shows the live tab rather than a deferred one another pane now holds', () => {
+    const moved = (id: string) => id === 'b';
+    expect(
+      shownIdFor({
+        activeId: 'c',
+        deferredId: 'b',
+        spare: null,
+        shown: b,
+        elsewhere: moved,
+      })
+    ).toBe('c');
+    // A deferred tab closed outright still waits its turn.
+    expect(
+      shownIdFor({ activeId: 'c', deferredId: 'b', spare: null, shown: b })
+    ).toBe('b');
+  });
+});
+
 describe('panesFor', () => {
   it('renders the pane on screen and the spare, in id order', () => {
     expect(panesFor(b, a)).toEqual([a, b]);

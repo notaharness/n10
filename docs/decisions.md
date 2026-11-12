@@ -904,11 +904,85 @@ it.
 The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): tabs by id, a
 layout tree of splits over panes (each with its order and active tab), the
 focused pane, and the user's marks — pins, collapsed groups, group names and
-dismissed sessions — beside `unseen` and `lastActiveByRepo`. The layout is
-one pane for now; it has the final shape so splitting needs no migration of
-the saved file. Every reducer pass works on one pane's `Strip` (its tabs as
-an ordered list and its active tab, beside the workspace-wide sets);
-`reduce` applies them to the focused pane, `reduceStrip` is the pass layer.
+dismissed sessions — beside `unseen` and `lastActiveByRepo`. Every reducer
+pass works on one pane's `Strip` (its tabs as an ordered list and its active
+tab, beside the workspace-wide sets); `reduceStrip` is the pass layer.
+
+`reduce` (`workspace-reduce.ts`) picks the pane. A strip action runs on the
+pane holding the tab it names, else the pane that sent it, else the focused
+one; bringing a tab to the front in another pane focuses that pane. The
+reconciliations (`sync-items`, removed worktrees, undismiss) run on every
+pane's tabs as one strip, so a tab is open once whichever pane holds it, and
+are dealt back: a tab stays in its pane, and one a sync opens joins the pane
+holding its group (`groupOf`, the strip's own affiliation), else the focused
+one. A reconciliation never moves focus. After every action the reducer
+drops empty panes but a sole one, keeps focus on a pane that exists, clears
+`unseen` for every pane's active tab (each pane shows its own), and notes the
+focused pane's active tab in `lastActiveByRepo`.
+
+Splits (`layout.ts`, `pane-moves.ts`). A split has two or more children and
+sizes summing to 1; a one-child split gives way to its child, and a child
+split running the parent's way hands its children up. Splitting a pane moves
+tabs into a new half beside it (never a copy: a terminal has one view), and
+does nothing where the pane would be left empty. Moving tabs to a pane
+appends them, so they land at the end of their group there. A pane's tabs
+leave in pane order; the destination shows the active tab that came along,
+else the one asked for. Closing a pane is layout only: its tabs, pins and
+order go to the neighbour whose shared edge is centred nearest its own, ties
+going left, right, up, down. Focus and move toward a side take the pane past
+that side and level with it, nearest first. Sizes persist per split by
+`splitKey`, its children's first panes; only a resize the user made is saved,
+so a window that clamps panes does not overwrite their ratios. Restore reads
+the saved tree as it is, less panes left without tabs; a pane or split whose
+id is malformed or taken is given the next free one, keeping its tabs.
+
+A pane keeps its selection. Focus moving onto a pane leaves its active tab
+as it is, none included, and a repository coming into view acts on the
+focused pane only (`repoTab`, then the strip's `focusRepo`). So a pane left
+blank while another repository was in view is still blank when focus comes
+back to it, even holding a tab of the repository in view now; a click on one
+of its tabs fills it. Re-running `focusRepo` on every focus change would
+change a pane the user did not touch. With one pane, the editor goes blank
+only where the repository in view has no tab (`tabs.properties.spec.ts`).
+
+The editor draws the tree with nested `react-resizable-panels` groups
+(`EditorLayout.tsx`), each leaf an `EditorArea` under `PaneScopeContext`,
+which `useTabs` reads to give that pane's strip. Every pane shows its active
+tab and marks its output seen; only the focused one takes the keyboard
+(`usePaneTakesKeys`) and its terminal focuses itself. The window keeps one
+spare (`ownsSpare`): the focused pane's, or the pane whose strip tab the
+pointer rests on, and never a tab another pane holds. A split keeps its id
+(`split-N`) for as long as it stands, and React keys panels by pane and
+split ids. Each pane's content renders once, keyed by pane id, through a
+portal into a container of its own (`pane-slots.ts`); the tree draws only
+an empty slot per pane, which adopts that container. So a pane changing
+level (the sole pane split, a collapsing split's survivor moving up) moves
+rather than remounts: its terminal, scroll, selection and focus stay. React
+detaches a removed subtree's refs before taking it out of the document and
+attaches the new slots in the same commit, so the container waits in a
+holder in between; the moves use `Element.moveBefore`, which keeps focus
+and scroll state (elsewhere, `appendChild` with focus restored).
+A wrapped strip takes at most ten rows, or 70% of its pane if that is
+less (the pane is a size container, `cqh`); past that it scrolls inside
+itself and keeps the active tab in view, so a short pane keeps some content.
+Scroll mode is one row as ever.
+
+Dragging onto a pane's content (`use-pane-drop.ts`): its sides split, its
+middle moves (`pane-drop.ts`), the half (or whole) it would take tinted
+strongly enough to read over a terminal in either theme. Inside its strip
+a dragged tab moves itself, held to the strip; out of it, a copy follows
+the pointer instead (`drag-preview.ts`, `CarriedOverlay.tsx`), so pane
+overflow and the pane portals never clip it, and the zone is read from the
+pointer's own events. Keyboard drags stay on the strip. On a strip, a block
+dropped among its own pane's blocks arranges that pane as presented;
+carried over another pane's strip, a tab or block (a member too, beside a
+block or its own group's member) opens the slot it would land in there, on
+the side the pointer is on, and moves there on drop. Another pane's places
+are targets only under the pointer, never the nearest place. Let go over
+nothing outside its strip's row (the strip's height across its pane), a
+drag is abandoned; within the row, past the strip's ends, it lands on the
+nearest place. Each pane reports its own blocks, and end rooms resolve
+within their pane.
 
 `dismissed` replaces auto-open history. Every running agent, listed terminal
 and foreign agent has a tab unless its session is dismissed. Every close

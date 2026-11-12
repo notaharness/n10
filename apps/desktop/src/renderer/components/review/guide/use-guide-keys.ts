@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent } from 'react';
 import { inField } from '../../../lib/field-keys.js';
-import { usePaneShown } from '../../../lib/tabs/pane-shown.js';
+import { usePaneTakesKeys } from '../../../lib/tabs/pane-shown.js';
 
 const STEPS: Record<string, -1 | 1> = {
   ArrowLeft: -1,
@@ -19,7 +19,7 @@ export function useGuideKeys(handlers: {
   onPrev: () => void;
   onNext: () => void;
 }): void {
-  const shown = usePaneShown();
+  const shown = usePaneTakesKeys();
   const prev = useEffectEvent(handlers.onPrev);
   const next = useEffectEvent(handlers.onNext);
   useEffect(() => {

@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useDesktopPrefs } from '../desktop-prefs.js';
 import { isRecordingShortcut, useDesktopBindings } from '../keybindings.js';
 import { listenForTabSwitching, noteStrip } from './tab-switching.js';
-import { useTabs } from './tabs.js';
+import { useTabs, useWorkspace } from './tabs.js';
+import { panesOf } from './workspace.js';
 
 /**
  * Switch the editor tab strip from the keyboard: the rebindable desktop
@@ -19,7 +20,12 @@ export function useTabSwitching(enabled: boolean): void {
   const { tabCycleMru } = useDesktopPrefs();
   const latest = useRef({ tabs, bindings, tabCycleMru, enabled });
 
-  const tabIds = tabs.tabs.map((t) => t.id).join('\n');
+  // Recent use spans the panes, so a pane focused again keeps its
+  // order; a walk goes through the focused pane's tabs alone.
+  const { workspace } = useWorkspace();
+  const tabIds = panesOf(workspace.layout)
+    .flatMap((p) => p.order)
+    .join('\n');
   useEffect(() => {
     latest.current = { tabs, bindings, tabCycleMru, enabled };
   });

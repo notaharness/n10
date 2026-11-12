@@ -400,6 +400,8 @@ export type ContextMenuItem =
       checked?: boolean;
       /** Where the platform shows one (macOS), a line on hover. */
       toolTip?: string;
+      /** Items under this one: it opens them rather than being chosen. */
+      submenu?: ContextMenuItem[];
     };
 
 /** Mirror of app-core's ActivitySnapshot, redeclared so the renderer

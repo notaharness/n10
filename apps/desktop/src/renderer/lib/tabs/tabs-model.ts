@@ -14,12 +14,20 @@
  * two repos routinely share branch names and so share item keys.
  */
 
-import { isForeignTab, tabHome, terminalTabId } from './tab-identity.js';
+import {
+  isForeignTab,
+  tabHome,
+  terminalTabId,
+  type Tab,
+} from './tab-identity.js';
+import type { Edge } from './layout.js';
+import type { Anchor } from './pane-moves.js';
 
 export type { ItemTab, Tab, TerminalTab } from './tab-identity.js';
 export type { TerminalEntry } from './tab-terminals.js';
 export type { ForeignSessionEntry } from './tab-foreign.js';
-export type { Strip, Workspace } from './workspace.js';
+export type { PaneId, Strip, Workspace } from './workspace.js';
+export type { WorkspaceAction } from './workspace-reduce.js';
 export { EMPTY_STRIP, EMPTY_WORKSPACE } from './workspace.js';
 import {
   closeOtherTabs,
@@ -44,13 +52,8 @@ import {
   syncTerminals,
   type TerminalEntry,
 } from './tab-terminals.js';
-import {
-  focusedPaneOf,
-  stripOf,
-  withStrip,
-  type Strip,
-  type Workspace,
-} from './workspace.js';
+import { reduceWorkspace, type WorkspaceAction } from './workspace-reduce.js';
+import type { PaneId, Strip, Workspace } from './workspace.js';
 
 /** One sidebar item as the tab model needs it. */
 export interface ItemEntry {
@@ -141,8 +144,15 @@ export type TabsAction =
    *  `alive` names every agent session tmux runs on this machine, any
    *  repository's: only it says a dismissed agent ended. `scanned` are
    *  the machines whose terminal listing is complete; a restored or
-   *  dismissed terminal of any other machine waits. */
-  | ({ type: 'sync-items'; repo: string } & SyncListings)
+   *  dismissed terminal of any other machine waits.
+   *
+   *  `groupOf` is the group a tab belongs to (its affiliation key), so a
+   *  tab this opens joins the pane already holding its group. */
+  | ({
+      type: 'sync-items';
+      repo: string;
+      groupOf?: (tab: Tab) => string | null;
+    } & SyncListings)
   /** Open (or activate) the tab for a terminal the host just started. */
   | { type: 'open-terminal'; terminal: TerminalEntry }
   /** The host says the process behind a terminal ended, by name — the
@@ -164,7 +174,38 @@ export type TabsAction =
   /** Give these dismissed sessions (`dismissKeyOf`) their tabs back on
    *  the next sync: the user asked for a closed agent again, or a
    *  close's kill failed and left it running behind no tab. */
-  | { type: 'undismiss'; keys: readonly string[] };
+  | { type: 'undismiss'; keys: readonly string[] }
+  | PaneAction;
+
+/** What the user does to the panes (`pane-moves.ts`). None of them
+ *  opens, closes or stops a tab. */
+type PaneAction =
+  /** The user is in this pane now. */
+  | { type: 'focus-pane'; pane: PaneId }
+  | { type: 'focus-toward'; edge: Edge }
+  /** Move the focused pane's active tab to the pane toward `edge`. */
+  | { type: 'move-toward'; edge: Edge }
+  /** Split pane `target` on its `edge`, moving `ids` into the new half;
+   *  it shows `activate` when that is among them. */
+  | {
+      type: 'split';
+      ids: readonly string[];
+      target: PaneId;
+      edge: Edge;
+      activate?: string;
+    }
+  /** Move `ids` into pane `pane`, beside `anchor` or at its end. */
+  | {
+      type: 'move-to-pane';
+      ids: readonly string[];
+      pane: PaneId;
+      anchor?: Anchor;
+      activate?: string;
+    }
+  /** Close a pane, its tabs going to its neighbour. */
+  | { type: 'close-pane'; pane: PaneId }
+  /** The user resized the split `key` (`splitKey`). */
+  | { type: 'resize-split'; key: string; sizes: readonly number[] };
 
 /** Activate a tab, ignoring an id that is no longer on the strip. */
 function activateTab(state: Strip, id: string): Strip {
@@ -173,13 +214,10 @@ function activateTab(state: Strip, id: string): Strip {
     : state;
 }
 
-/** The workspace after `action`, applied to the focused pane's strip.
- *  The same workspace object when nothing changed. */
-export function reduce(ws: Workspace, action: TabsAction): Workspace {
-  const pane = focusedPaneOf(ws);
-  const strip = stripOf(ws, pane.id);
-  const next = reduceStrip(strip, action);
-  return next === strip ? ws : withStrip(ws, pane.id, next);
+/** The workspace after `action` (`workspace-reduce.ts`). The same
+ *  workspace object when nothing changed. */
+export function reduce(ws: Workspace, action: WorkspaceAction): Workspace {
+  return reduceWorkspace(ws, action, reduceStrip);
 }
 
 /** One pane's strip after `action`: every transition the reducer has. */
