@@ -53,7 +53,7 @@ function tabClassName({
     'group relative flex h-9 min-w-28 cursor-default items-center gap-2 border-r border-border px-3 text-base transition-colors select-none',
     // Wrapped, a full row's tabs share its width (TabStrip's end, or a
     // group's, takes the last row's room); in one row, each keeps its own.
-    wrap ? 'grow' : 'max-w-56',
+    wrap ? 'grow' : 'max-w-56 shrink-0',
     // Lifted above the tabs it slides over.
     dragging && 'z-10',
     tabStateClassName({ active, unseen, flashing })
@@ -167,6 +167,7 @@ export function TabButton({
       }}
       title={tabTitle(tab, foreignRepo)}
       data-face={kind}
+      data-tab-id={tab.id}
       data-unseen={face.unseen || undefined}
       className={tabClassName({
         active,

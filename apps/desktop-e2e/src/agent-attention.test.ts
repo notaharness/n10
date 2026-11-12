@@ -44,7 +44,36 @@ test.describe('An agent that finishes while you are elsewhere', () => {
       timeout: 30_000,
     });
 
+    await expect(
+      page.getByRole('button', { name: 'All tabs, 1 need attention' })
+    ).toBeVisible();
+    await page.keyboard.press('Control+Shift+KeyA');
+    await expect(tab(page, /worker/)).toHaveAttribute('aria-selected', 'true');
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.activeElement?.classList.contains('xterm-helper-textarea')
+        )
+      )
+      .toBe(true);
+
     // Looking at it is what clears it.
+    await expect(tab(page, /worker/)).not.toHaveClass(/tab-attention/, {
+      timeout: 20_000,
+    });
+  });
+
+  test('clears the mark when the agent tab is clicked', async ({ desktop }) => {
+    const { page } = desktop;
+    await createWorktree(page, 'worker');
+    await launchAgentFromRail(page);
+    await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await createWorktree(page, 'elsewhere');
+    await expect(tab(page, /worker/)).toHaveClass(/tab-attention/, {
+      timeout: 30_000,
+    });
     await tab(page, /worker/).click();
     await expect(tab(page, /worker/)).not.toHaveClass(/tab-attention/, {
       timeout: 20_000,

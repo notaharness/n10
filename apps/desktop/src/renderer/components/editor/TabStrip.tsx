@@ -5,10 +5,7 @@ import {
   useDroppable,
   useSensor,
   useSensors,
-  type Active,
-  type Announcements,
   type DragEndEvent,
-  type Over,
 } from '@dnd-kit/core';
 import {
   restrictToHorizontalAxis,
@@ -27,6 +24,7 @@ import {
   useCallback,
   useContext,
   useLayoutEffect,
+  useMemo,
   useRef,
   type KeyboardEvent,
   type PointerEvent,
@@ -34,6 +32,9 @@ import {
 } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { collisionsEndingAt, END_ID, groupEndId } from './strip-collisions.js';
+import { stripAnnouncements } from './strip-announcements.js';
+import { StripScrollArrows } from './StripScrollArrows.js';
+import { useStripScrollEdges } from './use-strip-scroll-edges.js';
 import {
   acceptsDrop,
   dropMove,
@@ -42,6 +43,7 @@ import {
   type StripDragData,
 } from './strip-drag.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
+import { setStripDragging } from '../../lib/tabs/tab-switching.js';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
 import { cn } from '../../lib/utils.js';
 import {
@@ -54,33 +56,6 @@ import {
 /** How far the pointer travels before a press becomes a drag, so
  *  clicks and double clicks on a tab stay clicks. */
 const DRAG_THRESHOLD_PX = 5;
-
-/** A tab as a screen reader hears it: its label, not its id. */
-function spoken(target: Active | Over): string {
-  const data = target.data.current;
-  return isStripDragData(data) ? data.label : String(target.id);
-}
-
-/** Where a place stands among those the drag may land on: its
- *  sortable list's, a group's members or the strip's blocks. */
-function position(over: Over): string | undefined {
-  const sortable = (
-    over.data.current as
-      | { sortable?: { index: number; items: unknown[] } }
-      | undefined
-  )?.sortable;
-  return sortable
-    ? `Position ${sortable.index + 1} of ${sortable.items.length}.`
-    : undefined;
-}
-
-const announcements: Announcements = {
-  onDragStart: ({ active }) => `Moving ${spoken(active)}.`,
-  onDragOver: ({ over }) => (over ? position(over) : undefined),
-  onDragEnd: ({ active, over }) =>
-    over ? `Moved ${spoken(active)}.` : 'Move cancelled.',
-  onDragCancel: () => 'Move cancelled.',
-};
 
 /** Where the strip tells the drag what its blocks are, as presented. */
 const StripBlocksReport = createContext<(blocks: StripBlocks) => void>(
@@ -136,6 +111,7 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
     <DndContext
       sensors={sensors}
       collisionDetection={collisionsEndingAt}
+      autoScroll={{ threshold: { x: 0.08, y: 0.2 }, acceleration: 6 }}
       // The dragged tab stays inside the strip. Carried past its end, it
       // would widen the nearest scrolling box (the strip, scrolled; the
       // editor column, wrapped), which auto-scroll then scrolls after
@@ -146,8 +122,16 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
           ? [restrictToParentElement]
           : [restrictToHorizontalAxis, restrictToParentElement]
       }
-      accessibility={{ announcements, screenReaderInstructions }}
-      onDragEnd={onDragEnd}
+      accessibility={{
+        announcements: stripAnnouncements,
+        screenReaderInstructions,
+      }}
+      onDragStart={() => setStripDragging(true)}
+      onDragCancel={() => setStripDragging(false)}
+      onDragEnd={(event) => {
+        setStripDragging(false);
+        onDragEnd(event);
+      }}
     >
       <StripBlocksReport.Provider value={reportBlocks}>
         {children}
@@ -169,33 +153,50 @@ export function TabDragProvider({ children }: { children: ReactNode }) {
 export function TabStrip({
   blocks,
   children,
+  controls,
 }: {
   /** Each block's sortable id and its tabs, in strip order. */
   blocks: readonly { id: string; ids: readonly string[] }[];
   children: ReactNode;
+  controls: ReactNode;
 }) {
   const wrap = useDesktopPrefs().tabOverflow === 'wrap';
   const report = useContext(StripBlocksReport);
   useLayoutEffect(() => report(blocks.map((b) => b.ids)), [report, blocks]);
+  const blockKey = blocks.map((block) => block.id).join('\n');
+  const blockIds = useMemo(() => blockKey.split('\n'), [blockKey]);
+  const { track, edges, update } = useStripScrollEdges(blockKey, wrap);
   return (
     <SortableContext
-      items={blocks.map((b) => b.id)}
+      items={blockIds}
       strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
     >
-      <div
-        role="tablist"
-        aria-label="Open tabs"
-        data-overflow={wrap ? 'wrap' : 'scroll'}
-        className={cn(
-          'flex shrink-0 items-stretch gap-2 border-b border-border bg-tab',
-          wrap
-            ? // Every row but the last is ruled off from the one below.
-              'flex-wrap [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
-            : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+      <div className="flex min-w-0 shrink-0 border-b border-border bg-tab">
+        <div
+          ref={track}
+          role="tablist"
+          aria-label="Open tabs"
+          data-overflow={wrap ? 'wrap' : 'scroll'}
+          className={cn(
+            'flex min-w-0 flex-1 items-stretch gap-2 bg-tab',
+            wrap
+              ? // Every row but the last is ruled off from the one below.
+                'flex-wrap [&>*]:-mb-px [&>*]:border-b [&>*]:border-border'
+              : 'h-9 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          )}
+          onScroll={update}
+        >
+          {children}
+          <StripEnd />
+        </div>
+        {!wrap && edges.overflow && (
+          <StripScrollArrows
+            left={edges.left}
+            right={edges.right}
+            track={track}
+          />
         )}
-      >
-        {children}
-        <StripEnd />
+        {controls}
       </div>
     </SortableContext>
   );
@@ -210,9 +211,11 @@ export function GroupMembers({
   children: ReactNode;
 }) {
   const wrap = useDesktopPrefs().tabOverflow === 'wrap';
+  const itemsKey = ids.join('\n');
+  const items = useMemo(() => itemsKey.split('\n'), [itemsKey]);
   return (
     <SortableContext
-      items={[...ids]}
+      items={items}
       strategy={wrap ? rectSortingStrategy : horizontalListSortingStrategy}
     >
       {children}
@@ -222,8 +225,8 @@ export function GroupMembers({
 
 /**
  * The room after the last tab. Its growth outweighs the tabs', so it
- * takes the last row's room while each full row above is shared out
- * among its tabs. A drop target only for its rect, and only under the
+ * takes the last row's remaining room; plain flex-wrap keeps each tab
+ * at its natural width. A drop target only for its rect, and only under the
  * pointer: collisions resolve it to the last place the drag may land
  * (`strip-collisions.ts`), and a keyboard drag, which steps from
  * droppable to droppable, skips it.

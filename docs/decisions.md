@@ -786,6 +786,30 @@ connecting), leaving the order and any walk as they were. Nothing pushes config 
 renderer, so the bindings are read again when the window comes to the front
 and when Settings → Keyboard opens; a read begun before a write is dropped.
 
+### All tabs and attention
+
+The fixed All tabs control sits outside the tab track, so it remains available
+whether tabs wrap or scroll. Its popover is a plain roster in presented strip
+order, including members hidden behind a collapsed chip. It has no search or
+filter: the roster gives a complete account of the strip. The same row
+component serves chip rosters. Selecting a row expands its group, reveals its
+tab and focuses its terminal when present, else the tab itself. The control's
+badge counts tabs needing attention, currently new output only.
+
+Next attention (Ctrl+Shift+A) walks a stable snapshot: blocked, error,
+unseen completion, then new output, each tier in presented order. Only new
+output has a source today; the other tiers reserve their places for explicit
+states rather than inferring them from silence or a session exit. A round
+skips tabs closed or cleared since its start and leaves newly active tabs for
+the next round. Manual activation resets the round; its own jump preserves
+it. A jump to a new-output item tab selects its agent pane so the output is
+visible. With no other pending tab, the command reports the current tab or
+toasts “Nothing needs attention.” Collapse others (Ctrl+Shift+J) keeps the
+active group expanded while collapsing the rest. Both commands are
+rebindable; a saved override on a conflicting chord wins and leaves the new
+default unassigned. On desktop a capital-letter chord requires the physical
+Shift modifier, because Caps Lock can capitalize a DOM key without Shift.
+
 ### Tab groups
 
 The strip groups tabs by what they belong to, their affiliation: the parent

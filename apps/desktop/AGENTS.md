@@ -214,11 +214,13 @@ Every rule below has its reasoning in `docs/decisions.md`.
   shows it (`showSession`), which is what marks output seen.
 - The tab strip wraps or scrolls as the `tabOverflow` desktop pref says,
   chosen from a tab's menu (radio items). Wrapped, dnd-kit sorts it with
-  `rectSortingStrategy` and no axis lock; full rows share their width, and
-  the strip's end (`StripEnd`) takes the last row's room. Either way the
+  `rectSortingStrategy` and no axis lock; plain flex-wrap leaves space
+  after each row's tabs, and the strip's end (`StripEnd`) takes the last
+  row's remaining room. Either way the
   dragged tab stays inside the strip (`restrictToParentElement`): past its
   end it would widen a scrolling box that auto-scroll then chases.
-  Collisions go by pointer first, then nearest centre; the strip's end
+  Collisions go by pointer first, then nearest centre within the
+  keyboard drag's row; the strip's end
   resolves to the last tab and is disabled for keyboard drags. The
   strip's `DndContext` (`TabDragProvider`) sits above the repository
   gate. A label that does not

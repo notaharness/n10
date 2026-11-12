@@ -1,6 +1,14 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import type { SidebarItem } from '../../../host/contract.js';
 import { useRepo } from '../../lib/repo-context.js';
+import {
+  nextAttention,
+  noteActivation,
+  type AttentionRound,
+} from '../../lib/tabs/attention-round.js';
+import { rowStatus } from '../../lib/tabs/group-status.js';
+import { setStripCommands } from '../../lib/tabs/strip-commands.js';
 import {
   groupOf,
   isCollapsed,
@@ -11,8 +19,10 @@ import {
 import { indexItems } from '../../lib/tabs/tab-item.js';
 import { tabPresentation } from '../../lib/tabs/tab-presentation.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
+import { useRequestAgentView } from '../../lib/tabs/tab-views.js';
 import { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
 import { EditorPane } from './EditorPane.js';
+import { AllTabs } from './AllTabs.js';
 import { EmptyState } from './EmptyState.js';
 import { GroupBlock } from './GroupBlock.js';
 import { groupBlockId, stripRuns } from './strip-blocks.js';
@@ -43,7 +53,11 @@ function groupLabel(
     const face = faceOf(group.head);
     return tabPresentation(face.tab, face.item, face.machineLabel).label;
   }
-  return group.affiliation?.label ?? '';
+  if (group.affiliation) return group.affiliation.label;
+  const first = group.tabs[0];
+  if (!first) return '';
+  const face = faceOf(first);
+  return tabPresentation(face.tab, face.item, face.machineLabel).label;
 }
 
 /**
@@ -70,10 +84,18 @@ export function EditorArea({
 }) {
   const { repo } = useRepo();
   const tabs = useTabs();
+  const requestAgentView = useRequestAgentView();
   const closer = useCloseTabs(items);
   const index = indexItems(repo.cwd, items);
   const { groups, faceOf, colorOf } = useStripGroups(items);
   const [announced, announce] = useState('');
+  const round = useRef<AttentionRound | null>(null);
+  const attentionActivation = useRef<string | null>(null);
+  useEffect(() => {
+    const byAttention = attentionActivation.current === tabs.activeId;
+    round.current = noteActivation(round.current, byAttention);
+    if (byAttention) attentionActivation.current = null;
+  }, [tabs.activeId]);
 
   const tabStopId = tabStopOf(
     presentedIds(groups),
@@ -87,6 +109,10 @@ export function EditorArea({
     others.some((g) => !isCollapsed(g, tabs.collapsed)) ||
     (!!activeGroup && isCollapsed(activeGroup, tabs.collapsed));
   const collapseOthers = () => {
+    if (!canCollapseOthers) {
+      announce('No other groups to collapse');
+      return;
+    }
     tabs.setCollapsed(
       others.map((g) => g.key),
       true
@@ -94,6 +120,60 @@ export function EditorArea({
     if (activeGroup?.chipped) tabs.setCollapsed([activeGroup.key], false);
     announce(activeGroup ? 'Other groups collapsed' : 'Groups collapsed');
   };
+  const revealTab = (id: string) => {
+    requestAnimationFrame(() => {
+      const key = CSS.escape(id);
+      const target = document.querySelector<HTMLElement>(
+        `[data-home-tab="${key}"], [data-tab-id="${key}"]`
+      );
+      target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const terminal = document.querySelector<HTMLElement>(
+        '[data-editor-panes] > :not([data-spare-pane]) .xterm-helper-textarea'
+      );
+      (terminal ?? target)?.focus();
+    });
+  };
+  const attention = () => {
+    const faces = groups.flatMap((group) => group.tabs.map(faceOf));
+    const step = nextAttention(
+      round.current,
+      faces.map((face) => ({
+        id: face.tab.id,
+        status: face.status,
+      })),
+      tabs.activeId
+    );
+    round.current = step.round;
+    if (!step.target) {
+      const message =
+        step.feedback === 'current'
+          ? 'Current tab needs attention'
+          : 'Nothing needs attention';
+      toast(message, { duration: 2000, id: 'tab-attention-feedback' });
+      announce(message);
+      return;
+    }
+    const target = faces.find((face) => face.tab.id === step.target)!;
+    if (target.tab.kind === 'item' && target.status === 'new-output')
+      requestAgentView(target.tab.id);
+    attentionActivation.current = target.tab.id;
+    tabs.activate(target.tab.id);
+    const label = tabPresentation(
+      target.tab,
+      target.item,
+      target.machineLabel
+    ).label;
+    const status = rowStatus(target.status, {
+      exited: target.snapshot?.exited ?? false,
+      unseen: target.unseen,
+    });
+    announce(`${label}, ${status}, ${step.index} of ${step.total}`);
+    revealTab(target.tab.id);
+  };
+  useEffect(() => {
+    setStripCommands({ attention, collapseOthers });
+    return () => setStripCommands(null);
+  });
 
   const runs = stripRuns(groups);
   const blocks = runs.map((run) => ({
@@ -145,7 +225,26 @@ export function EditorArea({
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-background">
-      <TabStrip blocks={blocks}>
+      <TabStrip
+        blocks={blocks}
+        controls={
+          <AllTabs
+            groups={groups}
+            faceOf={faceOf}
+            labelOf={(group) => groupLabel(group, faceOf)}
+            activeId={tabs.activeId}
+            onJump={(tab) => {
+              const face = faceOf(tab);
+              if (tab.kind === 'item' && face.status === 'new-output')
+                requestAgentView(tab.id);
+              const group = groupOf(groups, tab.id);
+              if (group?.chipped) tabs.setCollapsed([group.key], false);
+              tabs.activate(tab.id);
+              revealTab(tab.id);
+            }}
+          />
+        }
+      >
         {runs.map((run, at) =>
           run.lead.chipped
             ? groupBlock(

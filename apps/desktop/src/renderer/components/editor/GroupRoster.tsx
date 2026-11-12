@@ -1,5 +1,5 @@
 import { CheckIcon } from 'lucide-react';
-import { useEffect, useRef, type KeyboardEvent, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import {
   groupSummary,
   rowStatus,
@@ -21,6 +21,7 @@ import { FACE_ICON } from './TabIcon.js';
 import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
 import type { useRosterOpen } from './use-roster-open.js';
+import { walkRows } from './roster-keys.js';
 
 /** Where a row's tab lives, under its label: its repository and branch,
  *  a terminal's directory, its machine when it has one. */
@@ -85,7 +86,7 @@ function rowName(
     .join(', ');
 }
 
-function RosterRow({
+export function RosterRow({
   face,
   active,
   onJump,
@@ -143,28 +144,6 @@ function RosterRow({
       <RowBand color={face.repoColor} />
     </li>
   );
-}
-
-/** Arrow keys walk the rows without wrapping; Home and End go to the
- *  ends. */
-function walkRows(e: KeyboardEvent<HTMLUListElement>): void {
-  const rows = [
-    ...e.currentTarget.querySelectorAll<HTMLElement>('[data-roster-row]'),
-  ];
-  const at = rows.indexOf(document.activeElement as HTMLElement);
-  const next =
-    e.key === 'ArrowDown'
-      ? Math.min(at + 1, rows.length - 1)
-      : e.key === 'ArrowUp'
-      ? Math.max(at - 1, 0)
-      : e.key === 'Home'
-      ? 0
-      : e.key === 'End'
-      ? rows.length - 1
-      : null;
-  if (next === null) return;
-  e.preventDefault();
-  rows[next]?.focus();
 }
 
 /**

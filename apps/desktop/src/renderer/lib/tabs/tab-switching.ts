@@ -10,6 +10,7 @@ import {
   stepMru,
   type TabMru,
 } from './tab-mru.js';
+import { hasStripCommands, runStripCommand } from './strip-commands.js';
 
 /**
  * The keyboard tab switcher, apart from React: one MRU order for the
@@ -42,7 +43,7 @@ export interface TabSwitchingDeps {
   activate(id: string): void;
 }
 
-const STEP: Record<DesktopActionId, 1 | -1> = {
+const STEP: Partial<Record<DesktopActionId, 1 | -1>> = {
   'desktop.tabs.next': 1,
   'desktop.tabs.previous': -1,
   'desktop.tabs.cycle-next': 1,
@@ -60,7 +61,14 @@ type KeyEvent = Event & {
   shiftKey: boolean;
   altKey: boolean;
   metaKey: boolean;
+  repeat?: boolean;
+  isComposing?: boolean;
 };
+
+let stripDragging = false;
+export function setStripDragging(active: boolean): void {
+  stripDragging = active;
+}
 
 /** A modifier that holds a walk open is still down. Shift alone does
  *  not count: it only reverses the direction. */
@@ -126,13 +134,36 @@ function commit(): void {
   mru = commitMru(mru);
 }
 
-function onKeyDown(e: KeyEvent, deps: TabSwitchingDeps): void {
-  if (!deps.enabled() || deps.recording() || inModal(e.target)) return;
-  const action = resolveDesktopAction(e, deps.bindings());
-  if (!action) return;
+function runAuxiliaryAction(e: KeyEvent, action: DesktopActionId): boolean {
+  if (
+    action !== 'desktop.tabs.attention' &&
+    action !== 'desktop.groups.collapse-others'
+  )
+    return false;
+  if (!hasStripCommands()) return true;
   e.preventDefault();
   e.stopImmediatePropagation();
-  const delta = STEP[action];
+  if (!e.repeat) runStripCommand(action);
+  return true;
+}
+
+function canHandleKey(e: KeyEvent, deps: TabSwitchingDeps): boolean {
+  return (
+    deps.enabled() &&
+    !deps.recording() &&
+    !inModal(e.target) &&
+    !e.isComposing &&
+    !stripDragging
+  );
+}
+
+function onKeyDown(e: KeyEvent, deps: TabSwitchingDeps): void {
+  if (!canHandleKey(e, deps)) return;
+  const action = resolveDesktopAction(e, deps.bindings());
+  if (!action || runAuxiliaryAction(e, action)) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const delta = STEP[action]!;
   if (!deps.byRecentUse() || !MRU_CAPABLE.has(action)) {
     const next = stepPresented(
       presented,

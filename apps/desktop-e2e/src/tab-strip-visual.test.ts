@@ -1,6 +1,11 @@
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
-import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, switchRepo, tab } from './setup/app.js';
+import { test, expect, fakeAgent } from './fixtures/desktop.js';
+import {
+  createWorktree,
+  launchAgentFromRail,
+  switchRepo,
+  tab,
+} from './setup/app.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
 /**
@@ -105,6 +110,44 @@ test.describe('Visual (tab strip) @visual', () => {
       const { page, app } = desktop;
       await twoReposOfTabs(page, app, other);
       await expect(strip(page)).toHaveScreenshot('tab-strip-scroll.png', shot);
+      await expect(strip(page).locator('..')).toHaveScreenshot(
+        'tab-strip-controls-scroll.png',
+        shot
+      );
+      await page.getByRole('button', { name: 'All tabs' }).click();
+      await expect(
+        page.getByRole('dialog', { name: 'All tabs' })
+      ).toHaveScreenshot('all-tabs-popover.png', shot);
+    });
+  });
+
+  test.describe('light, attention', () => {
+    test.use({
+      desktopPrefs: { theme: 'light', nativeFrame: false },
+      n10Config: {
+        aiCommand: fakeAgent({ stream: true, intervalMs: 120, streamMs: 6000 }),
+      },
+    });
+
+    test('shows the attention badge inside the fixed control', async ({
+      desktop,
+    }) => {
+      const { page, app } = desktop;
+      await size(app);
+      await createWorktree(page, 'worker');
+      await page.getByRole('button', { name: 'Show review sidebar' }).click();
+      await launchAgentFromRail(page);
+      await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
+        timeout: 30_000,
+      });
+      await createWorktree(page, 'elsewhere');
+      await expect(tab(page, /worker/)).toHaveClass(/tab-attention/, {
+        timeout: 30_000,
+      });
+      await expect(strip(page).locator('..')).toHaveScreenshot(
+        'tab-strip-attention-control.png',
+        shot
+      );
     });
   });
 

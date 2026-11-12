@@ -127,6 +127,17 @@ test.describe('Tab groups', () => {
     const members = group(page, CLAUDE).getByRole('tab');
     await expect(members).toHaveCount(1);
     await expect(tab(page, new RegExp(first))).toHaveCount(0);
+    await page.getByRole('button', { name: 'All tabs' }).click();
+    const all = page.getByRole('dialog', { name: 'All tabs' });
+    await expect(all.locator('[data-roster-row]')).toHaveCount(4);
+    await all.getByRole('button', { name: new RegExp(second) }).click();
+    await expect(tab(page, new RegExp(second))).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await expect(members).toHaveCount(3);
+    await chipOf(page, CLAUDE).locator('[data-group-disclosure]').click();
+    await expect(members).toHaveCount(1);
     await chipOf(page, CLAUDE).locator('[data-group-disclosure]').click();
     await expect(members).toHaveCount(3);
     await expect(tab(page, new RegExp(first))).toBeVisible();

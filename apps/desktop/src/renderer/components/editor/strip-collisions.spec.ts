@@ -35,6 +35,27 @@ const block = (index: number): StripDragData => ({
 });
 
 describe('collisionsEndingAt', () => {
+  it('keeps a keyboard drag in the row it moved to, even when that row ends far left', () => {
+    const containers = [
+      container('previous-row', 1000, block(1), 200),
+      container('next-row', 0, block(2), 200),
+    ];
+    containers[1]!.rect.current = {
+      ...rect(0, 200),
+      top: 36,
+      bottom: 66,
+    };
+    const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
+    const collisions = collisionsEndingAt({
+      active: { id: 'active' } as never,
+      collisionRect: { ...rect(1000, 200), top: 36, bottom: 66 },
+      droppableRects: rects,
+      droppableContainers: containers,
+      pointerCoordinates: null,
+    });
+    expect(collisions[0]?.id).toBe('next-row');
+  });
+
   it('takes the room after the last tab for the last place by index, not by registration', () => {
     // Registered last but shown first: a block that mounted after a drag.
     const containers = [

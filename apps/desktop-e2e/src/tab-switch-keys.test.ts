@@ -58,6 +58,24 @@ test.describe('Tab switching keys', () => {
   // A project config of its own, to show the shortcuts never land there.
   test.use({ projectConfig: { email: 'tabs@example.com' } });
 
+  test('new strip actions appear as rebindable shortcuts', async ({
+    desktop,
+  }) => {
+    const { app, page } = desktop;
+    await openSettings(app, page);
+    await expect(
+      page.getByTestId('shortcut-desktop.tabs.attention')
+    ).toHaveText('Ctrl+Shift+a');
+    await expect(
+      page.getByTestId('shortcut-desktop.groups.collapse-others')
+    ).toHaveText('Ctrl+Shift+j');
+    await page.getByTestId('shortcut-desktop.groups.collapse-others').click();
+    await page.keyboard.press('Control+Alt+j');
+    await expect(
+      page.getByTestId('shortcut-desktop.groups.collapse-others')
+    ).toHaveText('Ctrl+Alt+j');
+  });
+
   test('Ctrl+PgUp/PgDn step along the strip and wrap, from inside a terminal', async ({
     desktop,
   }) => {

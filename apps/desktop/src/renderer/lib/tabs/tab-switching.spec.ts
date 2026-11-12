@@ -6,8 +6,10 @@ import {
   notePresentedOrder,
   noteStrip,
   resetTabMru,
+  setStripDragging,
   type TabSwitchingDeps,
 } from './tab-switching.js';
+import { setStripCommands } from './strip-commands.js';
 
 /** Stands in for the window, and for a focused element inside or
  *  outside a dialog (the listener reads `closest`). */
@@ -92,9 +94,59 @@ beforeEach(() => {
   stop = listenForTabSwitching(target, strip.deps);
 });
 
-afterEach(() => stop());
+afterEach(() => {
+  stop();
+  setStripCommands(null);
+  setStripDragging(false);
+});
 
 describe('keyboard tab switching', () => {
+  it.each([
+    ['desktop.tabs.attention', 'A'],
+    ['desktop.groups.collapse-others', 'J'],
+  ] as const)(
+    '%s consumes repeat events without running twice',
+    (action, key) => {
+      strip.bindings = {
+        ...strip.bindings,
+        [action]: [{ ctrl: true, input: key }],
+      };
+      let commands = 0;
+      let delivered = 0;
+      setStripCommands({
+        attention: () => commands++,
+        collapseOthers: () => commands++,
+      });
+      target.addEventListener('keydown', () => delivered++);
+      const first = press(key, { ctrl: true, shift: true });
+      const repeat = press(key, { ctrl: true, shift: true, repeat: true });
+      expect(first.defaultPrevented).toBe(true);
+      expect(repeat.defaultPrevented).toBe(true);
+      expect(commands).toBe(1);
+      expect(delivered).toBe(0);
+    }
+  );
+
+  it('leaves auxiliary chords untouched without a mounted strip', () => {
+    const event = press('A', { ctrl: true, shift: true });
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('stands aside while composing or dragging the strip', () => {
+    let runs = 0;
+    setStripCommands({ attention: () => runs++, collapseOthers: () => runs++ });
+    const composing = Object.assign(
+      keyEvent('keydown', 'A', { ctrl: true, shift: true }),
+      { isComposing: true }
+    );
+    target.dispatchEvent(composing);
+    expect(composing.defaultPrevented).toBe(false);
+    setStripDragging(true);
+    const dragging = press('A', { ctrl: true, shift: true });
+    expect(dragging.defaultPrevented).toBe(false);
+    expect(runs).toBe(0);
+  });
+
   it('Ctrl+PgDn/PgUp go along the strip and stop the event', () => {
     strip.visit('a');
     const e = press('PageDown', { ctrl: true });

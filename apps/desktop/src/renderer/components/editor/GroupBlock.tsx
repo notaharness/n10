@@ -29,10 +29,11 @@ function blockClassName(
   dragging: boolean
 ): string {
   return cn(
-    'flex max-w-full items-stretch gap-px',
+    'flex items-stretch gap-px',
     // Wrapped, the group breaks between its tabs, each row but its last
     // ruled off and shared out among them (`TabButton`).
     wrap && 'flex-wrap [&>*]:-mb-px [&>*]:border-b [&>*]:border-border',
+    wrap ? 'max-w-full' : 'shrink-0',
     // Behind the group it follows, as far off as the strip's blocks.
     carried && 'ml-[7px]',
     dragging && 'z-10 opacity-90'

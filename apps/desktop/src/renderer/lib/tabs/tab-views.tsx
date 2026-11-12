@@ -39,6 +39,8 @@ export type TabViews = Map<string, TabView>;
 
 const TabViewsContext = createContext<TabViews | null>(null);
 const TabIdContext = createContext<string | null>(null);
+const AgentViewContext = createContext<(id: string) => void>(() => undefined);
+const AGENT_VIEW_EVENT = 'n10:agent-view';
 
 /** Names the tab a pane shows, for the views inside it. */
 export const TabViewScope = TabIdContext.Provider;
@@ -51,6 +53,21 @@ export const TabViewScope = TabIdContext.Provider;
 export function TabViewsHost({ children }: { children: ReactNode }) {
   const { tabs } = useTabs();
   const [views] = useState<TabViews>(() => new Map());
+  const requestAgent = useCallback(
+    (id: string) => {
+      const previous = views.get(id);
+      views.set(id, {
+        ...previous,
+        pane: {
+          mode: 'agent',
+          chosen: true,
+          hasPr: previous?.pane?.hasPr ?? false,
+        },
+      });
+      window.dispatchEvent(new CustomEvent(AGENT_VIEW_EVENT, { detail: id }));
+    },
+    [views]
+  );
   useEffect(() => {
     const open = new Set(tabs.map((t) => t.id));
     for (const id of views.keys()) {
@@ -59,9 +76,29 @@ export function TabViewsHost({ children }: { children: ReactNode }) {
   }, [views, tabs]);
   return (
     <TabViewsContext.Provider value={views}>
-      {children}
+      <AgentViewContext.Provider value={requestAgent}>
+        {children}
+      </AgentViewContext.Provider>
     </TabViewsContext.Provider>
   );
+}
+
+/** Select a tab's agent pane before an attention jump activates it. */
+export function useRequestAgentView(): (id: string) => void {
+  return useContext(AgentViewContext);
+}
+
+/** A mounted review pane follows an external attention jump as well. */
+export function useAgentViewRequest(onRequest: () => void): void {
+  const id = useContext(TabIdContext);
+  useEffect(() => {
+    if (!id) return;
+    const receive = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === id) onRequest();
+    };
+    window.addEventListener(AGENT_VIEW_EVENT, receive);
+    return () => window.removeEventListener(AGENT_VIEW_EVENT, receive);
+  }, [id, onRequest]);
 }
 
 /**
