@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { expect, fakeAgent } from './fixtures/desktop.js';
 import {
   focusTerminal,
+  openAllTabs,
   sessionCard,
   sessionCards,
   sessionMenu,
@@ -98,7 +99,9 @@ test.describe('A pull request worked on another machine @beam', () => {
 
     // Discovery lists workbox's tmux beside this machine's. A session
     // started here from outside gets a tab once a scan has adopted it;
-    // a second one's tab means a later scan has run too. The terminal
+    // a second one's tab means a later scan has run too. With the pull
+    // request's they stand behind their repository's chip, so All tabs,
+    // which lists every tab and shows none, is where to look. The terminal
     // on workbox outlives both and still answers. A terminal those
     // scans ended would keep its card but no longer carry what is
     // typed into it.
@@ -110,9 +113,12 @@ test.describe('A pull request worked on another machine @beam', () => {
         worktreePath: addExternalWorktree(desktop.repoPath, branch),
         command: 'sleep 600',
       });
-      await expect(tabs(page).filter({ hasText: branch })).toBeVisible({
-        timeout: 30_000,
-      });
+      const all = await openAllTabs(page);
+      await expect(
+        all.locator('[data-roster-row]').filter({ hasText: branch })
+      ).toHaveCount(1, { timeout: 30_000 });
+      await page.keyboard.press('Escape');
+      await expect(all).toBeHidden();
     };
     await adopted(outside[0]!);
     await adopted(outside[1]!);
