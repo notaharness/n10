@@ -64,7 +64,13 @@ export function useHostEvents(
   // The sidebar is a query cache, so it has to be told to look again.
   // (A removed worktree's tabs close in `TabsProvider`.)
   useEffect(() => {
-    const off = window.n10.onDiscoveryChanged(() => {
+    const off = window.n10.onDiscoveryChanged(({ labelsOnly }) => {
+      if (labelsOnly) {
+        void qc.invalidateQueries({ queryKey: keys.sessions(cwd) });
+        void qc.invalidateQueries({ queryKey: keys.terminals });
+        void qc.invalidateQueries({ queryKey: keys.foreignSessions });
+        return;
+      }
       void qc.invalidateQueries({ queryKey: keys.sidebar(cwd) });
       void qc.invalidateQueries({ queryKey: keys.sessions(cwd) });
       // Discovery also brings back terminal tabs, and what it found

@@ -49,6 +49,9 @@ export function startDiscoveryForRepo(cwd: string): void {
         removedWorktrees: delta.disappeared.map((wt) => wt.path),
       });
     },
+    labelsChanged() {
+      changed?.({ repo: repo.cwd, removedWorktrees: [], labelsOnly: true });
+    },
   });
 }
 

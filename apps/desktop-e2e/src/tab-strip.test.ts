@@ -234,9 +234,14 @@ const fitsItsBox = (t: Locator) =>
 const TITLE =
   'Handle cancelled requests without leaving the half-written cache entry behind';
 
-/** The tab whose accessible name starts with the whole of `name`. */
+/** The tab whose full accessible label ends with its primary name. */
 const namedTab = (page: Page, name: string) =>
-  tab(page, new RegExp(`^${name}\\b`));
+  tab(
+    page,
+    new RegExp(
+      `(?:^| · )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: Close tab)?$`
+    )
+  );
 
 test.describe('Tab labels', () => {
   test('a name too long for its tab loses its front, and a screen reader hears it whole', async ({
@@ -253,18 +258,15 @@ test.describe('Tab labels', () => {
     expect(shown.length).toBeLessThan(LONG.length);
     expect(await fitsItsBox(t)).toBe(true);
     // A sighted reader gets the whole of it too, on hover.
-    await expect(t.locator('[data-tab-label]')).toHaveAttribute('title', LONG);
+    await expect(t).toHaveAttribute('title', new RegExp(LONG));
   });
 
   test('a name that fits is shown whole', async ({ desktop }) => {
     const { page } = desktop;
     await createWorktree(page, 'docs');
     const t = namedTab(page, 'docs');
-    await expect(shownLabel(t)).toHaveText('docs');
-    await expect(t.locator('[data-tab-label]')).not.toHaveAttribute(
-      'title',
-      /./
-    );
+    await expect(shownLabel(t)).toHaveText(/(?:^| · )docs$/);
+    await expect(t).toHaveAttribute('title', /docs/);
   });
 });
 
@@ -289,7 +291,7 @@ test.describe('Tab labels of pull requests', () => {
     expect(shown).toMatch(/^Handle cancelled .+…$/);
     expect(TITLE.startsWith(shown.slice(0, -1))).toBe(true);
     expect(await fitsItsBox(t)).toBe(true);
-    await expect(t.locator('[data-tab-label]')).toHaveAttribute('title', TITLE);
+    await expect(t).toHaveAttribute('title', new RegExp(TITLE));
   });
 });
 

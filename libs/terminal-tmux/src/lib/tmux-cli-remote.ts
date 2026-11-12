@@ -122,9 +122,13 @@ export async function tmuxPaneStateWith(
  */
 export async function tmuxListSessionsDetailedWith(
   executor: MachineExecutor,
-  options: readonly string[] = []
+  options: readonly string[] = [],
+  paneOption?: string
 ): Promise<TmuxSessionInfo[]> {
-  const result = await runTmuxWith(executor, listSessionsArgv(options));
+  const result = await runTmuxWith(
+    executor,
+    listSessionsArgv(options, paneOption)
+  );
   if (isNoServer(result)) return [];
   if (result.exitCode !== 0)
     throw new Error(
@@ -136,7 +140,7 @@ export async function tmuxListSessionsDetailedWith(
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => parseSessionLine(line, options));
+    .map((line) => parseSessionLine(line, options, paneOption));
 }
 
 /** Async twin of `tmuxFreeSessionName`: probes candidates one at a

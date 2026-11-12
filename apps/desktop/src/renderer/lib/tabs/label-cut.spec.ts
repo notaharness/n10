@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutToFit, dropChars, ELLIPSIS } from './label-cut.js';
+import { cutToFit, dropChars, ELLIPSIS, fitContextLabel } from './label-cut.js';
 
 /** One unit per character, the ellipsis included. */
 const mono = (s: string) => [...s].length;
@@ -37,6 +37,39 @@ describe('cutToFit', () => {
       [...s].reduce((w, c) => w + (c === 'W' ? 3 : 1), 0);
     // "…xW" is 5 wide, "…WxW" 8.
     expect(cutToFit('WWWxW', 5, wide, 'start')).toBe(3);
+  });
+});
+
+describe('fitContextLabel', () => {
+  const shown = (parts: ReturnType<typeof fitContextLabel>['parts']) =>
+    parts.map((part) => part.text).join('');
+
+  it('spends narrow width on the primary label before the place', () => {
+    const fit = fitContextLabel(
+      'n10-desktop-e2e-XYdfx0 · ',
+      'feature/auth',
+      '',
+      null,
+      18,
+      mono,
+      'start'
+    );
+    expect(shown(fit.parts)).toBe('n1… · feature/auth');
+    expect(fit.cut).toBe('end');
+  });
+
+  it('drops the place before cutting a branch from its own start', () => {
+    const fit = fitContextLabel(
+      'n10-desktop-e2e-XYdfx0 · ',
+      'feature/auth',
+      '',
+      null,
+      8,
+      mono,
+      'start'
+    );
+    expect(shown(fit.parts)).toBe('…re/auth');
+    expect(fit.cut).toBe('start');
   });
 });
 

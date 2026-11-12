@@ -23,7 +23,7 @@ import {
 } from '../lib/sidebar/sidebar-model.js';
 import { CommandPalette } from '../components/CommandPalette.js';
 import { EditorLayout } from '../components/editor/EditorLayout.js';
-import { useGrouping } from '../components/editor/use-strip-groups.js';
+import { useGrouping } from '../components/editor/use-tab-facts.js';
 import { prefetchPanes } from '../components/editor/lazy-panes.js';
 import { ShortcutsDialog } from '../components/ShortcutsDialog.js';
 import { Sidebar } from '../components/sidebar/Sidebar.js';

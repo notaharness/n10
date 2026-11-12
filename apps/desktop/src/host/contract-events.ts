@@ -176,6 +176,8 @@ export interface DiscoveryChangedEvent {
   /** Checkouts that are gone — removed by n10, with `git worktree
    *  remove`, or deleted from disk. */
   removedWorktrees: string[];
+  /** Only normalised pane labels changed; no repository scan is needed. */
+  labelsOnly?: boolean;
 }
 
 /** A user-facing event from the host's remote sync loop (auto-deleted

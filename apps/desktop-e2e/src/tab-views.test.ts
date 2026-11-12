@@ -211,7 +211,7 @@ test('a tab in a pane without focus keeps where it was left', async ({
   await expect(page.locator('[data-pane-id]')).toHaveCount(2);
   await expect(
     page.locator('[data-pane-id][data-pane-focused]').getByRole('tab')
-  ).toHaveText([/^gamma/]);
+  ).toHaveText([/gamma/]);
 
   // The split closed again, alpha comes back with its file picked.
   await page.keyboard.press('Control+Alt+w');

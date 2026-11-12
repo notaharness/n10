@@ -2,10 +2,10 @@ import { memo, useCallback, useState, useSyncExternalStore } from 'react';
 import {
   cutToFit,
   dropChars,
+  fitContextLabel,
   type CutSide,
   type LabelPart,
 } from '../../lib/tabs/label-cut.js';
-import { repoDisplayName } from '../../lib/tabs/tab-presentation.js';
 import { cn } from '../../lib/utils.js';
 
 let canvas: CanvasRenderingContext2D | null = null;
@@ -68,17 +68,43 @@ const MEASURE_SLACK_PX = 0.5;
 
 /** How many characters the label loses from `side` to fit the box:
  *  none until it has been measured. */
-function cutFor(text: string, box: string, side: CutSide): number {
+function cutFor(text: string, box: string, side: CutSide, fixed = ''): number {
   if (!box) return 0;
   const [width = '0', font = ''] = box.split('\n');
-  const room = Number(width) + MEASURE_SLACK_PX;
+  const room = Number(width) + MEASURE_SLACK_PX - measurer(font)(fixed);
   return cutToFit(text, room, measurer(font), side);
 }
 
+function visibleLabel(
+  segments: { prefix: string; base: string; suffix: string },
+  box: string,
+  side: CutSide,
+  machineLabel: string | null
+): { parts: LabelPart[]; cut?: CutSide } {
+  if (box && segments.prefix) {
+    const [width = '0', font = ''] = box.split('\n');
+    return fitContextLabel(
+      segments.prefix,
+      segments.base,
+      segments.suffix,
+      machineLabel,
+      Number(width) + MEASURE_SLACK_PX,
+      measurer(font),
+      side
+    );
+  }
+  const dropped = cutFor(segments.base, box, side, segments.suffix);
+  return {
+    parts: [
+      ...dropChars([{ key: 'base', text: segments.base }], dropped, side),
+      { key: 'suffix', text: segments.suffix },
+    ],
+    cut: dropped ? side : undefined,
+  };
+}
+
 /**
- * The tab's title, prefixed with its repository when that is not the
- * open one — the strip spans repos, and `main` alone says nothing about
- * which checkout it is. Too long for the tab, it loses `cut`'s end (a
+ * The tab's title. Too long for the tab, it loses `cut`'s end (a
  * branch its start, so its end stays in view) and shows the whole of
  * itself as a tooltip.
  *
@@ -89,36 +115,31 @@ function cutFor(text: string, box: string, side: CutSide): number {
 export const TabLabel = memo(function TabLabel({
   label,
   preview,
-  foreignRepo,
   cut,
+  task,
+  parts,
+  machineLabel,
 }: {
   label: string;
   preview: boolean;
-  foreignRepo: string | null;
   cut: CutSide;
+  task?: boolean;
+  parts?: { prefix: string; base: string; suffix: string };
+  machineLabel?: string | null;
 }) {
   const [el, setEl] = useState<HTMLSpanElement | null>(null);
   const box = useTextBox(el);
-  const parts: LabelPart[] = foreignRepo
-    ? [
-        {
-          key: 'repo',
-          text: `${repoDisplayName(foreignRepo)}/`,
-          className: 'text-muted-foreground/70',
-        },
-        { key: 'label', text: label },
-      ]
-    : [{ key: 'label', text: label }];
-  const whole = parts.map((p) => p.text).join('');
-  const dropped = cutFor(whole, box, cut);
+  const segments = parts ?? { prefix: '', base: label, suffix: '' };
+  const whole = label;
+  const fitted = visibleLabel(segments, box, cut, machineLabel ?? null);
   return (
     <span
       ref={setEl}
       data-tab-label
-      data-cut={dropped > 0 ? cut : undefined}
-      title={dropped > 0 ? whole : undefined}
+      data-cut={fitted.cut}
       className={cn(
-        'relative min-w-0 flex-1 overflow-hidden whitespace-nowrap',
+        'relative min-w-0 overflow-hidden whitespace-nowrap',
+        task ? 'w-36 shrink grow-0' : 'flex-1',
         preview && 'italic'
       )}
     >
@@ -128,7 +149,7 @@ export const TabLabel = memo(function TabLabel({
         {whole}
       </span>
       <span aria-hidden data-tab-label-shown className="absolute inset-0">
-        {dropChars(parts, dropped, cut).map((p) => (
+        {fitted.parts.map((p) => (
           <span key={p.key} className={p.className}>
             {p.text}
           </span>

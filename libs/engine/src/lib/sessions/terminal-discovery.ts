@@ -55,8 +55,12 @@ export interface MachineScanPorts {
   awaitingAttach(offered: readonly DiscoveredTerminal[]): boolean;
   adopt(terminal: DiscoveredTerminal): Promise<boolean>;
   onChanged(delta: DiscoveryDelta): void;
+  onLabelsChanged?: () => void;
   /** Handed the machine's whole listing. */
-  listed?(machine: string, sessions: readonly TaggedSession[]): void;
+  listed?(
+    machine: string,
+    sessions: readonly TaggedSession[]
+  ): boolean | 'labels' | undefined;
   /** Told once a listing of the machine succeeded and its terminals
    *  are adopted, none still waiting on a retried attach. */
   scanned?(machine: string): void;
@@ -80,13 +84,28 @@ const EMPTY_SCAN: DiscoveryScan = {
 export function createMachineScans(ports: MachineScanPorts) {
   const listing = new Set<string>();
 
+  function announce(
+    delta: DiscoveryDelta,
+    adopted: number,
+    metadata: boolean | 'labels'
+  ): void {
+    if (!ports.live()) return;
+    if (metadata === true || adopted > 0 || delta.endedTerminals.length > 0)
+      ports.onChanged({ ...delta, changed: true });
+    else if (metadata === 'labels') ports.onLabelsChanged?.();
+  }
+
   async function scanMachine(machine: string): Promise<void> {
     const before = heldTerminals(machine);
     let terminals: DiscoveredTerminal[];
+    const metadata = { changed: false as boolean | 'labels' };
     try {
       terminals = await observeRemoteTerminals(
         machine,
-        ports.listed && ((sessions) => ports.listed?.(machine, sessions))
+        ports.listed &&
+          ((sessions) => {
+            metadata.changed = ports.listed?.(machine, sessions) ?? false;
+          })
       );
     } catch (error) {
       log('warn', 'discovery', `could not list ${machine}'s sessions`, {
@@ -110,8 +129,7 @@ export function createMachineScans(ports: MachineScanPorts) {
     if (adopted === null) return;
     if (ports.live() && !ports.awaitingAttach(delta.adoptableTerminals))
       ports.scanned?.(machine);
-    if ((adopted > 0 || delta.endedTerminals.length > 0) && ports.live())
-      ports.onChanged({ ...delta, changed: true });
+    announce(delta, adopted, metadata.changed);
   }
 
   /** How many of `terminals` attached; null once the scan went stale. */

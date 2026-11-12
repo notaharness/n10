@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type {
   SessionActivitySnapshot,
   SidebarItem,
@@ -10,18 +10,13 @@ import {
   useSessions,
   useTerminals,
 } from '../../lib/data/queries.js';
-import {
-  hasPeerMachines,
-  resolveMachineLabel,
-} from '../../lib/machines/machine-model.js';
+import { resolveMachineLabel } from '../../lib/machines/machine-model.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
-import { affiliationIndex, tabFacts } from '../../lib/tabs/tab-affiliation.js';
 import {
   expandsOnShow,
   groupOf,
   isCollapsed,
-  isHomeTab,
   present,
   presentedIds,
   statusFromActivity,
@@ -29,11 +24,16 @@ import {
   type TabGroup,
   type TabStatus,
 } from '../../lib/tabs/tab-groups.js';
-import { indexItems, tabItem } from '../../lib/tabs/tab-item.js';
-import { listedSessions, tabSessions } from '../../lib/tabs/tab-sessions.js';
-import { tabRepo } from '../../lib/tabs/tab-presentation.js';
+import { tabItem } from '../../lib/tabs/tab-item.js';
+import {
+  tabRepo,
+  type tabPresentation,
+} from '../../lib/tabs/tab-presentation.js';
 import { notePresentedOrder } from '../../lib/tabs/tab-switching.js';
 import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
+import { canShowTask } from './strip-labels.js';
+import { useTabFacts } from './use-tab-facts.js';
+import { useStripLabels } from './use-strip-labels.js';
 
 /** What a tab's button shows, wherever it is drawn: on the strip or as
  *  a roster row. */
@@ -48,6 +48,15 @@ export interface TabFace {
   unseen: boolean;
   /** Its own session's state, for its group's roll-up. */
   status: TabStatus;
+  label: string;
+  labelParts: { prefix: string; base: string; suffix: string };
+  labelKind: ReturnType<typeof tabPresentation>['face'];
+  labelSource: ReturnType<typeof tabPresentation>['source'];
+  agentTab: boolean;
+  taskTitle?: string;
+  branch?: string;
+  harness?: string;
+  chipped: boolean;
 }
 
 export interface StripGroups {
@@ -64,66 +73,6 @@ export interface StripGroups {
 }
 
 /**
- * What the strip needs of a tab to group it: the session it shows or
- * works beside, and its affiliation. Also how the workspace places a
- * tab a sync opens (`groupOf`), so it shares one answer with the strip.
- */
-export function useTabFacts(items: SidebarItem[]) {
-  const { repo } = useRepo();
-  const terminals = useTerminals();
-  const foreign = useForeignSessions();
-  const sessions = useSessions(repo.cwd);
-  const index = useMemo(() => indexItems(repo.cwd, items), [repo.cwd, items]);
-
-  const sessionRows = useMemo(
-    () => listedSessions(items, sessions.data),
-    [items, sessions.data]
-  );
-  const affiliations = useMemo(
-    () =>
-      affiliationIndex({
-        repo: repo.cwd,
-        sessions: sessionRows,
-        terminals: terminals.data ?? [],
-        foreign: foreign.data?.sessions ?? [],
-      }),
-    [repo.cwd, sessionRows, terminals.data, foreign.data]
-  );
-
-  const { sessionOf, ownSession } = tabSessions(items, index);
-
-  const factsOf = (tab: Tab) => tabFacts(tab, sessionOf(tab), affiliations);
-  return { index, sessionOf, ownSession, factsOf };
-}
-
-/** Whether `tab` is its parent group's home: the orchestrator's own. */
-export function isHomeIn(tab: Tab, facts: TabFacts): boolean {
-  const a = facts.affiliation;
-  return a?.kind === 'parent' && !!a.home && isHomeTab(tab, facts, a.home);
-}
-
-/** The group a tab belongs to as the strip reads it (`useTabFacts`), and
- *  whether it is that group's home, by functions that keep their
- *  identity and read the latest facts: a sync places the tabs it opens
- *  with them without re-running on every render. */
-export function useGrouping(items: SidebarItem[]) {
-  const { factsOf } = useTabFacts(items);
-  const latest = useRef(factsOf);
-  useEffect(() => {
-    latest.current = factsOf;
-  });
-  const groupOf = useCallback(
-    (tab: Tab) => latest.current(tab).affiliation?.key ?? null,
-    []
-  );
-  const isHome = useCallback(
-    (tab: Tab) => isHomeIn(tab, latest.current(tab)),
-    []
-  );
-  return useMemo(() => ({ groupOf, isHome }), [groupOf, isHome]);
-}
-
-/**
  * The strip's groups and every tab's face, from the open repository's
  * items, the host's session listings and the tabs. Notes the presented
  * order for positional switching, and expands a collapsed group when one
@@ -135,45 +84,116 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
   const tabs = useTabs();
   const activity = useSessionActivity(repo.cwd);
   const terminals = useTerminals();
+  const foreign = useForeignSessions();
   const sessions = useSessions(repo.cwd);
   const machines = useMachines();
   const repoColors = useRepoColors();
-  const showMachines = hasPeerMachines(machines.data ?? []);
   const { index, sessionOf, ownSession, factsOf } = useTabFacts(items);
+  const terminalByName = useMemo(
+    () => new Map((terminals.data ?? []).map((row) => [row.name, row])),
+    [terminals.data]
+  );
+  const sessionByName = useMemo(
+    () => new Map((sessions.data ?? []).map((row) => [row.name, row])),
+    [sessions.data]
+  );
+  const foreignByCheckout = useMemo(
+    () =>
+      new Map(
+        (foreign.data?.sessions ?? []).map((row) => [
+          `${row.repo}\0${row.worktree}`,
+          row,
+        ])
+      ),
+    [foreign.data]
+  );
 
   const machineLabelFor = (tab: Tab): string | null => {
-    if (!showMachines) return null;
     const name = sessionOf(tab);
     if (!name) return null;
     const machineId =
       tab.kind === 'terminal'
-        ? terminals.data?.find((t) => t.name === name)?.machine
-        : sessions.data?.find((s) => s.name === name)?.machine;
-    return resolveMachineLabel(machineId, machines.data);
+        ? terminalByName.get(name)?.machine ?? tab.machine
+        : sessionByName.get(name)?.machine;
+    return !machineId || machineId === 'local'
+      ? null
+      : tab.kind === 'terminal' &&
+        !machines.data?.some((m) => m.peerId === machineId)
+      ? tab.machineLabel ?? resolveMachineLabel(machineId, machines.data)
+      : resolveMachineLabel(machineId, machines.data);
   };
   const colorOfTab = (tab: Tab): string | null => {
     const r = tabRepo(tab);
     return (r && repoColors.get(r)) ?? null;
   };
+  const groups = present(tabs.tabs, factsOf, tabs.pinned);
+  const taskOf = (tab: Tab): string | undefined => {
+    if (tab.kind === 'terminal' && tab.terminalKind === 'shell')
+      return undefined;
+    if (tab.kind === 'terminal') return terminalByName.get(tab.name)?.taskTitle;
+    if (tab.kind === 'settings') return undefined;
+    const item = tabItem(tab, index);
+    if (item?.kind === 'session') return item.session.taskTitle;
+    return foreignByCheckout.get(`${tab.repo}\0${tab.worktree}`)?.taskTitle;
+  };
+  const harnessOf = (tab: Tab): string | undefined => {
+    if (tab.kind === 'terminal') return terminalByName.get(tab.name)?.agent;
+    if (tab.kind === 'settings') return undefined;
+    return (
+      sessionByName.get(sessionOf(tab) ?? '')?.agent ??
+      foreignByCheckout.get(`${tab.repo}\0${tab.worktree}`)?.agent
+    );
+  };
+  const branchOf = (tab: Tab): string | undefined =>
+    tab.kind === 'terminal' ? terminalByName.get(tab.name)?.branch : undefined;
+  const { groupFor, presentationOf, labelOf } = useStripLabels({
+    groups,
+    tabs,
+    index,
+    machineLabelFor,
+    taskOf,
+    branchOf,
+  });
+  const faces = new Map<string, TabFace>();
   const faceOf = (tab: Tab): TabFace => {
+    const cached = faces.get(tab.id);
+    if (cached) return cached;
     const session = sessionOf(tab);
     const own = ownSession(tab);
-    return {
+    const item = tabItem(tab, index);
+    const presentation = presentationOf(tab);
+    const collision = labelOf(tab);
+    const face: TabFace = {
       tab,
-      item: tabItem(tab, index),
+      item,
       snapshot: session ? activity.data?.[session] : undefined,
       foreignRepo: foreignRepoOf(tab, repo.cwd),
       running:
-        tab.kind === 'terminal' &&
-        (terminals.data ?? []).some((t) => t.name === tab.name && t.running),
+        tab.kind === 'terminal' && !!terminalByName.get(tab.name)?.running,
       machineLabel: machineLabelFor(tab),
       repoColor: colorOfTab(tab),
       unseen: tabs.unseen.includes(tab.id),
       status: statusFromActivity(own ? activity.data?.[own] : undefined),
+      label: collision.label,
+      labelParts: {
+        prefix: presentation.prefix,
+        base: presentation.base,
+        suffix: collision.label.slice(presentation.label.length),
+      },
+      labelKind: presentation.face,
+      labelSource: presentation.source,
+      agentTab: canShowTask(tab, item, harnessOf(tab)),
+      taskTitle: taskOf(tab),
+      branch:
+        tab.kind === 'terminal'
+          ? terminalByName.get(tab.name)?.branch
+          : undefined,
+      harness: harnessOf(tab),
+      chipped: groupFor(tab)?.chipped ?? false,
     };
+    faces.set(tab.id, face);
+    return face;
   };
-
-  const groups = present(tabs.tabs, factsOf, tabs.pinned);
   const colorOf = (group: TabGroup): string | null => {
     if (group.head) return colorOfTab(group.head);
     // A terminal in a subdirectory names no repository of its own: it

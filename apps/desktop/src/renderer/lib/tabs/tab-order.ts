@@ -1,5 +1,20 @@
-import type { Tab } from './tab-identity.js';
+import { isForeignTab, tabHome, type Tab } from './tab-identity.js';
 import type { Strip } from './workspace.js';
+export { presentationOrder } from './tab-label-state.js';
+
+/** Focus a tab in the repository just opened, or its empty state. */
+export function focusRepo(state: Strip, repo: string): Strip {
+  const active = state.tabs.find((tab) => tab.id === state.activeId);
+  if (active && !isForeignTab(active, repo)) return state;
+  const remembered = state.tabs.find(
+    (tab) => tab.id === state.lastActiveByRepo[repo]
+  );
+  const own =
+    remembered ??
+    [...state.tabs].reverse().find((tab) => tabHome(tab) === repo);
+  const activeId = own?.id ?? null;
+  return activeId === state.activeId ? state : { ...state, activeId };
+}
 
 /**
  * What the user does to tabs and groups short of opening and closing

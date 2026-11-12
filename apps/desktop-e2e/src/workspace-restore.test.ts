@@ -3,10 +3,10 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab, visibleText } from './setup/app.js';
+import { createWorktree, tab, tabs, visibleText } from './setup/app.js';
 import { tmuxAvailable } from './setup/external.js';
 import { shownTerminal } from './setup/prewarm.js';
-import { LIFT, motion, tabNames } from './setup/tab-row.js';
+import { LIFT, motion } from './setup/tab-row.js';
 import { startSurvivingTerminal } from './setup/terminals.js';
 import { killFixtureSessions, killTmuxSession } from './setup/tmux.js';
 
@@ -26,6 +26,18 @@ const SHELL_AGAIN = 'restore-shell-again';
 const placeChip = (page: Page) => page.locator('[data-group-chip^="place:"]');
 const disclosure = (page: Page) =>
   placeChip(page).locator('[data-group-disclosure]');
+
+/** Whole accessible labels, in strip order; painted text may be cut. */
+async function tabLabels(page: Page): Promise<string[]> {
+  return Promise.all(
+    (await tabs(page).all()).map(
+      async (item) =>
+        (await item.getAttribute('aria-label')) ??
+        (await item.locator('[data-tab-label] .sr-only').textContent()) ??
+        ''
+    )
+  );
+}
 
 /**
  * Lift `name`'s tab and step it right once, over `neighbour`. The
@@ -94,23 +106,30 @@ test.describe('Workspace restore', () => {
     for (const branch of ['alpha', 'beta', 'gamma'])
       await createWorktree(page, branch);
     await expect
-      .poll(() => tabNames(page))
-      .toEqual([folder, 'alpha', 'beta', 'gamma']);
+      .poll(() => tabLabels(page))
+      .toEqual([basename(folder), 'alpha', 'beta', 'gamma']);
 
     // Reorder: alpha after beta, by keyboard.
     await stepRightOver(page, /^alpha/, /^beta/);
     await page.keyboard.press('Space');
     await expect
-      .poll(() => tabNames(page))
-      .toEqual([folder, 'beta', 'alpha', 'gamma']);
+      .poll(() => tabLabels(page))
+      .toEqual([basename(folder), 'beta', 'alpha', 'gamma']);
 
     // Pin gamma: it moves to the strip's start, out of its group.
     await tab(page, /^gamma/).click();
     await page.keyboard.press('Control+Alt+p');
-    await expect(tab(page, /^gamma/)).toHaveAttribute('data-pinned', 'true');
+    await expect(page.locator('[role="tab"][data-pinned="true"]')).toHaveCount(
+      1
+    );
     await expect
-      .poll(() => tabNames(page))
-      .toEqual(['gamma', folder, 'beta', 'alpha']);
+      .poll(() => tabLabels(page))
+      .toEqual([
+        expect.stringMatching(/ · gamma$/),
+        basename(folder),
+        'beta',
+        'alpha',
+      ]);
 
     // The host has written that down.
     await expect
@@ -127,16 +146,20 @@ test.describe('Workspace restore', () => {
     await desktop.relaunch();
     const next = desktop.page;
 
-    await expect(tab(next, /^gamma/)).toHaveAttribute('data-pinned', 'true', {
-      timeout: 30_000,
-    });
-    await expect(tab(next, /^gamma/)).toHaveAttribute('aria-selected', 'true');
+    const pinned = next.locator('[role="tab"][data-pinned="true"]');
+    await expect(pinned).toHaveCount(1, { timeout: 30_000 });
+    await expect(pinned).toHaveAttribute('aria-selected', 'true');
     await expect(disclosure(next)).toHaveAttribute('aria-expanded', 'false');
     await expect(tab(next, /^beta/)).toHaveCount(0);
     await disclosure(next).click();
     await expect
-      .poll(() => tabNames(next))
-      .toEqual(['gamma', folder, 'beta', 'alpha']);
+      .poll(() => tabLabels(next))
+      .toEqual([
+        expect.stringMatching(/ · gamma$/),
+        basename(folder),
+        'beta',
+        'alpha',
+      ]);
 
     // The terminal tab is bound to the session it was saved with: it
     // shows that session, once, and is not waiting to reconnect.

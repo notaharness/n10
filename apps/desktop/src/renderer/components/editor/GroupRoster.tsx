@@ -6,11 +6,7 @@ import {
   rosterSummary,
   tabCount,
 } from '../../lib/tabs/group-status.js';
-import {
-  repoDisplayName,
-  cutSide,
-  tabPresentation,
-} from '../../lib/tabs/tab-presentation.js';
+import { cutSide } from '../../lib/tabs/tab-presentation.js';
 import type { Tab } from '../../lib/tabs/tabs.js';
 import { cn } from '../../lib/utils.js';
 import { PopoverContent } from '../ui/popover.js';
@@ -22,19 +18,7 @@ import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
 import type { useRosterOpen } from './use-roster-open.js';
 import { walkRows } from './roster-keys.js';
-
-/** Where a row's tab lives, under its label: its repository and branch,
- *  a terminal's directory, its machine when it has one. */
-function secondary(face: TabFace): string {
-  const { tab, machineLabel } = face;
-  const where =
-    tab.kind === 'terminal'
-      ? tab.displayPath
-      : tab.kind === 'item'
-      ? [repoDisplayName(tab.repo), tab.branch].filter(Boolean).join(' · ')
-      : '';
-  return [machineLabel, where].filter(Boolean).join(' · ');
-}
+import { rosterSecondary } from './roster-text.js';
 
 /** The row's state, at its end: active first, then the state. */
 function RowStatus({
@@ -90,22 +74,23 @@ export function RosterRow({
   face,
   active,
   onJump,
+  home,
 }: {
   face: TabFace;
   active: boolean;
   onJump: (tab: Tab) => void;
+  home: boolean;
 }) {
-  const { label, face: kind } = tabPresentation(
-    face.tab,
-    face.item,
-    face.machineLabel
-  );
+  const { labelKind: kind } = face;
+  const label = home
+    ? ['Orchestrator', face.taskTitle].filter(Boolean).join(' · ')
+    : face.label;
   const Icon = FACE_ICON[kind];
   const status = rowStatus(face.status, {
     exited: face.snapshot?.exited ?? false,
     unseen: face.unseen,
   });
-  const where = secondary(face);
+  const where = rosterSecondary(face);
   return (
     <li className="relative">
       <button
@@ -124,17 +109,15 @@ export function RosterRow({
           <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-5">
             <TabLabel
               label={label}
+              parts={home ? undefined : face.labelParts}
+              machineLabel={face.machineLabel}
               preview={face.tab.preview}
-              foreignRepo={null}
-              cut={cutSide(kind)}
+              cut={face.labelSource === 'task' ? 'end' : cutSide(kind)}
             />
             {face.unseen && <UnseenDot />}
           </span>
           {where && (
-            <span
-              title={where}
-              className="truncate text-[11px] leading-4 text-muted-foreground"
-            >
+            <span className="truncate text-[11px] leading-4 text-muted-foreground">
               {where}
             </span>
           )}
@@ -160,6 +143,7 @@ export function GroupRoster({
   roster,
   returnFocus,
   onJump,
+  homeId,
 }: {
   groupKey: string;
   label: string;
@@ -169,6 +153,7 @@ export function GroupRoster({
   /** Where focus goes when Escape closes it. */
   returnFocus: RefObject<HTMLElement | null>;
   onJump: (tab: Tab) => void;
+  homeId?: string;
 }) {
   const list = useRef<HTMLUListElement>(null);
   const escaped = useRef(false);
@@ -258,6 +243,7 @@ export function GroupRoster({
               face={face}
               active={face.tab.id === activeId}
               onJump={jump}
+              home={face.tab.id === homeId}
             />
           ))}
         </ul>

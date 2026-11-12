@@ -12,6 +12,7 @@ export interface SessionRef {
   key: string;
   repo: string;
   worktree: string;
+  place?: string;
 }
 
 export type Affiliation =
@@ -26,12 +27,14 @@ export type Affiliation =
       label: string;
       /** The parent's own session, when this machine's view lists it. */
       home?: SessionRef;
+      /** Canonical main checkout or directory of the home or members. */
+      place?: string;
       /** On a group whose home reports to another parent: that
        *  parent's key. The group is shown right after that one; groups
        *  never nest. */
       follows?: string;
     }
-  | { kind: 'place'; key: string; label: string };
+  | { kind: 'place'; key: string; label: string; place?: string };
 
 const BEAM_QUALIFIER = /^beam:([^/]+)\//;
 const TMUX = 'tmux:';
@@ -90,6 +93,7 @@ export function placeAffiliation(
     kind: 'place',
     key: placeKey(path, machine),
     label: placeLabel(path),
+    place: path,
   };
 }
 
@@ -97,6 +101,15 @@ const HARNESS_LABELS: Record<string, string> = {
   claude: 'Claude',
   codex: 'Codex',
 };
+
+/** Human name of a parent target's harness, independent of its id. */
+export function harnessLabel(key: string): string {
+  const bare = key.replace(BEAM_QUALIFIER, '');
+  const scheme = bare.split(':', 1)[0] ?? bare;
+  return (
+    HARNESS_LABELS[scheme] ?? (scheme === 'tmux' ? 'Orchestrator' : scheme)
+  );
+}
 
 /**
  * What a parent no session here answers to is called: its harness and
@@ -111,7 +124,7 @@ export function homelessLabel(
   const colon = bare.indexOf(':');
   const scheme = colon < 0 ? bare : bare.slice(0, colon);
   if (scheme === 'tmux') return bare.slice(colon + 1);
-  const harness = HARNESS_LABELS[scheme] ?? scheme;
+  const harness = harnessLabel(key);
   const places = new Set(memberPlaces);
   const [only] = places;
   return places.size === 1 && only ? `${harness} · ${only}` : harness;

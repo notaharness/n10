@@ -134,6 +134,12 @@ test.describe('Supervising layouts', () => {
     const home = chip(page).getByRole('tab');
     await home.click();
     await expect(home).toHaveAttribute('aria-selected', 'true');
+    await armContextMenuChoice(app, 'Rename group…');
+    await home.click({ button: 'right' });
+    const rename = page.getByRole('dialog', { name: 'Rename group' });
+    await rename.getByRole('textbox', { name: 'Name' }).fill('Release crew');
+    await rename.getByRole('button', { name: 'Save' }).click();
+    await expect(chip(page)).toContainText('Release crew');
     await focusTerminal(page);
     // A menu is opened with a press, which focuses the tab pressed.
     const pressed = await home.elementHandle();
@@ -153,6 +159,7 @@ test.describe('Supervising layouts', () => {
     const source = panes(page).nth(0);
     const follow = panes(page).nth(1);
     await expect(followLine(page)).toHaveText(/^Following /);
+    await expect(followLine(page)).toContainText('Following Release crew');
     await expect(follow.locator('[data-follow-line]')).toHaveCount(1);
     await expect(follow.getByRole('tab')).toHaveCount(2);
     await expect(source).toHaveAttribute('data-pane-focused', 'true');

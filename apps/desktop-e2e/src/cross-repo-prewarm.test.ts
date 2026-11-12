@@ -17,6 +17,11 @@ import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
 const PARKED_TTL_MS = 8_000;
 
+/** Each repository's one tab, alone on the strip and so named
+ *  '{place} · {primary}' in either repository. */
+const ALPHA_TAB = /^repo-alpha · alpha-work/;
+const BETA_TAB = /^repo-beta · beta-work/;
+
 async function restOn(page: Page, target: Locator): Promise<void> {
   const box = await target.boundingBox();
   if (!box) throw new Error('not laid out');
@@ -84,10 +89,10 @@ test.describe("Another repository's tab", () => {
     desktop,
   }) => {
     const { page } = desktop;
-    const alpha = tab(page, /^repo-alpha\/alpha-work/);
+    const alpha = tab(page, ALPHA_TAB);
     await expect(alpha).toBeVisible();
     // Off the strip's left-last spare first: the hover is what holds it.
-    await tab(page, /^beta-work/).click();
+    await tab(page, BETA_TAB).click();
     await restOn(page, alpha);
     const spare = page.locator('[data-spare-pane]');
     await expect(spare).toContainText('alpha-work');
@@ -96,11 +101,7 @@ test.describe("Another repository's tab", () => {
 
     await page.mouse.down();
     await page.mouse.up();
-    // At home in its repository: the tab lost its repository prefix.
-    await expect(tab(page, /^alpha-work/)).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    await expect(alpha).toHaveAttribute('aria-selected', 'true');
     await expect
       .poll(() => page.evaluate(() => window.n10.getRepo().then((r) => r?.cwd)))
       .toContain('repo-alpha');
@@ -111,11 +112,8 @@ test.describe("Another repository's tab", () => {
 
     // Back the other way: the tab left is the one held now.
     await watchEditor(page);
-    await tab(page, /^repo-beta\/beta-work/).click();
-    await expect(tab(page, /^beta-work/)).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    await tab(page, BETA_TAB).click();
+    await expect(tab(page, BETA_TAB)).toHaveAttribute('aria-selected', 'true');
     expect(await editorGaps(page)).toEqual([]);
   });
 
@@ -123,8 +121,8 @@ test.describe("Another repository's tab", () => {
     desktop,
   }) => {
     const { page, repoPath } = desktop;
-    const alpha = tab(page, /^repo-alpha\/alpha-work/);
-    await tab(page, /^beta-work/).click();
+    const alpha = tab(page, ALPHA_TAB);
+    await tab(page, BETA_TAB).click();
     await restOn(page, alpha);
     await expect(page.locator('[data-spare-pane]')).toContainText('alpha-work');
 
@@ -149,13 +147,13 @@ test.describe("Another repository's tab", () => {
   }) => {
     const { page } = desktop;
     for (let n = 0; n < 3; n++) {
-      await tab(page, /^repo-alpha\/alpha-work/).click();
-      await expect(tab(page, /^alpha-work/)).toHaveAttribute(
+      await tab(page, ALPHA_TAB).click();
+      await expect(tab(page, ALPHA_TAB)).toHaveAttribute(
         'aria-selected',
         'true'
       );
-      await tab(page, /^repo-beta\/beta-work/).click();
-      await expect(tab(page, /^beta-work/)).toHaveAttribute(
+      await tab(page, BETA_TAB).click();
+      await expect(tab(page, BETA_TAB)).toHaveAttribute(
         'aria-selected',
         'true'
       );
@@ -203,7 +201,7 @@ test.describe("A hover over another repository's tab", () => {
     desktop,
   }) => {
     const { page } = desktop;
-    const beta = tab(page, /^repo-beta\/beta-work/);
+    const beta = tab(page, BETA_TAB);
     const before = await listedAt(page, otherRepo);
 
     await restOn(page, beta);

@@ -68,6 +68,8 @@ export function isItemActive(item: SidebarItem): boolean {
 
 export interface AgentSession {
   name: string;
+  /** Clean primary pane task hint from the latest discovery listing. */
+  taskTitle?: string;
   label?: string;
   running: boolean;
   /** Mirrors `WorktreeInfo.state` — set when the worktree is mid-rebase. */

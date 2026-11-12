@@ -284,7 +284,7 @@ export function resolveMachineLabel(
 ): string | null {
   if (!machineId || machineId === 'local') return null;
   const found = machines?.find((m) => m.peerId === machineId);
-  return found ? found.label : 'Unknown machine';
+  return found ? found.label : 'Remote';
 }
 
 /** "Creating worktree on workbox…" / "Starting claude…" — the step

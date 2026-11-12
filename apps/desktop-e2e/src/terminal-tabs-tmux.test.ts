@@ -149,6 +149,10 @@ test.describe('Terminal tabs under tmux', () => {
   });
 });
 
+/** The tooltip line `{name}: {path}`, among the tab's detail lines. */
+const detailLine = (name: string, path: string) =>
+  new RegExp(`^${name}: ${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm');
+
 test.describe('Terminal tabs surviving a restart', () => {
   const PLAIN = 'plain-shell';
   const IN_REPO = 'survivor-repo-agent';
@@ -229,10 +233,14 @@ test.describe('Terminal tabs surviving a restart', () => {
 
     // The plain folder's terminal sits in the repo-less group.
     const plain = tab(page, new RegExp(basename(folder)));
-    await expect(plain).toHaveAttribute('title', folder);
-    // The other repository's terminal is foreign here — prefixed with
-    // that repository's name — and that repository is back on the list.
-    const foreign = tab(page, /survivor-repo\s*\/\s*/);
+    await expect(plain).toHaveAttribute(
+      'title',
+      detailLine('Directory', folder)
+    );
+    // The other repository's terminal is foreign here — alone on the
+    // strip and opened at that repository's root, so named after it —
+    // and that repository is back on the list.
+    const foreign = tab(page, /^survivor-repo\b/);
     await expect(foreign).toBeVisible();
     const recents = await page.evaluate(() => window.n10.listRecentRepos());
     expect(recents.map((r) => r.cwd)).toContain(other);

@@ -90,11 +90,12 @@ test.describe('A sidebar answer about another repository', () => {
     // Now the renderer catches up with the host. Beta's own tab opens
     // for the running agent; there is no second one under alpha's name.
     await switchRepo(page, otherRepo);
-    await expect(tab(page, new RegExp(`^\\s*${BETA_BRANCH}`))).toBeVisible({
-      timeout: 30_000,
-    });
+    // Each lone on the strip, a tab is named '{repository} · {branch}'.
     await expect(
-      tab(page, new RegExp(`${ALPHA}\\s*/\\s*${BETA_BRANCH}`))
+      tab(page, new RegExp(`^${BETA} · ${BETA_BRANCH}`))
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      tab(page, new RegExp(`^${ALPHA} · ${BETA_BRANCH}`))
     ).toHaveCount(0);
     await expect(tabs(page)).toHaveCount(1);
   });

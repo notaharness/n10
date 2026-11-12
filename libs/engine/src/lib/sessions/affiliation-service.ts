@@ -13,6 +13,7 @@ import {
   type TaggedSession,
 } from '@n10/core';
 import { logError } from '@n10/logger';
+import { normalizeAgentTitle } from './agent-title.js';
 
 /** What the service reads of a fleet row (`MachineView`). */
 export interface FleetMember {
@@ -27,6 +28,62 @@ const gone = (m: FleetMember) =>
 export type AffiliationService = ReturnType<typeof createAffiliationService>;
 
 const EMPTY: Affiliations = { sessions: new Map(), worktrees: new Map() };
+
+interface AcceptedTitle {
+  created: number;
+  title: string;
+  updated: number;
+}
+
+function acceptTitle(
+  titles: Map<string, AcceptedTitle>,
+  key: string,
+  session: TaggedSession,
+  now: number
+): boolean {
+  const old = titles.get(key);
+  if (old && old.created !== session.created) titles.delete(key);
+  const current = titles.get(key);
+  const title = normalizeAgentTitle(session.paneTitle, session.path);
+  if (
+    title &&
+    title !== current?.title &&
+    (!current || now - current.updated >= 1_000)
+  ) {
+    titles.set(key, { created: session.created, title, updated: now });
+  }
+  return old?.title !== titles.get(key)?.title;
+}
+
+function updateTitles(
+  titles: Map<string, AcceptedTitle>,
+  listings: ReadonlyMap<string, readonly TaggedSession[]>
+): boolean {
+  const now = Date.now();
+  let changed = false;
+  const byKey = new Map<string, TaggedSession>();
+  for (const session of [...listings.values()].flat()) {
+    const key = registryNameOf(session);
+    const previous = byKey.get(key);
+    if (!previous || session.created < previous.created)
+      byKey.set(key, session);
+  }
+  for (const [key, session] of byKey) {
+    if (session.type === 'shell' || !session.agent) continue;
+    changed = acceptTitle(titles, key, session, now) || changed;
+  }
+  const live = new Set(
+    [...byKey].flatMap(([key, session]) =>
+      session.type !== 'shell' && session.agent ? [key] : []
+    )
+  );
+  for (const key of titles.keys())
+    if (!live.has(key)) {
+      titles.delete(key);
+      changed = true;
+    }
+  return changed;
+}
 
 /**
  * What every session the engine sees belongs to (core's
@@ -44,6 +101,7 @@ const EMPTY: Affiliations = { sessions: new Map(), worktrees: new Map() };
  */
 export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
   const listings = new Map<string, readonly TaggedSession[]>();
+  const titles = new Map<string, AcceptedTitle>();
   const places = new Map<string, string>();
   let self: string | undefined;
   let snapshot = EMPTY;
@@ -82,11 +140,23 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
     for (const dir of places.keys()) if (!listed.has(dir)) places.delete(dir);
   }
 
-  function derive(): void {
-    const all = [...listings.values()].flat();
-    created = new Map(all.map((s) => [registryNameOf(s), s.created]));
+  function derive(): boolean | 'labels' {
+    const unique = new Map<string, TaggedSession>();
+    for (const session of [...listings.values()].flat()) {
+      const key = registryNameOf(session);
+      const prior = unique.get(key);
+      if (!prior || session.created < prior.created) unique.set(key, session);
+    }
+    const all = [...unique.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([, session]) => session);
+    const nextCreated = new Map(all.map((s) => [registryNameOf(s), s.created]));
+    const createdChanged = !isDeepStrictEqual(nextCreated, created);
+    created = nextCreated;
+    const titlesChanged = updateTitles(titles, listings);
     const next = affiliations(all, placeOf, { self });
-    if (isDeepStrictEqual(next, snapshot)) return;
+    const groupsChanged = !isDeepStrictEqual(next, snapshot);
+    if (!titlesChanged && !groupsChanged && !createdChanged) return false;
     snapshot = next;
     for (const listener of listeners) {
       try {
@@ -95,12 +165,16 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
         logError('affiliation observer', error);
       }
     }
+    return groupsChanged || createdChanged ? true : 'labels';
   }
 
-  function observe(machine: string, sessions: readonly TaggedSession[]): void {
+  function observe(
+    machine: string,
+    sessions: readonly TaggedSession[]
+  ): boolean | 'labels' {
     listings.set(machine, sessions);
     if (machine === LOCAL_MACHINE) forgetUnlisted();
-    derive();
+    return derive();
   }
 
   /** The fleet's rows: this machine's peerId, and the peers no longer in
@@ -151,6 +225,9 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
      *  seconds), by registry key, once a listing has named it. */
     createdOf(key: string): number | undefined {
       return created.get(key);
+    },
+    titleOf(key: string): string | undefined {
+      return titles.get(key)?.title;
     },
     /** The parent group of the agent working in a checkout, if any. */
     ofCheckout(path: string, machine = LOCAL_MACHINE): Affiliation | undefined {

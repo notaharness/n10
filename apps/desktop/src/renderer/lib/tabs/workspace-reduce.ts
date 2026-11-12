@@ -19,6 +19,7 @@ import {
   tileGroup,
 } from './supervise.js';
 import { placeFor } from './tab-placement.js';
+import { prunePaneLabels, reconciledPaneLabels } from './tab-label-state.js';
 import type { TabsAction } from './tabs-model.js';
 import {
   focusedPaneOf,
@@ -26,6 +27,7 @@ import {
   stripOf,
   withStrip,
   type PaneId,
+  type PaneLabels,
   type PaneNode,
   type Strip,
   type Workspace,
@@ -273,15 +275,15 @@ function distribute(
     for (const id of p.order) home.set(id, p.id);
   }
   const paneFor = (tab: Tab) => home.get(tab.id) ?? place(tab);
-  const { tabs: list, activeId, ...marks } = after;
-  const rest = { ...marks };
-  delete rest.others;
+  const { tabs: list, activeId } = after;
   const landed = list.find((t) => t.id === activeId);
   const landedIn = landed ? paneFor(landed) : null;
   let layout = ws.layout;
+  const labelState: Record<PaneId, PaneLabels> = {};
   for (const pane of panesOf(ws.layout)) {
     const mine = list.filter((t) => paneFor(t) === pane.id);
     const order = mine.map((t) => t.id);
+    labelState[pane.id] = reconciledPaneLabels(ws.labelState[pane.id], order);
     const focused = pane.id === ws.focusedPane;
     // Only the focused pane's choice moves the workspace's repository.
     const kept = keptActive(pane, mine, focused ? repo : undefined);
@@ -293,13 +295,18 @@ function distribute(
   }
   const tabs = Object.fromEntries(list.map((t) => [t.id, t]));
   // A pin goes with its tab, as `withStrip` has it.
-  const pinned = rest.pinned.filter((id) => Object.hasOwn(tabs, id));
+  const pinned = after.pinned.filter((id) => Object.hasOwn(tabs, id));
   return {
     ...ws,
-    ...rest,
-    pinned: pinned.length === rest.pinned.length ? rest.pinned : pinned,
+    pinned: pinned.length === after.pinned.length ? after.pinned : pinned,
+    collapsed: after.collapsed,
+    dismissed: after.dismissed,
+    groupNames: after.groupNames,
+    unseen: after.unseen,
+    lastActiveByRepo: after.lastActiveByRepo,
     tabs,
     layout,
+    labelState,
   };
 }
 
@@ -313,7 +320,7 @@ function settle(ws: Workspace): Workspace {
   const unseen = next.unseen.filter((id) => !shown.has(id));
   const seen =
     unseen.length === next.unseen.length ? next : { ...next, unseen };
-  return remembered(seen);
+  return prunePaneLabels(remembered(seen));
 }
 
 function remembered(ws: Workspace): Workspace {

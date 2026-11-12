@@ -67,6 +67,8 @@ export function useActiveTabInView(
     };
     const observer = new ResizeObserver(reveal);
     observer.observe(el);
+    // Label metadata can change a block's width without resizing the track.
+    for (const child of el.children) observer.observe(child);
     reveal();
     return () => observer.disconnect();
   }, [track, wrap, activeId, blockKey]);

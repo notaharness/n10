@@ -23,6 +23,10 @@ test.skip(!tmuxAvailable(), 'tmux is not installed');
 const panes = (page: Page) => page.locator('[data-pane-id]');
 const pane = (page: Page, n: number) => panes(page).nth(n);
 const content = (p: Locator) => p.locator('[data-editor-panes]');
+const namedTab = (page: Page, name: string) =>
+  tab(page, new RegExp(`(?:^| · )${name}(?: Close tab)?$`));
+const fullLabels = (p: Locator) =>
+  p.getByRole('tab').locator('[data-tab-label] .sr-only');
 
 /** Press `from` and carry it, in pointer steps, to (`fx`, `fy`) of
  *  `onto`'s box, still held. */
@@ -74,10 +78,10 @@ test.describe('Split panes', () => {
 
     // Ctrl+\ moves the active tab into a new pane on the right, which
     // takes focus.
-    await tab(page, /^delta/).click();
+    await namedTab(page, 'delta').click();
     await page.keyboard.press('Control+\\');
     await expect(panes(page)).toHaveCount(2);
-    await expect(pane(page, 1).getByRole('tab')).toHaveText([/^delta/]);
+    await expect(fullLabels(pane(page, 1))).toHaveText([/(?:^| · )delta$/]);
     await expect(pane(page, 1)).toHaveAttribute('data-pane-focused', 'true');
     // Focus goes with it: the new pane's tab takes the keys.
     await expect(
@@ -86,12 +90,20 @@ test.describe('Split panes', () => {
     await expect(pane(page, 0).getByRole('tab')).toHaveCount(3);
 
     // Escape lets go of a drag over a pane's side with nothing moved.
-    await carryTo(page, tab(page, /^alpha/), content(pane(page, 1)), 0.97, 0.5);
+    await carryTo(
+      page,
+      namedTab(page, 'alpha'),
+      content(pane(page, 1)),
+      0.97,
+      0.5
+    );
     await expect(
       pane(page, 1).locator('[data-pane-drop="right"]')
     ).toBeVisible();
     // A copy of the tab follows the pointer out of its strip.
-    await expect(page.locator('[data-drag-overlay]')).toHaveText(/^alpha/);
+    await expect(
+      page.locator('[data-drag-overlay] [data-tab-label] .sr-only')
+    ).toHaveText(/(?:^| · )alpha$/);
     await page.keyboard.press('Escape');
     await expect(page.locator('[data-pane-drop]')).toHaveCount(0);
     await page.mouse.up();
@@ -100,7 +112,13 @@ test.describe('Split panes', () => {
 
     // Dragging a tab onto the bottom of a pane shows the half it would
     // take, and dropping it there splits that pane.
-    await carryTo(page, tab(page, /^gamma/), content(pane(page, 0)), 0.5, 0.97);
+    await carryTo(
+      page,
+      namedTab(page, 'gamma'),
+      content(pane(page, 0)),
+      0.5,
+      0.97
+    );
     await expect(
       pane(page, 0).locator('[data-pane-drop="bottom"]')
     ).toBeVisible();
@@ -108,16 +126,18 @@ test.describe('Split panes', () => {
     await page.mouse.up();
     await expect(panes(page)).toHaveCount(3);
     await expect(
-      page.locator('[data-pane-id]', { has: tab(page, /^gamma/) })
+      page.locator('[data-pane-id]', { has: namedTab(page, 'gamma') })
     ).toHaveAttribute('data-pane-focused', 'true');
 
     // A group's chip carries its members: dropped in the middle of the
     // pane holding delta, alpha and beta move there, and the pane they
     // left goes.
-    const top = page.locator('[data-pane-id]', { has: tab(page, /^alpha/) });
+    const top = page.locator('[data-pane-id]', {
+      has: namedTab(page, 'alpha'),
+    });
     const chip = top.locator('[data-group-chip^="place:"]');
     const deltaPane = page.locator('[data-pane-id]', {
-      has: tab(page, /^delta/),
+      has: namedTab(page, 'delta'),
     });
     await carryTo(page, chip, content(deltaPane), 0.5, 0.5);
     await expect(deltaPane.locator('[data-pane-drop="centre"]')).toBeVisible();
@@ -128,7 +148,7 @@ test.describe('Split panes', () => {
 
     // Closing the focused pane moves its tabs to its neighbour; nothing
     // is closed or stopped.
-    await tab(page, /^gamma/).click();
+    await namedTab(page, 'gamma').click();
     await page.keyboard.press('Control+Alt+w');
     await expect(panes(page)).toHaveCount(1);
     await expect
@@ -143,30 +163,32 @@ test.describe('Split panes', () => {
     const { page } = desktop;
     for (const branch of ['alpha', 'beta', 'gamma'])
       await createWorktree(page, branch);
-    await tab(page, /^gamma/).click();
+    await namedTab(page, 'gamma').click();
     await page.keyboard.press('Control+\\');
-    await expect(pane(page, 1).getByRole('tab')).toHaveText([/^gamma/]);
+    await expect(fullLabels(pane(page, 1))).toHaveText([/(?:^| · )gamma$/]);
 
     // Over gamma's near half, the strip opens room before it as wide as
     // alpha, and a copy of alpha follows the pointer.
-    const gamma = tab(page, /^gamma/);
+    const gamma = namedTab(page, 'gamma');
     const [from, at] = await Promise.all([
-      tab(page, /^alpha/).boundingBox(),
+      namedTab(page, 'alpha').boundingBox(),
       gamma.boundingBox(),
     ]);
-    await carryTo(page, tab(page, /^alpha/), gamma, 0.25, 0.5);
-    await expect(page.locator('[data-drag-overlay]')).toHaveText(/^alpha/);
+    await carryTo(page, namedTab(page, 'alpha'), gamma, 0.25, 0.5);
+    await expect(
+      page.locator('[data-drag-overlay] [data-tab-label] .sr-only')
+    ).toHaveText(/(?:^| · )alpha$/);
     await expect
       .poll(async () => ((await gamma.boundingBox())?.x ?? 0) - at!.x)
       .toBeGreaterThan(from!.width);
     // Where it showed, it lands.
     await page.mouse.up();
     await expect(page.locator('[data-drag-overlay]')).toHaveCount(0);
-    await expect(pane(page, 1).getByRole('tab')).toHaveText([
-      /^alpha/,
-      /^gamma/,
+    await expect(fullLabels(pane(page, 1))).toHaveText([
+      /(?:^| · )alpha$/,
+      /(?:^| · )gamma$/,
     ]);
-    await expect(pane(page, 0).getByRole('tab')).toHaveText([/^beta/]);
+    await expect(fullLabels(pane(page, 0))).toHaveText([/(?:^| · )beta$/]);
   });
 
   test('a tab let go of outside every strip and pane stays where it was', async ({
@@ -202,7 +224,13 @@ test.describe('Split panes', () => {
     await outer.focus();
     for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowLeft');
     await expect.poll(() => share()?.[0]).toBeLessThan(0.45);
-    await carryTo(page, tab(page, /^beta/), content(pane(page, 1)), 0.5, 0.97);
+    await carryTo(
+      page,
+      namedTab(page, 'beta'),
+      content(pane(page, 1)),
+      0.5,
+      0.97
+    );
     await page.mouse.up();
     await expect(panes(page)).toHaveCount(3);
 
@@ -210,7 +238,7 @@ test.describe('Split panes', () => {
     await outer.focus();
     for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowRight');
     await expect.poll(() => share()?.[0]).toBeGreaterThan(0.55);
-    await tab(page, /^beta/).click();
+    await namedTab(page, 'beta').click();
     await page.keyboard.press('Control+Alt+w');
     await expect(panes(page)).toHaveCount(2);
 
@@ -218,7 +246,9 @@ test.describe('Split panes', () => {
     // two panes last had together.
     const saved = share()![0]!;
     expect(saved).toBeGreaterThan(0.55);
-    const gamma = page.locator('[data-pane-id]', { has: tab(page, /^gamma/) });
+    const gamma = page.locator('[data-pane-id]', {
+      has: namedTab(page, 'gamma'),
+    });
     await expect
       .poll(() => widthShare(pane(page, 0), gamma))
       .toBeCloseTo(saved, 1);
@@ -229,7 +259,7 @@ test.describe('Split panes', () => {
   }) => {
     const { page, homeDir } = desktop;
     for (const branch of ['alpha', 'beta']) await createWorktree(page, branch);
-    await tab(page, /^beta/).click();
+    await namedTab(page, 'beta').click();
     await page.keyboard.press('Control+\\');
     await expect(panes(page)).toHaveCount(2);
 
@@ -245,8 +275,8 @@ test.describe('Split panes', () => {
     await desktop.relaunch();
     const next = desktop.page;
     await expect(panes(next)).toHaveCount(2, { timeout: 30_000 });
-    await expect(pane(next, 0).getByRole('tab')).toHaveText([/^alpha/]);
-    await expect(pane(next, 1).getByRole('tab')).toHaveText([/^beta/]);
+    await expect(fullLabels(pane(next, 0))).toHaveText([/(?:^| · )alpha$/]);
+    await expect(fullLabels(pane(next, 1))).toHaveText([/(?:^| · )beta$/]);
     await expect
       .poll(async () => {
         const [a, b] = await Promise.all([
@@ -278,16 +308,16 @@ test.describe('Split panes', () => {
     for (const branch of names) await createWorktree(page, branch);
     // Half the width, half the height, then half the width again: the
     // top-left pane's long names wrap onto more rows than 70% of it.
-    await tab(page, /^docs-tab-strip/).click();
+    await namedTab(page, 'docs-tab-strip').click();
     await page.keyboard.press('Control+\\');
-    await tab(page, /^spike-front-truncation/).click();
+    await namedTab(page, 'spike-front-truncation').click();
     await page.keyboard.press('Control+Shift+|');
-    await tab(page, /^chore-bump-dependencies/).click();
+    await namedTab(page, 'chore-bump-dependencies').click();
     await page.keyboard.press('Control+\\');
     await expect(panes(page)).toHaveCount(4);
 
     const topLeft = page.locator('[data-pane-id]', {
-      has: tab(page, /^feature-tab-strip-wrap/),
+      has: namedTab(page, 'feature-tab-strip-wrap'),
     });
     const strip = topLeft.getByRole('tablist');
     const fit = await topLeft.evaluate((el) => {
@@ -308,7 +338,7 @@ test.describe('Split panes', () => {
 
     // Ctrl+9 opens the pane's last tab, out of view below: the strip
     // scrolls it in.
-    await tab(page, /^feature-tab-strip-wrap/).click();
+    await namedTab(page, 'feature-tab-strip-wrap').click();
     await page.keyboard.press('Control+9');
     const last = topLeft.getByRole('tab', { selected: true });
     await expect(last).toHaveText(/refactor-workspace-reducer/);

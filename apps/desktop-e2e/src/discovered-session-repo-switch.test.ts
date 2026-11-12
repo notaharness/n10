@@ -101,6 +101,11 @@ async function repoStays(page: Page, cwd: string, tabName: RegExp) {
   });
 }
 
+/** A repository's one tab, alone on the strip: '{place} · {branch}',
+ *  whichever repository is open. */
+const repoTab = (repo: string, branch: string) =>
+  new RegExp(`^${repo} · ${branch}`);
+
 test.describe('Discovered sessions across a repo switch', () => {
   test.use({ repo: { name: 'repo-alpha' } });
 
@@ -128,7 +133,7 @@ test.describe('Discovered sessions across a repo switch', () => {
     // attached and opened its tab. Selecting the row is what a user
     // does to look at it.
     await attached(page, alphaBranch);
-    const alphaTab = tab(page, new RegExp(alphaBranch));
+    const alphaTab = tab(page, repoTab('repo-alpha', alphaBranch));
     await expect(alphaTab).toBeVisible({ timeout: 30_000 });
     await sidebarRow(page, new RegExp(alphaBranch)).click();
     await expect(page.getByText('alpha-agent-here').first()).toBeVisible({
@@ -141,7 +146,7 @@ test.describe('Discovered sessions across a repo switch', () => {
 
     // Discovery in beta opens its tab.
     await attached(page, betaBranch);
-    const betaTab = tab(page, new RegExp(`^\\s*${betaBranch}`));
+    const betaTab = tab(page, repoTab('repo-beta', betaBranch));
     await expect(betaTab).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('beta-agent-here').first()).toBeVisible({
       timeout: 30_000,
@@ -160,9 +165,7 @@ test.describe('Discovered sessions across a repo switch', () => {
       cwd: otherRepo,
     });
     await expect(betaTab).toHaveAttribute('aria-selected', 'true');
-    await expect(
-      tab(page, new RegExp(`repo-alpha\\s*/\\s*${alphaBranch}`))
-    ).toHaveAttribute('aria-selected', 'false');
+    await expect(alphaTab).toHaveAttribute('aria-selected', 'false');
   });
 
   test('round trips through the recent-repositories menu stay put', async ({
@@ -170,10 +173,8 @@ test.describe('Discovered sessions across a repo switch', () => {
   }) => {
     const { page, repoPath, homeDir } = desktop;
     await attached(page, alphaBranch);
-    const alphaOwn = new RegExp(`^\\s*${alphaBranch}`);
-    const alphaForeign = new RegExp(`repo-alpha\\s*/\\s*${alphaBranch}`);
-    const betaOwn = new RegExp(`^\\s*${betaBranch}`);
-    const betaForeign = new RegExp(`repo-beta\\s*/\\s*${betaBranch}`);
+    const alphaOwn = repoTab('repo-alpha', alphaBranch);
+    const betaOwn = repoTab('repo-beta', betaBranch);
     await expect(tab(page, alphaOwn)).toBeVisible({ timeout: 30_000 });
     await sidebarRow(page, new RegExp(alphaBranch)).click();
 
@@ -192,10 +193,7 @@ test.describe('Discovered sessions across a repo switch', () => {
       timeout: 30_000,
     });
     await repoStays(page, repoPath, alphaOwn);
-    await expect(tab(page, betaForeign)).toHaveAttribute(
-      'aria-selected',
-      'false'
-    );
+    await expect(tab(page, betaOwn)).toHaveAttribute('aria-selected', 'false');
 
     // And to beta again.
     await switchRepoFromTitleBar(page, 'repo-beta', otherRepo);
@@ -206,9 +204,6 @@ test.describe('Discovered sessions across a repo switch', () => {
       timeout: 30_000,
     });
     await repoStays(page, otherRepo, betaOwn);
-    await expect(tab(page, alphaForeign)).toHaveAttribute(
-      'aria-selected',
-      'false'
-    );
+    await expect(tab(page, alphaOwn)).toHaveAttribute('aria-selected', 'false');
   });
 });

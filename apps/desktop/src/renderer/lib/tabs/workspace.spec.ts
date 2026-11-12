@@ -60,6 +60,22 @@ const shell = (created?: number, machine?: string): TerminalEntry => ({
   ...(machine ? { machine } : {}),
 });
 
+it('keeps sync-opened label order in its pane without adding strip fields to the workspace', () => {
+  const first = run(sync([live]));
+  const next = then(
+    first,
+    sync([
+      live,
+      { ...live, itemKey: 'branch:y', branch: 'y', sessionName: 'y' },
+    ])
+  );
+  expect(next.labelState['pane-1']?.openedIds).toEqual([
+    id('branch:x'),
+    id('branch:y'),
+  ]);
+  expect(Object.keys(next).sort()).toEqual(Object.keys(EMPTY_WORKSPACE).sort());
+});
+
 describe('keep and pin', () => {
   it('ends a preview without pinning it', () => {
     const ws = run(open('branch:a', true), {

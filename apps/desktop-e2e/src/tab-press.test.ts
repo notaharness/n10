@@ -107,11 +107,10 @@ test.describe("Choosing another repository's tab", () => {
     desktop,
   }) => {
     const { page } = desktop;
-    await expect(tab(page, /^repo-alpha\/alpha-work/)).toBeVisible();
-    await pressAndNudge(page, tab(page, /alpha-work/));
-    // Chosen and at home in its repository before the button comes up:
-    // it has lost the repository prefix.
-    const alpha = tab(page, /^alpha-work/);
+    const alpha = tab(page, /^repo-alpha · alpha-work/);
+    await expect(alpha).toBeVisible();
+    await pressAndNudge(page, alpha);
+    // The label stays stable as the chosen tab opens its repository.
     await expect(alpha).toHaveAttribute('aria-selected', 'true');
     await expect.poll(() => transformOf(alpha)).toMatch(LIFTED);
     await page.mouse.up();
@@ -122,13 +121,15 @@ test.describe("Choosing another repository's tab", () => {
   }) => {
     const { page } = desktop;
     await carryOver(page, tab(page, /alpha-work/), tab(page, /beta-work/));
-    await expect(tab(page, /^alpha-work/)).toHaveAttribute(
+    await expect(tab(page, /^repo-alpha · alpha-work/)).toHaveAttribute(
       'aria-selected',
       'true'
     );
     await page.mouse.up();
     await expect
-      .poll(() => tabNames(page))
-      .toEqual(['repo-beta/beta-work', 'alpha-work']);
+      .poll(() =>
+        page.locator('[role="tab"] [data-tab-label] .sr-only').allTextContents()
+      )
+      .toEqual(['repo-beta · beta-work', 'repo-alpha · alpha-work']);
   });
 });

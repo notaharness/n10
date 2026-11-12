@@ -123,6 +123,8 @@ export type SessionType = 'worktree' | 'shell' | 'agent';
 export interface TaggedSession {
   /** The tmux name — a label, never parsed. */
   name: string;
+  /** Optional title of the session's primary pane at discovery time. */
+  paneTitle?: string;
   /** `#{session_created}`, epoch seconds: orders two sessions that
    *  claim one identity. */
   created: number;

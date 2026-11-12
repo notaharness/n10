@@ -9,6 +9,7 @@ const {
   listPersistedMock,
   listTerminalsMock,
   listHeldMock,
+  listTaggedMock,
   remoteTerminalsMock,
   isSessionAliveMock,
   sessionNamesMock,
@@ -23,6 +24,7 @@ const {
   listPersistedMock: vi.fn<() => Set<string>>(),
   listTerminalsMock: vi.fn<() => DiscoveredTerminal[]>(),
   listHeldMock: vi.fn<() => Set<string> | null>(),
+  listTaggedMock: vi.fn<() => Primitive.TaggedSession[]>(),
   remoteTerminalsMock:
     vi.fn<(machine: string) => Promise<DiscoveredTerminal[]>>(),
   isSessionAliveMock: vi.fn<(name: string) => boolean>(),
@@ -61,6 +63,7 @@ vi.mock('@n10/core', async (original) => ({
         persisted: listPersistedMock(),
         terminals: listTerminalsMock(),
         held,
+        listed: listTaggedMock(),
       }
     );
   },
@@ -79,6 +82,7 @@ vi.mock('@n10/core', async (original) => ({
 }));
 
 import { startSessionDiscovery } from './session-discovery.js';
+import { createAffiliationService } from './affiliation-service.js';
 
 /** The registry key of the worktree checked out in directory `dir`. */
 const wtKey = (dir: string) =>
@@ -122,6 +126,7 @@ beforeEach(() => {
   listPersistedMock.mockReset().mockReturnValue(new Set());
   listTerminalsMock.mockReset().mockReturnValue([]);
   listHeldMock.mockReset().mockReturnValue(new Set());
+  listTaggedMock.mockReset().mockReturnValue([]);
   remoteTerminalsMock.mockReset().mockResolvedValue([]);
   isSessionAliveMock.mockReset().mockImplementation((name) => alive.has(name));
   basePathMock.mockReset().mockReturnValue('/repo/.claude/worktrees');
@@ -467,6 +472,53 @@ describe('startSessionDiscovery', () => {
     onChanged.mockClear();
     await discovery.scanNow();
     await discovery.scanNow();
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it('does not announce spinner-only pane title changes', async () => {
+    const affiliations = createAffiliationService({ placeOf: (dir) => dir });
+    const session: Primitive.TaggedSession = {
+      name: 'agent',
+      created: 1,
+      paneDead: false,
+      path: '/repo',
+      spawner: 'orchestra',
+      agent: 'codex',
+      repo: '/repo',
+      type: 'agent',
+      branch: '',
+      worktreePath: '',
+      machine: 'local',
+      identityTags: {},
+      paneTitle: '⠋ Codex: Fix auth',
+    };
+    listTaggedMock.mockReturnValue([{ ...session }]);
+    const onLabelsChanged = vi.fn();
+    const { discovery, onChanged } = start({
+      listed: affiliations.observe,
+      onLabelsChanged,
+    });
+    await discovery.scanNow();
+    expect(affiliations.titleOf(terminalSessionKey('agent'))).toBe('Fix auth');
+    onChanged.mockClear();
+
+    listTaggedMock.mockReturnValue([
+      { ...session, paneTitle: '⠙ Codex: Fix auth' },
+    ]);
+    vi.setSystemTime(Date.now() + 1_000);
+    await discovery.scanNow();
+
+    expect(affiliations.titleOf(terminalSessionKey('agent'))).toBe('Fix auth');
+    expect(onChanged).not.toHaveBeenCalled();
+    expect(onLabelsChanged).not.toHaveBeenCalled();
+
+    listTaggedMock.mockReturnValue([{ ...session, paneTitle: 'Fix tokens' }]);
+    vi.setSystemTime(Date.now() + 1_000);
+    await discovery.scanNow();
+    expect(affiliations.titleOf(terminalSessionKey('agent'))).toBe(
+      'Fix tokens'
+    );
+    expect(onLabelsChanged).toHaveBeenCalledOnce();
     expect(onChanged).not.toHaveBeenCalled();
   });
 

@@ -38,6 +38,15 @@ const BETA = 'repo-beta';
 /** A branch name both checkouts have — the collision case. */
 const SHARED = 'shared-name';
 
+/** A repository's one tab, alone on the strip: '{place} · {branch}',
+ *  whichever repository is open. */
+const repoTab = (repo: string, branch: string) =>
+  new RegExp(`^${repo} · ${branch}`);
+
+/** The tooltip line `{name}: {path}`, among the tab's detail lines. */
+const detailLine = (name: string, path: string) =>
+  new RegExp(`^${name}: ${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm');
+
 test.describe('Tabs across repositories', () => {
   test.use({ repo: { name: ALPHA } });
 
@@ -66,10 +75,13 @@ test.describe('Tabs across repositories', () => {
 
     await switchRepo(page, otherRepo);
 
-    // The tab is still there, and now says which repository it is from.
-    const foreign = tab(page, new RegExp(`${ALPHA}\\s*/\\s*${BRANCH}`));
+    // The tab is still there, saying which repository it is from.
+    const foreign = tab(page, repoTab(ALPHA, BRANCH));
     await expect(foreign).toBeVisible();
-    await expect(foreign).toHaveAttribute('title', repoPath);
+    await expect(foreign).toHaveAttribute(
+      'title',
+      detailLine('Repository', repoPath)
+    );
     // …but its content is not: beta is in view, and it has no tabs.
     await expect(page.getByText('n10-fake-agent-ready')).toBeHidden();
 
@@ -86,7 +98,7 @@ test.describe('Tabs across repositories', () => {
     await expect(visibleText(page, 'n10-fake-agent-ready')).toBeVisible({
       timeout: 30_000,
     });
-    await expect(tab(page, new RegExp(`^\\s*${BRANCH}`))).toBeVisible();
+    await expect(foreign).toHaveAttribute('aria-selected', 'true');
 
     // And it closes like any other tab.
     await tab(page, new RegExp(BRANCH)).getByLabel('Close tab').click();
@@ -104,9 +116,7 @@ test.describe('Tabs across repositories', () => {
     await expect(tab(page, new RegExp(BRANCH))).toBeVisible();
 
     await switchRepo(page, otherRepo);
-    await expect(
-      tab(page, new RegExp(`${ALPHA}\\s*/\\s*${BRANCH}`))
-    ).toBeVisible();
+    await expect(tab(page, repoTab(ALPHA, BRANCH))).toBeVisible();
     execFileSync(
       'git',
       ['worktree', 'remove', join(repoPath, '.claude', 'worktrees', BRANCH)],
@@ -134,10 +144,8 @@ test.describe('Tabs across repositories', () => {
 
     // One tab each, not one shared tab.
     await expect(tabs(page)).toHaveCount(2);
-    await expect(
-      tab(page, new RegExp(`${ALPHA}\\s*/\\s*${BRANCH}`))
-    ).toHaveCount(1);
-    await expect(tab(page, new RegExp(`^\\s*${BRANCH}`))).toHaveCount(1);
+    await expect(tab(page, repoTab(ALPHA, BRANCH))).toHaveCount(1);
+    await expect(tab(page, repoTab(BETA, BRANCH))).toHaveCount(1);
   });
 
   test('closing a foreign tab leaves the other repository’s agent running', async ({
@@ -184,9 +192,9 @@ test.describe('Tabs across repositories', () => {
       timeout: 30_000,
     });
 
-    const foreign = tab(page, new RegExp(`${ALPHA}\\s*/\\s*${SHARED}`));
+    const foreign = tab(page, repoTab(ALPHA, SHARED));
     await expect(foreign).toHaveCount(1);
-    const own = tab(page, new RegExp(`^\\s*${SHARED}`));
+    const own = tab(page, repoTab(BETA, SHARED));
     // Positive control: beta's own tab carries the live-agent badge, so
     // the assertion below is about the repo check and not about the
     // badge being absent everywhere.
@@ -254,6 +262,9 @@ test.describe('Tabs across repositories', () => {
         timeout: 30_000,
       })
       .toMatchObject({ cwd: repoPath });
-    await expect(tab(page, new RegExp(`^\\s*${SHARED}`))).toBeVisible();
+    await expect(tab(page, repoTab(ALPHA, SHARED))).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 });

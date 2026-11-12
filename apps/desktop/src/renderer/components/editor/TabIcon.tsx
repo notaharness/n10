@@ -9,8 +9,7 @@ import type { TabFace } from '../../lib/tabs/tab-presentation.js';
 import { cn } from '../../lib/utils.js';
 
 /** The tab's kind icon, with the agent's state hung off its corner,
- *  set off by a ring of the tab's own background. A group's home hangs
- *  it off the chip's folder instead (`iconClassName` sizes that). */
+ *  set off by a ring of the tab's own background. */
 export function TabIcon({
   Icon,
   running,

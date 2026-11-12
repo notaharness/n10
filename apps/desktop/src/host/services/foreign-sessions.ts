@@ -64,6 +64,8 @@ export function listForeignSessions(): ForeignSessionsAnswer {
       branch: live.branch,
       worktree: live.path,
       sessionName: live.sessionName,
+      taskTitle: affiliations.titleOf(live.sessionName),
+      agent: live.agent,
       ...affiliationOf(live.sessionName),
     });
   }

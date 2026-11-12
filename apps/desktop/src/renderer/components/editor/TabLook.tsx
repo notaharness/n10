@@ -1,7 +1,7 @@
 import type { SidebarItem } from '../../../host/contract.js';
 import { usePlanCount } from '../../lib/plan/plan.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
-import { cutSide, tabPresentation } from '../../lib/tabs/tab-presentation.js';
+import { cutSide } from '../../lib/tabs/tab-presentation.js';
 import { FACE_ICON, TabIcon } from './TabIcon.js';
 import { TabLabel } from './TabLabel.js';
 import {
@@ -70,8 +70,8 @@ export function TabLook({
   pinned?: boolean;
   onClose?: () => void;
 }) {
-  const { tab, item, snapshot, foreignRepo, machineLabel, repoColor } = face;
-  const { label, face: kind } = tabPresentation(tab, item, machineLabel);
+  const { tab, item, snapshot, machineLabel, repoColor } = face;
+  const { label, labelKind: kind } = face;
   return (
     <>
       <TabIcon
@@ -82,9 +82,11 @@ export function TabLook({
       />
       <TabLabel
         label={label}
+        parts={face.labelParts}
+        machineLabel={machineLabel}
         preview={tab.preview}
-        foreignRepo={foreignRepo}
-        cut={cutSide(kind)}
+        task={face.agentTab && kind !== 'pr'}
+        cut={face.labelSource === 'task' ? 'end' : cutSide(kind)}
       />
       <TabEnd
         item={item}
