@@ -37,6 +37,10 @@ export type Tab =
        *  not the open one, so the sidebar cannot describe it — rather
        *  than falling back to a key. */
       title?: string;
+      /** The registry name of the agent session on this item, stamped
+       *  by `sync-items` (or the foreign listing). What closing the tab
+       *  dismisses: see `dismissKeyOf`. */
+      session?: string;
     }
   | { id: 'settings'; kind: 'settings'; preview: false }
   | {
@@ -61,6 +65,20 @@ export type Tab =
        *  it — only a listing that has named it, and then stops, has
        *  seen it end. */
       listed: boolean;
+      /** Its tmux session's creation time, once a listing has said. A
+       *  saved tab carries it, and binds on restore only to a session
+       *  with the same name *and* this time: names are reused. */
+      created?: number;
+      /** The machine it runs on, `'local'` or a beam peerId, once a
+       *  listing has said. A restored tab on another machine is not
+       *  given up for being unlisted: that machine may be offline. */
+      machine?: string;
+      /** That machine's name as the fleet last gave it, kept so a
+       *  restored tab can say what it waits for before the fleet answers. */
+      machineLabel?: string;
+      /** Restored from the saved workspace and not yet matched against
+       *  a listing. Its pane attaches nothing until it is. */
+      restored?: true;
     };
 
 /** A tab that shows a sidebar item, and so belongs to a repository. */
@@ -170,7 +188,65 @@ export function foreignRepoOf(tab: Tab, repo: string): string | null {
   return home !== null && home !== repo ? home : null;
 }
 
-/** Identity of an auto-opened session, unique across repositories. */
-export function autoOpenKey(repo: string, sessionName: string): string {
+/** Identity of an item's agent session, unique across repositories:
+ *  what `dismissed` records for it. Repo-qualified for the same reason
+ *  tab ids are — the PTY registry keys sessions by bare branch name, so
+ *  two repos' agents share a name. */
+export function sessionKey(repo: string, sessionName: string): string {
   return `${repo.length}:${repo}:${sessionName}`;
+}
+
+/** Whether `key` (from {@link sessionKey}) is a session of `repo`. */
+export function isSessionKeyOf(key: string, repo: string): boolean {
+  return key.startsWith(sessionKey(repo, ''));
+}
+
+/** The dismissal key of a terminal session. With its creation time it
+ *  names that one session, so a later one under the same name is not
+ *  dismissed with it; without, any session of that name. */
+export function terminalDismissKey(name: string, created?: number): string {
+  return created === undefined
+    ? terminalTabId(name)
+    : `terminal@${created}:${name}`;
+}
+
+/** The session name inside a key from {@link sessionKey}. */
+export function sessionOfKey(key: string): string {
+  const length = /^(\d+):/.exec(key);
+  if (!length) return key;
+  return key.slice(length[0].length + Number(length[1]) + 1);
+}
+
+/** The session name inside a key from {@link terminalDismissKey}. */
+export function terminalOfKey(key: string): string {
+  return key.slice(key.indexOf(':') + 1);
+}
+
+/**
+ * The machine a registry name says its session runs on: the optional
+ * trailing segment of its tuple (`@n10/core`'s `session-key.ts`), after
+ * a terminal's id or a worktree's repository and checkout. `'local'`
+ * when there is none, or the name is no tuple.
+ */
+export function machineOfSession(name: string): string {
+  let value: unknown;
+  try {
+    value = JSON.parse(name);
+  } catch {
+    return 'local';
+  }
+  if (!Array.isArray(value)) return 'local';
+  const at = value[0] === 'terminal' ? 2 : value[0] === 'worktree' ? 3 : -1;
+  const machine: unknown = at < 0 ? undefined : value[at];
+  return typeof machine === 'string' ? machine : 'local';
+}
+
+/** The session key closing `tab` dismisses: a terminal's own, an
+ *  item's agent, or `null` for a tab with no session behind it. */
+export function dismissKeyOf(tab: Tab): string | null {
+  if (tab.kind === 'terminal') return terminalDismissKey(tab.name, tab.created);
+  if (tab.kind === 'item' && tab.session) {
+    return sessionKey(tab.repo, tab.session);
+  }
+  return null;
 }

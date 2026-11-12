@@ -1,10 +1,36 @@
 import { useEffect, useMemo, useReducer, type ReactNode } from 'react';
 import { TabsContext, tabsActions } from './tabs.js';
-import { EMPTY_TABS, reduce } from './tabs-model.js';
+import { reduce } from './tabs-model.js';
+import { focusedPaneOf, stripOf } from './workspace.js';
+import {
+  type Restored,
+  useRestoredWorkspace,
+  useSaveWorkspace,
+} from './workspace-persistence.js';
 
-/** The strip's state, above the repository gate: it spans repositories. */
-export function TabsProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reduce, EMPTY_TABS);
+/** The strip's state, above the repository gate: it spans repositories.
+ *  Drawn once the saved workspace is restored; `fallback` until then. */
+export function TabsProvider({
+  fallback,
+  children,
+}: {
+  fallback: ReactNode;
+  children: ReactNode;
+}) {
+  const restored = useRestoredWorkspace();
+  if (!restored) return fallback;
+  return <RestoredTabs restored={restored}>{children}</RestoredTabs>;
+}
+
+function RestoredTabs({
+  restored,
+  children,
+}: {
+  restored: Restored;
+  children: ReactNode;
+}) {
+  const [workspace, dispatch] = useReducer(reduce, restored.workspace);
+  useSaveWorkspace(workspace, restored.canSave);
 
   // A removed worktree takes its tabs with it, whoever removed it: n10,
   // `git worktree remove` or `rm -rf`. Heard here, above the repo gate,
@@ -24,6 +50,12 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   );
 
   const actions = useMemo(() => tabsActions(dispatch), []);
-  const api = useMemo(() => ({ ...state, ...actions }), [state, actions]);
+  const api = useMemo(
+    () => ({
+      ...stripOf(workspace, focusedPaneOf(workspace).id),
+      ...actions,
+    }),
+    [workspace, actions]
+  );
   return <TabsContext.Provider value={api}>{children}</TabsContext.Provider>;
 }

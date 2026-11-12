@@ -32,6 +32,7 @@ describe('desktop default bindings', () => {
     ['Tab', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.cycle-previous'],
     ['A', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.attention'],
     ['J', { ctrlKey: true, shiftKey: true }, 'desktop.groups.collapse-others'],
+    ['p', { ctrlKey: true, altKey: true }, 'desktop.tabs.toggle-pin'],
   ] as const)('%s with %o fires %s', (key, mods, action) => {
     expect(resolveDesktopAction(press(key, mods), defaults)).toBe(action);
   });
@@ -58,6 +59,7 @@ describe('desktop default bindings', () => {
       'Ctrl+Shift+Tab',
       'Ctrl+Shift+a',
       'Ctrl+Shift+j',
+      'Ctrl+Alt+p',
     ]);
   });
 

@@ -168,7 +168,7 @@ interface ItemViewProps {
   /** Whether the strip has this tab in front, before the pane switch
    *  (deferred) catches up — what a session menu request goes by. */
   menuActive: boolean;
-  onPin: () => void;
+  onKeep: () => void;
 }
 
 export function ItemView(props: ItemViewProps) {
@@ -184,7 +184,7 @@ function WorktreeItemView({
   items,
   itemKey,
   menuActive,
-  onPin,
+  onKeep,
 }: ItemViewProps) {
   const { repo } = useRepo();
   const paneRef = useRef<HTMLDivElement>(null);
@@ -227,7 +227,7 @@ function WorktreeItemView({
   const { sessionName, running, hasWorktree, pr } = state;
 
   const onLaunchClick = () => {
-    onPin();
+    onKeep();
     menu.show();
   };
   // A remote launch leaves the dialog open to show its step, and to
@@ -239,7 +239,7 @@ function WorktreeItemView({
     menu.close();
   };
   const onChoose = (choice: LaunchChoice) => {
-    onPin();
+    onKeep();
     if (!choice.machine) closeMenu();
     choose(choice);
   };

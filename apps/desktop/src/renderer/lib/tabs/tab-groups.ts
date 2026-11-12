@@ -5,9 +5,10 @@ import type { Tab } from './tab-identity.js';
  * How the strip groups its tabs: by what each belongs to (its
  * affiliation — a reporting parent, else a place), one group per
  * affiliation, in the order of each group's first tab. Pure, over the
- * flat `TabsState.tabs` order: nothing re-sorts that order to keep a
+ * flat order of a pane's tabs: nothing re-sorts that order to keep a
  * group together, and no move is refused. A group shows together
  * wherever its tabs sit; the strip derives contiguity, it never stores it.
+ * Pinned tabs come first, each standing alone outside its group.
  */
 
 /** What the strip knows of a tab to group it. */
@@ -34,6 +35,9 @@ export interface TabGroup {
   /** On a group shown right after the parent group its home reports to
    *  (`Affiliation.follows`): that group's key. It moves with it. */
   behind?: string;
+  /** A pinned tab standing alone at the pane's start. Its group counts
+   *  it no longer. */
+  pinned?: true;
 }
 
 /** Whether `tab` is the tab of a parent's home session. */
@@ -105,15 +109,30 @@ function firstOf(
   return cycle.reduce((a, b) => (rank.get(b)! < rank.get(a)! ? b : a));
 }
 
+/** A pinned tab as the strip shows it: on its own, before every group. */
+function pinnedGroup(tab: Tab, facts: (tab: Tab) => TabFacts): TabGroup {
+  return {
+    key: `pin:${tab.id}`,
+    affiliation: facts(tab).affiliation,
+    head: null,
+    tabs: [tab],
+    chipped: false,
+    pinned: true,
+  };
+}
+
 export function present(
   tabs: readonly Tab[],
-  facts: (tab: Tab) => TabFacts
+  facts: (tab: Tab) => TabFacts,
+  pinned: readonly string[] = []
 ): TabGroup[] {
+  const pins = new Set(pinned);
   const members = new Map<
     string,
     { affiliation: Affiliation | null; tabs: Tab[] }
   >();
   for (const tab of tabs) {
+    if (pins.has(tab.id)) continue;
     const { affiliation } = facts(tab);
     const key = affiliation?.key ?? `tab:${tab.id}`;
     const group = members.get(key) ?? { affiliation, tabs: [] };
@@ -132,7 +151,19 @@ export function present(
         (affiliation?.kind === 'place' && list.length > 1),
     };
   });
-  return orderFollowers(groups);
+  const pinnedFirst = tabs
+    .filter((t) => pins.has(t.id))
+    .map((t) => pinnedGroup(t, facts));
+  return [...pinnedFirst, ...orderFollowers(groups)];
+}
+
+/** What a group is called: the user's name for it, else `derived`. */
+export function groupName(
+  group: TabGroup,
+  names: Readonly<Record<string, string>>,
+  derived: string
+): string {
+  return names[group.key] ?? derived;
 }
 
 /** Whether a group the user has not collapsed or expanded starts

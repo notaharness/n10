@@ -38,7 +38,7 @@ export function App() {
             so switching repos must not unmount the tabs of the one being
             left — their agents keep running and stay in the strip — nor
             drop a drag the press that switched them began. */}
-        <TabsProvider>
+        <TabsProvider fallback={<Connecting />}>
           <TabViewsHost>
             <PrewarmProvider>
               <TabDragProvider>
@@ -63,6 +63,18 @@ export function App() {
 function RevocationDialog() {
   const { target } = useFleet().revocation;
   return target ? <RevokeMachineDialog machine={target} /> : null;
+}
+
+/** While the host has not answered: the repository, or the saved
+ *  workspace the strip starts from. */
+function Connecting() {
+  return (
+    <main className="flex h-screen items-center justify-center bg-background">
+      <p className="animate-pulse text-sm text-muted-foreground">
+        Connecting to host…
+      </p>
+    </main>
+  );
 }
 
 function Gate() {
@@ -176,15 +188,7 @@ function Gate() {
     return off;
   }, [isPending, repoCwd, openRepo, pickRepoFolder]);
 
-  if (isPending) {
-    return (
-      <main className="flex h-screen items-center justify-center bg-background">
-        <p className="animate-pulse text-sm text-muted-foreground">
-          Connecting to host…
-        </p>
-      </main>
-    );
-  }
+  if (isPending) return <Connecting />;
 
   if (!repo) {
     return <RepoOpen onOpened={adoptRepo} />;

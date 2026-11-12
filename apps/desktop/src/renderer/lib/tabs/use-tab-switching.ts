@@ -5,9 +5,10 @@ import { listenForTabSwitching, noteStrip } from './tab-switching.js';
 import { useTabs } from './tabs.js';
 
 /**
- * Switch the editor tab strip from the keyboard: the four rebindable
- * desktop shortcuts (Ctrl+PgDn/PgUp positional, Ctrl+Tab/Ctrl+Shift+Tab
- * positional or most-recently-used per the `tabCycleMru` pref). Mount
+ * Switch the editor tab strip from the keyboard: the rebindable desktop
+ * shortcuts (Ctrl+PgDn/PgUp positional, Ctrl+Tab/Ctrl+Shift+Tab
+ * positional or most-recently-used per the `tabCycleMru` pref), and
+ * Ctrl+Alt+P to pin or unpin the active tab. Mount
  * it above the repository gate, beside the strip; `tab-switching.ts`
  * holds the order and the listeners. `enabled` is false while no
  * repository is open, when the strip is not on screen.

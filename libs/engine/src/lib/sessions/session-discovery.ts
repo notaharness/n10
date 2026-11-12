@@ -86,6 +86,12 @@ export interface SessionDiscoveryOptions {
   onChanged: (delta: DiscoveryDelta) => void;
   /** Handed each machine's whole listing as a scan reads it. */
   listed?: (machine: string, sessions: readonly TaggedSession[]) => void;
+  /** Told each time a machine's scan has finished, the terminals it
+   *  found adopted: from then on, a terminal of that machine no listing
+   *  names is gone, not yet to be found. Withheld while an attach that
+   *  failed is still to be retried; one retired for good no longer
+   *  holds it back. */
+  scanned?: (machine: string) => void;
   /** Abandon work between awaits when selection changes, before attaching a stale repo's sessions. */
   isCurrent?: () => boolean;
   /** What an earlier scanner of this repository last saw (`lastScan()`).
@@ -231,6 +237,11 @@ export function startSessionDiscovery(
     }
   }
 
+  /** Whether one of `offered` failed to attach and is tried again on a
+   *  later scan: until then its machine's listing lacks a session that
+   *  is there, so the scan does not speak for the machine. */
+  const awaitingAttach = (offered: readonly { name: string }[]) =>
+    offered.some(({ name }) => failures.has(name) && !retired.has(name));
   const live = () => !stopped && isCurrent();
   const isAttached = (name: string) =>
     isSessionAlive(name) && hasSessionConnection(name);
@@ -241,9 +252,11 @@ export function startSessionDiscovery(
     isHeld: hasSessionConnection,
     retired,
     forgetFailures,
+    awaitingAttach,
     adopt: (terminal) => adoptOne(terminal, adoptTerminal ?? (() => undefined)),
     onChanged,
     listed: opts.listed,
+    scanned: opts.scanned,
   });
 
   async function runScan(): Promise<void> {
@@ -279,6 +292,8 @@ export function startSessionDiscovery(
     // re-reading the registry, and it must see the sessions this scan
     // just adopted rather than the state from before them.
     const adopted = await adoptAll(delta);
+    if (live() && !awaitingAttach(delta.adoptableTerminals))
+      opts.scanned?.(LOCAL_MACHINE);
     const announce = first || worthAnnouncing(delta, adopted + released);
     if (announce && !stopped && isCurrent()) onChanged(delta);
     ensureWatch();

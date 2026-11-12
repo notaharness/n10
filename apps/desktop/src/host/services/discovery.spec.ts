@@ -31,6 +31,7 @@ vi.mock('./machines.js', () => ({
 vi.mock('./terminals.js', () => ({
   adoptTerminal: state.terminal,
   forgetTerminal: state.forget,
+  noteTerminalsScanned: () => undefined,
 }));
 import {
   setDiscoveryNotifier,

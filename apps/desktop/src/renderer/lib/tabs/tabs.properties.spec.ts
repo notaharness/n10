@@ -2,15 +2,27 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { itemTabId, tabHome, terminalTabId } from './tab-identity.js';
 import {
-  EMPTY_TABS,
-  reduce,
+  EMPTY_WORKSPACE,
+  reduce as reduceWorkspace,
+  reduceStrip as reduce,
   type ForeignSessionEntry,
   type ItemEntry,
+  type Strip,
   type Tab,
   type TabsAction,
-  type TabsState,
   type TerminalEntry,
+  type Workspace,
 } from './tabs-model.js';
+import { dismissKeyOf } from './tab-identity.js';
+import type { SyncListings } from './tabs-model.js';
+import { restoreWorkspace, toSaved } from './workspace-file.js';
+import {
+  focusedPaneOf,
+  panesOf,
+  stripOf,
+  type LayoutNode,
+} from './workspace.js';
+import type { SavedWorkspace } from '../../../host/contract.js';
 
 /**
  * Property tests for the tab reducer, alongside the worked cases in
@@ -24,7 +36,11 @@ import {
  * agent's terminal with it.
  *
  * So rather than adding more example sequences, these run arbitrary
- * ones and assert what has to hold after any of them.
+ * ones and assert what has to hold after any of them. Sequences run
+ * through the workspace reducer, as the app does; the properties about
+ * a strip read the focused pane's (`view`), and the workspace's own
+ * invariants — panes, pins, dismissals, the saved file — are at the
+ * end.
  *
  * The strip also spans repositories — it keeps the tabs of the repo you
  * switched away from — and both repos below deliberately use the same
@@ -49,6 +65,8 @@ const TERMINALS: TerminalEntry[] = [
     cwd: '/home/dev/notes',
     displayPath: '~/notes',
     repo: null,
+    // Listed by discovery: what lets its tab be saved and restored.
+    created: 1,
   },
   {
     name: 'scratch-agent',
@@ -66,6 +84,16 @@ const TERMINALS: TerminalEntry[] = [
       repo,
     })
   ),
+  // On another machine, whose listing may not have answered.
+  {
+    name: JSON.stringify(['terminal', 'far-shell', 'peer']),
+    kind: 'shell',
+    cwd: '/far',
+    displayPath: '/far',
+    repo: null,
+    created: 2,
+    machine: 'peer',
+  },
 ];
 
 /**
@@ -99,8 +127,27 @@ const action: fc.Arbitrary<TabsAction> = fc.oneof(
     terminal: fc.constantFrom(...TERMINALS),
   }),
   fc.record({
-    type: fc.constant('pin' as const),
+    type: fc.constant('keep' as const),
     id: fc.constantFrom(...IDS),
+  }),
+  fc.record({
+    type: fc.constant('set-pinned' as const),
+    ids: fc.subarray([...IDS], { minLength: 1, maxLength: 3 }),
+    pinned: fc.boolean(),
+  }),
+  fc.record({
+    type: fc.constant('rename-group' as const),
+    key: fc.constantFrom('place:/repos/alpha', 'claude:x'),
+    name: fc.constantFrom('Ops', '  ', null),
+  }),
+  // A failed kill, or the user asking for a closed agent back.
+  fc.record({
+    type: fc.constant('undismiss' as const),
+    keys: fc.subarray([
+      terminalTabId('notes-shell'),
+      `${REPOS[0].length}:${REPOS[0]}:sa`,
+      `${REPOS[1].length}:${REPOS[1]}:sb`,
+    ]),
   }),
   fc.record({
     type: fc.constant('activate' as const),
@@ -115,7 +162,10 @@ const action: fc.Arbitrary<TabsAction> = fc.oneof(
     type: fc.constant('close-others' as const),
     id: fc.constantFrom(...IDS),
   }),
-  fc.record({ type: fc.constant('close-all' as const) }),
+  fc.record({
+    type: fc.constant('close-all' as const),
+    repo: fc.constantFrom(...REPOS),
+  }),
   // The host reporting a terminal's process ended, by name — the one
   // way a terminal tab closes without the user or a listing.
   fc.record({
@@ -180,21 +230,34 @@ const action: fc.Arbitrary<TabsAction> = fc.oneof(
         ),
         { maxLength: 4 }
       ),
-      terminals: fc.uniqueArray(fc.constantFrom(...TERMINALS), {
-        maxLength: 4,
-      }),
-      foreign: fc.uniqueArray(fc.constantFrom(...FOREIGN), { maxLength: 2 }),
+      // Each listing may not have answered yet.
+      loaded: fc.boolean(),
+      terminals: fc.option(
+        fc.uniqueArray(fc.constantFrom(...TERMINALS), { maxLength: 4 }),
+        { nil: undefined, freq: 4 }
+      ),
+      foreign: fc.option(
+        fc.uniqueArray(fc.constantFrom(...FOREIGN), { maxLength: 2 }),
+        { nil: undefined, freq: 4 }
+      ),
+      // Which agents tmux runs, and which machines' terminal listings
+      // are complete: this one's whenever there is a listing at all.
+      alive: fc.option(fc.subarray(['sa', 'sb']), { nil: undefined, freq: 4 }),
+      scanned: fc.constantFrom(undefined, ['local'], ['local', 'peer']),
     })
-    .map(({ repo, entries, terminals, foreign }) => ({
+    .map(({ repo, entries, loaded, terminals, foreign, alive, scanned }) => ({
       type: 'sync-items' as const,
       repo,
-      entries,
+      entries: loaded ? entries : undefined,
       terminals,
       foreign,
+      alive,
+      scanned,
     }))
 );
 
-const EMPTY: TabsState = EMPTY_TABS;
+/** The focused pane's strip: what every property below reads. */
+const view = (ws: Workspace): Strip => stripOf(ws, focusedPaneOf(ws).id);
 
 /**
  * Replay a sequence the way the app dispatches one.
@@ -215,25 +278,32 @@ const inViewOf = (a: TabsAction, repo: string): TabsAction =>
   a.type === 'open-item' ||
   a.type === 'sync-items' ||
   a.type === 'close' ||
+  a.type === 'close-all' ||
   a.type === 'terminal-ended'
     ? { ...a, repo }
     : a;
 
-const replay = (
-  actions: TabsAction[]
-): { state: TabsState; inView: string } => {
+const replayWorkspace = (
+  actions: TabsAction[],
+  from: Workspace = EMPTY_WORKSPACE
+): { ws: Workspace; inView: string } => {
   // The app has a repo open before the strip exists: `Gate` announces
   // one on mount, so there is no "no repo in view" state to model.
   let inView: string = REPOS[0];
-  let state = EMPTY;
+  let ws = from;
   for (const a of actions) {
     if (a.type === 'repo-opened') inView = a.repo;
-    state = reduce(state, inViewOf(a, inView));
+    ws = reduceWorkspace(ws, inViewOf(a, inView));
   }
-  return { state, inView };
+  return { ws, inView };
 };
 
-const run = (actions: TabsAction[]): TabsState => replay(actions).state;
+const replay = (actions: TabsAction[]): { state: Strip; inView: string } => {
+  const { ws, inView } = replayWorkspace(actions);
+  return { state: view(ws), inView };
+};
+
+const run = (actions: TabsAction[]): Strip => replay(actions).state;
 
 const sequence = fc.array(action, { maxLength: 25 });
 
@@ -392,7 +462,7 @@ describe('tab reducer invariants', () => {
 
 describe('one repository cannot reach another', () => {
   /** The strip as the repos *other* than `repo` see it. */
-  const foreign = (state: TabsState, repo: string): Tab[] =>
+  const foreign = (state: Strip, repo: string): Tab[] =>
     state.tabs.filter((t) => t.kind === 'item' && t.repo !== repo);
 
   it('leaves every other repo’s tabs exactly as they were on sync', () => {
@@ -459,7 +529,7 @@ describe('closing never hands focus to another repository', () => {
     actions: TabsAction[],
     id: string,
     repo: string
-  ): TabsState | null => {
+  ): Strip | null => {
     const before = run(actions);
     const after = reduce(before, { type: 'close', id, repo });
     return after.activeId === before.activeId ? null : after;
@@ -546,7 +616,7 @@ describe('terminal tabs', () => {
             entries,
             terminals: undefined,
           });
-          const terminals = (s: TabsState) =>
+          const terminals = (s: Strip) =>
             s.tabs.filter((t) => t.kind === 'terminal');
           // Identity, not equality: a terminal tab that came out rebuilt
           // has been reconciled against a sidebar it has no row in.
@@ -643,7 +713,7 @@ describe('terminal tabs', () => {
             terminals,
           });
           const listed = new Set(terminals.map((t) => t.name));
-          const open = (s: TabsState) =>
+          const open = (s: Strip) =>
             s.tabs.filter((t) => t.kind === 'terminal');
           // A surviving tab is either named by this listing, or has
           // never been named by one since it opened (`listed` is the
@@ -672,7 +742,7 @@ describe('re-keying preserves the tab', () => {
   it('keeps one tab through any number of key changes', () => {
     fc.assert(
       fc.property(fc.array(keyForA, { minLength: 1, maxLength: 6 }), (keys) => {
-        let state = reduce(EMPTY, {
+        let state = reduce(view(EMPTY_WORKSPACE), {
           type: 'open-item',
           repo: REPOS[0],
           itemKey: keys[0],
@@ -705,7 +775,7 @@ describe('re-keying preserves the tab', () => {
   it('stamps the branch so a stale key can still be resolved', () => {
     fc.assert(
       fc.property(keyForA, (key) => {
-        let state = reduce(EMPTY, {
+        let state = reduce(view(EMPTY_WORKSPACE), {
           type: 'open-item',
           repo: REPOS[0],
           itemKey: key,
@@ -729,7 +799,7 @@ describe('re-keying preserves the tab', () => {
   it('merges rather than duplicates when both keys are open at once', () => {
     // Opening a branch tab and its PR tab separately, then syncing, has
     // to collapse them — they are one item.
-    let state = reduce(EMPTY, {
+    let state = reduce(view(EMPTY_WORKSPACE), {
       type: 'open-item',
       repo: REPOS[0],
       itemKey: 'branch:a',
@@ -772,11 +842,216 @@ describe('agents alive in other repositories', () => {
             foreign,
           });
           expect(after.activeId).toBe(before.activeId);
-          const own = (s: TabsState) =>
+          const own = (s: Strip) =>
             s.tabs.filter((t) => t.kind === 'item' && t.repo === inView);
           expect(own(after).length).toBe(own(before).length);
         }
       ),
+      { numRuns: 500 }
+    );
+  });
+});
+
+describe('the workspace', () => {
+  const sequenceWs = (actions: TabsAction[]) => replayWorkspace(actions).ws;
+
+  /** Every split well formed, at any depth: two or more children, and
+   *  sizes that sum to one, one per child. */
+  const wellFormed = (node: LayoutNode): boolean =>
+    node.kind === 'pane' ||
+    (node.children.length >= 2 &&
+      node.sizes.length === node.children.length &&
+      Math.abs(node.sizes.reduce((a, b) => a + b, 0) - 1) < 1e-9 &&
+      node.children.every(wellFormed));
+
+  it('holds every tab in exactly one pane, and nothing a pane does not', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const ws = sequenceWs(actions);
+        const placed = panesOf(ws.layout).flatMap((p) => p.order);
+        expect(new Set(placed).size).toBe(placed.length);
+        expect([...placed].sort()).toEqual(Object.keys(ws.tabs).sort());
+      }),
+      { numRuns: 500 }
+    );
+  });
+
+  it('keeps its layout well formed, with an empty pane only as the sole one', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const ws = sequenceWs(actions);
+        const panes = panesOf(ws.layout);
+        expect(wellFormed(ws.layout)).toBe(true);
+        expect(panes.some((p) => p.id === ws.focusedPane)).toBe(true);
+        const empties = panes.filter((p) => p.order.length === 0);
+        expect(empties.length === 0 || panes.length === 1).toBe(true);
+        for (const p of panes) {
+          expect(p.activeId === null || p.order.includes(p.activeId)).toBe(
+            true
+          );
+        }
+      }),
+      { numRuns: 500 }
+    );
+  });
+
+  it('pins only tabs it holds, each once', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const ws = sequenceWs(actions);
+        expect(new Set(ws.pinned).size).toBe(ws.pinned.length);
+        for (const id of ws.pinned) expect(ws.tabs[id]).toBeDefined();
+      }),
+      { numRuns: 500 }
+    );
+  });
+
+  it('keeps every pinned tab through Close Others and Close All', () => {
+    fc.assert(
+      fc.property(
+        sequence,
+        fc.constantFrom(...IDS),
+        fc.boolean(),
+        (actions, id, all) => {
+          const { ws, inView } = replayWorkspace(actions);
+          const after = reduceWorkspace(
+            ws,
+            all
+              ? { type: 'close-all', repo: inView }
+              : { type: 'close-others', id }
+          );
+          for (const pinned of ws.pinned) {
+            expect(after.tabs[pinned]).toBe(ws.tabs[pinned]);
+          }
+        }
+      ),
+      { numRuns: 300 }
+    );
+  });
+
+  it('dismisses no session that has a tab, once a sync has run', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const { ws, inView } = replayWorkspace(actions);
+        const after = reduceWorkspace(ws, {
+          type: 'sync-items',
+          repo: inView,
+          entries: [],
+        });
+        const open = new Set(Object.values(after.tabs).map(dismissKeyOf));
+        for (const key of after.dismissed) expect(open.has(key)).toBe(false);
+      }),
+      { numRuns: 300 }
+    );
+  });
+
+  // Bounded: a dismissal lasts only as long as the listings that speak
+  // for its session still have it alive.
+  it('dismisses nothing the listings say has ended', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const { ws, inView } = replayWorkspace(actions);
+        const after = reduceWorkspace(ws, {
+          type: 'sync-items',
+          repo: inView,
+          entries: [],
+          terminals: [],
+          foreign: [],
+          alive: [],
+          scanned: ['local', 'peer'],
+        });
+        expect(after.dismissed).toEqual([]);
+      }),
+      { numRuns: 300 }
+    );
+  });
+
+  // The converse, and what keeps a closed tab closed: a dismissal is
+  // never forgotten while its session runs, nor on the word of a
+  // listing that has not answered, or is not complete for its machine.
+  it('forgets no dismissal while its session runs, or nothing says it ended', () => {
+    const ended = fc.constantFrom<Omit<SyncListings, 'entries'>>(
+      // Everything alive: tmux runs every agent, every terminal listed.
+      { alive: ['sa', 'sb'], terminals: TERMINALS, scanned: ['local', 'peer'] },
+      // Nothing has answered.
+      {},
+      // This machine's listing is not complete, nor the peer's.
+      { terminals: [], scanned: [] }
+    );
+    fc.assert(
+      fc.property(sequence, ended, (actions, listings) => {
+        const { ws, inView } = replayWorkspace(actions);
+        // A terminal listing that names everything opens tabs on what
+        // is not dismissed; those keys were not dismissed to begin with.
+        const after = reduceWorkspace(ws, {
+          type: 'sync-items',
+          repo: inView,
+          ...listings,
+        });
+        const open = new Set(Object.values(after.tabs).map(dismissKeyOf));
+        const closed = ws.dismissed.filter((key) => !open.has(key));
+        expect(after.dismissed).toEqual(expect.arrayContaining(closed));
+      }),
+      { numRuns: 300 }
+    );
+  });
+
+  // After a restart: a restored terminal tab binds to its own session or
+  // waits; only a listing complete for its machine can close it.
+  it('keeps every restored terminal tab through listings that are not complete', () => {
+    const incomplete = fc.constantFrom<SyncListings>(
+      { entries: [], terminals: [], scanned: [] },
+      { entries: [], terminals: [] },
+      { entries: [] }
+    );
+    fc.assert(
+      fc.property(sequence, incomplete, (actions, listings) => {
+        const { ws, inView } = replayWorkspace(actions);
+        const file = JSON.parse(JSON.stringify(toSaved(ws))) as SavedWorkspace;
+        const back = restoreWorkspace(file);
+        const after = reduceWorkspace(back, {
+          type: 'sync-items',
+          repo: inView,
+          ...listings,
+        });
+        // The default completes this machine's listing, not a peer's.
+        const waiting = Object.values(back.tabs).filter(
+          (tab) =>
+            tab.kind === 'terminal' &&
+            !(listings.terminals && !listings.scanned && tab.machine !== 'peer')
+        );
+        expect(waiting.map((tab) => after.tabs[tab.id])).toEqual(waiting);
+      }),
+      { numRuns: 300 }
+    );
+  });
+
+  it('comes back from its saved file as it was, less what is not saved', () => {
+    fc.assert(
+      fc.property(sequence, (actions) => {
+        const ws = sequenceWs(actions);
+        const file = JSON.parse(JSON.stringify(toSaved(ws))) as SavedWorkspace;
+        const back = restoreWorkspace(file);
+        // A terminal tab no listing has dated is not saved.
+        const saved = (id: string) => {
+          const t = ws.tabs[id];
+          return t.kind !== 'terminal' || t.created !== undefined;
+        };
+        const before = view(ws);
+        const kept = before.tabs.filter((t) => saved(t.id)).map((t) => t.id);
+        expect(view(back).tabs.map((t) => t.id)).toEqual(kept);
+        expect(view(back).activeId).toBe(
+          before.activeId && saved(before.activeId) ? before.activeId : null
+        );
+        expect(back.pinned).toEqual(ws.pinned.filter(saved));
+        expect(back.collapsed).toEqual(ws.collapsed);
+        expect(back.groupNames).toEqual(ws.groupNames);
+        expect(back.dismissed).toEqual(ws.dismissed);
+        expect(back.lastActiveByRepo).toEqual(ws.lastActiveByRepo);
+        expect(back.unseen).toEqual([]);
+        const terminals = view(back).tabs.filter((t) => t.kind === 'terminal');
+        expect(terminals.every((t) => t.restored)).toBe(true);
+      }),
       { numRuns: 500 }
     );
   });

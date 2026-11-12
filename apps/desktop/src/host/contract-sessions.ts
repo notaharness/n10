@@ -43,3 +43,16 @@ export interface ForeignSessionSummary {
   /** What it belongs to, once discovery has listed it. */
   affiliation?: Affiliation;
 }
+
+/** Agents alive elsewhere, and what this machine's tmux runs. */
+export interface ForeignSessionsAnswer {
+  /** The open repository the answer leaves out, as `RepoInfo.cwd` names
+   *  it: a shell whose open repository is another reads it as no answer. */
+  excluded: string;
+  /** Agents alive in repositories other than `excluded`. */
+  sessions: ForeignSessionSummary[];
+  /** The registry name of every agent session alive on this machine, in
+   *  any repository (`excluded` too) and on a branch or not: whether a
+   *  closed agent has ended. `null` when tmux could not be asked. */
+  alive: string[] | null;
+}

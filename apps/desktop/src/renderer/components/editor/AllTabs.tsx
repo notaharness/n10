@@ -8,6 +8,29 @@ import { RosterRow } from './GroupRoster.js';
 import { walkRows } from './roster-keys.js';
 import type { TabFace } from './use-strip-groups.js';
 
+/** The popover's sections: every pinned tab once, under Pinned, then
+ *  each group, titled with its name when it is one (chipped, or of more
+ *  than one tab). */
+function sectionsOf(
+  groups: readonly TabGroup[],
+  labelOf: (group: TabGroup) => string
+): { key: string; label: string; titled: boolean; tabs: readonly Tab[] }[] {
+  const pinned = groups.filter((g) => g.pinned).flatMap((g) => g.tabs);
+  return [
+    ...(pinned.length > 0
+      ? [{ key: 'pinned', label: 'Pinned', titled: true, tabs: pinned }]
+      : []),
+    ...groups
+      .filter((g) => !g.pinned)
+      .map((g) => ({
+        key: g.key,
+        label: labelOf(g),
+        titled: g.chipped || g.tabs.length > 1,
+        tabs: g.tabs,
+      })),
+  ];
+}
+
 export function AllTabs({
   groups,
   faceOf,
@@ -84,15 +107,15 @@ export function AllTabs({
         </div>
         <ScrollArea className="min-h-0 flex-1">
           <div ref={list} onKeyDown={walkRows} className="max-h-[400px]">
-            {groups.map((group) => (
-              <section key={group.key} aria-label={labelOf(group)}>
-                {(group.chipped || group.tabs.length > 1) && (
+            {sectionsOf(groups, labelOf).map((section) => (
+              <section key={section.key} aria-label={section.label}>
+                {section.titled && (
                   <h3 className="sticky top-0 z-10 border-b border-border bg-popover px-3 py-1 text-[11px] font-medium text-muted-foreground">
-                    {labelOf(group)}
+                    {section.label}
                   </h3>
                 )}
                 <ul>
-                  {group.tabs.map((tab) => (
+                  {section.tabs.map((tab) => (
                     <RosterRow
                       key={tab.id}
                       face={faceOf(tab)}

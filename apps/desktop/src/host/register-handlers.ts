@@ -10,6 +10,7 @@ import { IPC } from './contract.js';
 import * as updates from './services/updates.js';
 import * as repo from './services/repo.js';
 import * as prefs from './services/desktop-prefs.js';
+import * as workspaceFile from './services/workspace-file.js';
 import * as theme from './services/theme.js';
 import * as settings from './services/settings.js';
 import * as keybindings from './services/keybindings.js';
@@ -140,6 +141,8 @@ export function createHostApi(): HostApi {
       Promise.resolve(clipboardImage.saveClipboardImage(data, mimeType)),
     launchTerminal: (req) => terminals.launchTerminal(req),
     listTerminals: () => Promise.resolve(branchSessions.listTerminals()),
+    scannedTerminalMachines: () =>
+      Promise.resolve(terminals.scannedTerminalMachines()),
     killTerminal: (name) => Promise.resolve(terminals.killTerminal(name)),
     listBranchSessions: (cwd, branch) =>
       Promise.resolve(branchSessions.listBranchSessions(cwd, branch)),
@@ -172,6 +175,8 @@ export function createHostApi(): HostApi {
       prefsChanged(next);
       return Promise.resolve(next);
     },
+    loadWorkspace: () => Promise.resolve(workspaceFile.loadWorkspace()),
+    saveWorkspace: (workspace) => workspaceFile.saveWorkspace(workspace),
     getTheme: () => Promise.resolve(theme.getTheme()),
     onThemeChanged: () => () => undefined,
     getKeybindings: () => Promise.resolve(keybindings.getDesktopKeybindings()),

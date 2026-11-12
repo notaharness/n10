@@ -1,7 +1,12 @@
 import type { TerminalKind } from '../../../host/contract.js';
 import { closeTab } from './tab-close.js';
-import { terminalTabId, type Tab, type TerminalTab } from './tab-identity.js';
-import type { TabsState } from './tabs-model.js';
+import {
+  terminalDismissKey,
+  terminalTabId,
+  type Tab,
+  type TerminalTab,
+} from './tab-identity.js';
+import type { Strip } from './workspace.js';
 
 /**
  * The terminal-tab passes of the reducer: opening one, and reconciling
@@ -21,6 +26,62 @@ export interface TerminalEntry {
   repo: string | null;
   /** The branch whose checkout it is in: that branch's tab lists it. */
   branch?: string;
+  /** Its tmux session's creation time, once discovery has listed it. */
+  created?: number;
+  /** `'local'` or a beam peerId. */
+  machine?: string;
+  /** Another machine's name, when the fleet knows it. */
+  machineLabel?: string;
+}
+
+/** Whether `dismissed` holds this listed terminal's session: by name
+ *  alone, by name and creation time, or — when the listing does not know
+ *  the time yet — any session of that name. */
+export function isTerminalDismissed(
+  dismissed: ReadonlySet<string>,
+  entry: TerminalEntry
+): boolean {
+  if (dismissed.has(terminalDismissKey(entry.name))) return true;
+  if (entry.created !== undefined)
+    return dismissed.has(terminalDismissKey(entry.name, entry.created));
+  const suffix = `:${entry.name}`;
+  return [...dismissed].some(
+    (k) => k.startsWith('terminal@') && k.endsWith(suffix)
+  );
+}
+
+/** The machines whose listing is complete when a sync names none: this
+ *  one, which a defined listing always speaks for. */
+export const LOCAL_ONLY: readonly string[] = ['local'];
+
+/** How many restored terminal tabs a listing gives up: their session is
+ *  gone (`bindRestored`'s rule). For the one notice the user gets. */
+export function restoredGone(
+  tabs: readonly Tab[],
+  entries: readonly TerminalEntry[],
+  scanned: readonly string[] = LOCAL_ONLY
+): number {
+  const byName = new Map(entries.map((e) => [e.name, e]));
+  return tabs.filter(
+    (t) =>
+      t.kind === 'terminal' &&
+      t.restored &&
+      restoredFate(t, byName.get(t.name), scanned) === 'gone'
+  ).length;
+}
+
+/** A restored tab's session, by the listing: the one it was saved with
+ *  (`bind`), gone, or not known yet (`wait`) — named without a creation
+ *  time, or left out by a listing that is not complete for its machine
+ *  yet (`scanned` lacks it: not scanned, or offline). */
+function restoredFate(
+  tab: TerminalTab,
+  entry: TerminalEntry | undefined,
+  scanned: readonly string[]
+): 'bind' | 'wait' | 'gone' {
+  if (!entry) return scanned.includes(tab.machine ?? 'local') ? 'gone' : 'wait';
+  if (entry.created === undefined) return 'wait';
+  return entry.created === tab.created ? 'bind' : 'gone';
 }
 
 function terminalTab(entry: TerminalEntry, listed: boolean): TerminalTab {
@@ -34,99 +95,139 @@ function terminalTab(entry: TerminalEntry, listed: boolean): TerminalTab {
     repo: entry.repo,
     preview: false,
     listed,
+    ...(entry.created !== undefined ? { created: entry.created } : {}),
+    ...(entry.machine !== undefined ? { machine: entry.machine } : {}),
+    ...(entry.machineLabel ? { machineLabel: entry.machineLabel } : {}),
   };
-}
-
-/** Auto-open history key. Terminal names are globally unique, so no
- *  repository qualifier is needed. */
-function seenKey(name: string): string {
-  return terminalTabId(name);
 }
 
 /**
  * Activate the tab for a terminal, opening one if none is on it yet.
  *
- * Recorded as auto-opened as well, so a listing that follows the open
- * does not count it as new — and, if the user later closes it, does not
- * bring it back.
+ * A restored tab under the same name is not this terminal: the host
+ * just started it, so whatever the saved tab was bound to is gone, and
+ * the new terminal takes its place on the strip.
  */
-export function openTerminal(
-  state: TabsState,
-  entry: TerminalEntry
-): TabsState {
+export function openTerminal(state: Strip, entry: TerminalEntry): Strip {
   const id = terminalTabId(entry.name);
   const existing = state.tabs.find((t) => t.id === id);
+  // Unlisted until a listing names it: the host answered the launch
+  // before its listing caught up, and a sync landing in between must
+  // not read the older listing as this terminal having ended.
+  const fresh = terminalTab(entry, false);
+  if (existing?.kind === 'terminal' && existing.restored) {
+    const tabs = state.tabs.map((t) => (t.id === id ? fresh : t));
+    return { ...state, tabs, activeId: id };
+  }
   if (existing) return { ...state, activeId: id };
-  const seen = seenKey(entry.name);
-  return {
-    ...state,
-    // Unlisted until a listing names it: the host answered the launch
-    // before its listing caught up, and a sync landing in between
-    // must not read the older listing as this terminal having ended.
-    tabs: [...state.tabs, terminalTab(entry, false)],
-    activeId: id,
-    autoOpened: state.autoOpened.includes(seen)
-      ? state.autoOpened
-      : [...state.autoOpened, seen],
-  };
+  return { ...state, tabs: [...state.tabs, fresh], activeId: id };
 }
 
 /**
  * Reconcile the strip with the host's terminal listing.
  *
- * Every terminal outside a branch's checkout gets a tab once — the
- * restore path after a restart, and one found by the running scan —
- * recorded in `autoOpened` so a tab the user closed stays closed while
- * the host keeps listing the terminal.
- * Opening never moves focus: a restored terminal from another
- * repository would otherwise switch the workspace at startup. A tab
- * that is already there has its stamp refreshed, and an unchanged
- * listing returns the same state object so a quiet poll does not
- * re-render the strip.
+ * Every terminal outside a branch's checkout has a tab unless it was
+ * dismissed (`tab-dismissed.ts`) — the restore path after a restart,
+ * and one found by the running scan. Opening never moves focus: a
+ * restored terminal from another repository would otherwise switch the
+ * workspace at startup. A tab that is already there has its stamp
+ * refreshed, and an unchanged listing returns the same state object so
+ * a quiet poll does not re-render the strip.
  *
- * The listing is also the only word on which terminals still exist: a
- * tab whose terminal it no longer names has ended — the shell exited,
- * the agent quit, tmux killed the session from outside — and is closed
- * by {@link dropEnded}, with focus moving as a close in `repo` would.
+ * A tab restored from the saved workspace is bound first
+ * ({@link bindRestored}). The listing is also the only word on which
+ * terminals still exist: a tab whose terminal it no longer names has
+ * ended — the shell exited, the agent quit, tmux killed the session
+ * from outside — and is closed by {@link dropEnded}, with focus moving
+ * as a close in `repo` would.
  */
 export function syncTerminals(
-  state: TabsState,
+  state: Strip,
   repo: string,
-  entries: TerminalEntry[]
-): TabsState {
-  return dropEnded(openListed(state, entries), repo, entries);
+  entries: TerminalEntry[],
+  scanned: readonly string[] = LOCAL_ONLY
+): Strip {
+  const bound = bindRestored(state, repo, entries, scanned);
+  return dropEnded(openListed(bound, entries), repo, entries);
 }
 
-/** The opening half: a tab per listed terminal that has not had one. */
-function openListed(state: TabsState, entries: TerminalEntry[]): TabsState {
-  const opened = new Set(state.autoOpened);
+/**
+ * A restored tab binds only to the session it was saved with: the same
+ * name *and* the same creation time, since names are reused. Bound, it
+ * is a listed tab like any other. Otherwise the listing closes it — its
+ * session is gone — and a later session under its name gets a tab of
+ * its own from {@link openListed}. Two cases say neither, and the tab
+ * waits: a listing that names it without a creation time yet, and one
+ * that leaves it out before its machine's listing is complete — this
+ * machine's before discovery's first scan, another's before it answers.
+ */
+function bindRestored(
+  state: Strip,
+  repo: string,
+  entries: TerminalEntry[],
+  scanned: readonly string[]
+): Strip {
+  const byName = new Map(entries.map((e) => [e.name, e]));
+  let next = state;
+  for (const tab of state.tabs) {
+    if (tab.kind !== 'terminal' || !tab.restored) continue;
+    const entry = byName.get(tab.name);
+    const fate = restoredFate(tab, entry, scanned);
+    // Gone with its pin: a later session under the name gets a tab of
+    // its own, in the same sync, under the same id.
+    if (fate === 'gone') next = unpinned(closeTab(next, tab.id, repo), tab.id);
+    if (fate !== 'bind' || !entry) continue;
+    const bound = restamp(withoutRestored(tab), entry);
+    next = { ...next, tabs: next.tabs.map((t) => (t === tab ? bound : t)) };
+  }
+  return next;
+}
+
+function unpinned(state: Strip, id: string): Strip {
+  return state.pinned.includes(id)
+    ? { ...state, pinned: state.pinned.filter((p) => p !== id) }
+    : state;
+}
+
+function withoutRestored(tab: TerminalTab): TerminalTab {
+  const bound = { ...tab };
+  delete bound.restored;
+  return bound;
+}
+
+/** The opening half: a tab per listed terminal that has none and was
+ *  not dismissed. A terminal in a branch's checkout lives in that
+ *  branch's tab, and is dismissed from the strip as it is listed, so it
+ *  gets no tab later under a repository that does not know its branch. */
+function openListed(state: Strip, entries: TerminalEntry[]): Strip {
+  const dismissed = new Set(state.dismissed);
   const byId = new Map(
     state.tabs.flatMap((t): [string, TerminalTab][] =>
       t.kind === 'terminal' ? [[t.id, t]] : []
     )
   );
   let tabs: Tab[] = state.tabs;
-  let changed = false;
   for (const entry of entries) {
     const id = terminalTabId(entry.name);
     const existing = byId.get(id);
     if (existing) {
-      const stamped = restamp(existing, entry);
-      if (stamped === existing) continue;
-      tabs = tabs.map((t) => (t.id === id ? stamped : t));
-      changed = true;
+      // A restored tab still waiting on its creation time is not this
+      // listing's to stamp.
+      const stamped = existing.restored ? existing : restamp(existing, entry);
+      if (stamped !== existing)
+        tabs = tabs.map((t) => (t.id === id ? stamped : t));
       continue;
     }
-    const seen = seenKey(entry.name);
-    if (opened.has(seen)) continue;
-    opened.add(seen);
-    changed = true;
-    // A branch's terminal lives in that branch's tab; seen all the same,
-    // so it gets no tab later, under a repository that does not know it.
-    if (!entry.branch) tabs = [...tabs, terminalTab(entry, true)];
+    if (entry.branch) {
+      dismissed.add(terminalDismissKey(entry.name, entry.created));
+      continue;
+    }
+    if (!isTerminalDismissed(dismissed, entry))
+      tabs = [...tabs, terminalTab(entry, true)];
   }
-  if (!changed) return state;
-  return { ...state, tabs, autoOpened: [...opened] };
+  const grown = dismissed.size !== state.dismissed.length;
+  if (tabs === state.tabs && !grown) return state;
+  return { ...state, tabs, ...(grown ? { dismissed: [...dismissed] } : {}) };
 }
 
 /**
@@ -134,52 +235,55 @@ function openListed(state: TabsState, entries: TerminalEntry[]): TabsState {
  *
  * Through the same close as the user's, so the focus rules are the
  * user's too — the neighbour takes over, and never one from another
- * repository. The auto-open stamp goes with the tab: the host only
- * lists a name again when it re-adopted a live session under it (the
- * user detached from inside tmux and discovery found it still
- * running), and that terminal deserves its tab back rather than
- * running invisibly behind a stamp for a tab that ended. A tab still
- * open keeps its stamp whether or not the listing names it — closing
- * it later relies on that, or the listing that still names the
- * terminal until its kill lands would reopen it.
+ * repository. Nothing is dismissed by it: the terminal has ended, and
+ * if the host lists the name again it re-adopted a live session under
+ * it (the user detached from inside tmux and discovery found it still
+ * running), which deserves its tab back.
  */
 function dropEnded(
-  state: TabsState,
+  state: Strip,
   repo: string,
   entries: TerminalEntry[]
-): TabsState {
+): Strip {
   const listed = new Set(entries.map((e) => terminalTabId(e.name)));
   let next = state;
   for (const tab of state.tabs) {
     if (tab.kind !== 'terminal' || !tab.listed || listed.has(tab.id)) continue;
     next = closeTab(next, tab.id, repo);
   }
-  const open = new Set(next.tabs.map((t) => t.id));
-  const autoOpened = next.autoOpened.filter(
-    (key) => !key.startsWith('terminal:') || listed.has(key) || open.has(key)
-  );
-  if (autoOpened.length === next.autoOpened.length) return next;
-  return { ...next, autoOpened };
+  return next;
 }
 
 /** The listing's view of a terminal, onto its tab — the same tab when
  *  nothing moved. The directory itself never changes; what can is its
- *  repository (a `.git` appearing) and how home is written. Being
- *  named by a listing at all is the other thing a tab learns here. */
+ *  repository (a `.git` appearing) and how home is written, and the
+ *  creation time arrives once discovery lists it. Being named by a
+ *  listing at all is the other thing a tab learns here. */
 function restamp(tab: TerminalTab, entry: TerminalEntry): TerminalTab {
-  if (
-    tab.listed &&
-    tab.repo === entry.repo &&
-    tab.displayPath === entry.displayPath &&
-    tab.cwd === entry.cwd
-  ) {
-    return tab;
-  }
-  return {
+  const next: TerminalTab = {
     ...tab,
     cwd: entry.cwd,
     displayPath: entry.displayPath,
     repo: entry.repo,
     listed: true,
   };
+  const created = entry.created ?? tab.created;
+  const machine = entry.machine ?? tab.machine;
+  const machineLabel = entry.machineLabel ?? tab.machineLabel;
+  if (created !== undefined) next.created = created;
+  if (machine !== undefined) next.machine = machine;
+  if (machineLabel !== undefined) next.machineLabel = machineLabel;
+  const fields = [
+    'listed',
+    'repo',
+    'displayPath',
+    'cwd',
+    'created',
+    'machine',
+    'machineLabel',
+  ];
+  const same = fields.every(
+    (k) => next[k as keyof TerminalTab] === tab[k as keyof TerminalTab]
+  );
+  return same ? tab : next;
 }

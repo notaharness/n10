@@ -44,6 +44,7 @@ import {
 import { useCloseTabs } from '../lib/tabs/use-close-tabs.js';
 import { REMOTE_HOME_CWD } from '../lib/terminals/terminal-launch-request.js';
 import { useTerminalTabs } from '../lib/terminals/use-terminal-tabs.js';
+import { useRestoredNotice } from '../lib/tabs/use-restored-notice.js';
 import { NewTerminalDialog } from '../components/terminal/NewTerminalDialog.js';
 import { setThemePreference, type ThemePreference } from '../lib/theme.js';
 import { errorMessage } from '../lib/utils.js';
@@ -108,17 +109,25 @@ function WorkspaceInner({
   const terminalTabs = useTerminalTabs();
   // Agents alive in other repositories, as the tab model needs them;
   // `undefined` before the host has answered once.
+  // An answer that left out another repository — fetched before a
+  // switch — is no answer for this one, and one tmux could not give
+  // is none at all.
   const foreignSessions = useForeignSessions();
+  const answer = foreignSessions.data;
+  const answered = answer?.excluded === repo.cwd && answer.alive !== null;
   const foreign: ForeignSessionEntry[] | undefined = useMemo(
     () =>
-      foreignSessions.data?.map((s) => ({
-        repo: s.repo,
-        branch: s.branch,
-        worktree: s.worktree,
-        sessionName: s.sessionName,
-      })),
-    [foreignSessions.data]
+      answered
+        ? answer.sessions.map((s) => ({
+            repo: s.repo,
+            branch: s.branch,
+            worktree: s.worktree,
+            sessionName: s.sessionName,
+          }))
+        : undefined,
+    [answer, answered]
   );
+  const alive = answer?.alive ?? undefined;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarHidden, setSidebarHidden] = useState(
@@ -142,20 +151,25 @@ function WorkspaceInner({
     return () => setRevealHost(null);
   }, [setRevealHost]);
 
-  // The sidebar as the tab model sees it.
-  const entries: ItemEntry[] = useMemo(
+  // The sidebar as the tab model sees it; `undefined` until the host's
+  // first model lands, since only a sidebar that has answered can say a
+  // dismissed agent ended.
+  const loaded = model.data !== undefined;
+  const entries: ItemEntry[] | undefined = useMemo(
     () =>
-      items.map((i) => ({
-        itemKey: itemKey(i),
-        branch: itemBranch(i),
-        title: itemTitle(i),
-        running: itemRunning(i),
-        sessionName: itemSessionName(i),
-        worktree: itemWorktree(i),
-        sessionBranch:
-          i.kind === 'session' ? i.session.sessionBranch : undefined,
-      })),
-    [items]
+      loaded
+        ? items.map((i) => ({
+            itemKey: itemKey(i),
+            branch: itemBranch(i),
+            title: itemTitle(i),
+            running: itemRunning(i),
+            sessionName: itemSessionName(i),
+            worktree: itemWorktree(i),
+            sessionBranch:
+              i.kind === 'session' ? i.session.sessionBranch : undefined,
+          }))
+        : undefined,
+    [items, loaded]
   );
 
   // The one place every store the strip depends on is reconciled: the
@@ -174,9 +188,11 @@ function WorkspaceInner({
   // reason to re-run, since the branch it lands on may already be
   // live. Re-running settles — every step above is idempotent and
   // returns the same state object once there is nothing left to do.
+  const { entries: terminals, scanned } = terminalTabs;
+  useRestoredNotice(tabs.tabs, terminals, scanned);
   useEffect(() => {
-    tabs.syncItems(entries, terminalTabs.entries, foreign);
-  }, [tabs, entries, terminalTabs.entries, foreign]);
+    tabs.syncItems({ entries, terminals, foreign, alive, scanned });
+  }, [tabs, entries, terminals, foreign, alive, scanned]);
 
   // Boot milestones (see lib/perf.ts): the shell is on screen once this
   // mounts, and the sidebar is real once the host's first model lands —

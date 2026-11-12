@@ -11,8 +11,8 @@ import {
   itemKey,
   itemSessionName,
 } from '../sidebar/sidebar-model.js';
-import { useTabs, type Tab } from './tabs.js';
-import { autoOpenKey, terminalTabId } from './tab-identity.js';
+import { useTabs, type Tab, type TerminalTab } from './tabs.js';
+import { dismissKeyOf, sessionKey } from './tab-identity.js';
 import { errorMessage } from '../utils.js';
 
 /**
@@ -79,40 +79,41 @@ export function useCloseTabs(items: SidebarItem[]): {
     [items, repo.cwd]
   );
 
-  const forgetAutoOpened = tabs.forgetAutoOpened;
+  const undismiss = tabs.undismiss;
 
   // The tab already closed synchronously — the strip does not wait on
   // the kill's round trip to feel responsive — so a kill that fails
-  // leaves its session running behind no tab at all. Forgetting the
-  // auto-open key is what stops that being permanent: the session is
-  // still there on the next sidebar poll or terminal listing, and
-  // without this it reads as already seen and never gets a tab again.
+  // leaves its session running behind no tab at all. Undismissing it is
+  // what stops that lasting: the close dismissed the session, and while
+  // it still runs the next sidebar poll or terminal listing would keep
+  // it tabless.
   const killNames = useCallback(
     (names: string[]) => {
       for (const name of names) {
         killMutate(name, {
           onError: (e) => {
             toast.error(errorMessage(e));
-            forgetAutoOpened([autoOpenKey(repo.cwd, name)]);
+            undismiss([sessionKey(repo.cwd, name)]);
           },
         });
       }
     },
-    [killMutate, forgetAutoOpened, repo.cwd]
+    [killMutate, undismiss, repo.cwd]
   );
 
   const killTerminals = useCallback(
-    (names: string[]) => {
-      for (const name of names) {
-        killTerminalMutate(name, {
+    (closing: TerminalTab[]) => {
+      for (const tab of closing) {
+        killTerminalMutate(tab.name, {
           onError: (e) => {
             toast.error(errorMessage(e));
-            forgetAutoOpened([terminalTabId(name)]);
+            const key = dismissKeyOf(tab);
+            if (key) undismiss([key]);
           },
         });
       }
     },
-    [killTerminalMutate, forgetAutoOpened]
+    [killTerminalMutate, undismiss]
   );
 
   const requestClose = useCallback(
@@ -125,7 +126,7 @@ export function useCloseTabs(items: SidebarItem[]): {
       const terminals = closing.filter((t) => t.kind === 'terminal');
       const finish = () => {
         killNames(names);
-        killTerminals(terminals.map((t) => t.name));
+        killTerminals(terminals);
         run();
       };
       if (activeBranches.length > 0 || terminals.length > 0) {
@@ -151,16 +152,22 @@ export function useCloseTabs(items: SidebarItem[]): {
   );
   const closeOthers = useCallback(
     (id: string) => {
+      // Pinned tabs stay, as the reducer's close-others keeps them.
+      const pinned = new Set(tabs.pinned);
       requestClose(
-        tabs.tabs.filter((t) => t.id !== id),
+        tabs.tabs.filter((t) => t.id !== id && !pinned.has(t.id)),
         () => tabs.closeOthers(id)
       );
     },
     [tabs, requestClose]
   );
   const closeAll = useCallback(() => {
-    requestClose(tabs.tabs, () => tabs.closeAll());
-  }, [tabs, requestClose]);
+    const pinned = new Set(tabs.pinned);
+    requestClose(
+      tabs.tabs.filter((t) => !pinned.has(t.id)),
+      () => tabs.closeAll(repo.cwd)
+    );
+  }, [tabs, requestClose, repo.cwd]);
   const closeActive = useCallback(() => {
     if (tabs.activeId) close(tabs.activeId);
   }, [tabs.activeId, close]);

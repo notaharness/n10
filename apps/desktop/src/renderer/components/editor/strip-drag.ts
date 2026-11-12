@@ -1,7 +1,8 @@
 /**
  * What the strip drags, and where it may land. A member tab moves only
  * among its own group's members; a block (a group dragged by its chip, or
- * a tab standing alone) moves only between other blocks. Illegal places
+ * a tab standing alone) moves only between other blocks, a pinned tab
+ * only among the pinned and anything else only outside them. Illegal places
  * are not drop targets at all (`useSortable`'s `disabled.droppable`), so
  * the pointer and the keyboard both meet only legal slots, and the slot
  * the strip opens is the one the drop takes: a block's drop arranges the
@@ -26,6 +27,9 @@ export type StripDragData =
       ids: readonly string[];
       /** Its place among the blocks, as presented. */
       index: number;
+      /** A pinned tab: it moves only among the pinned ones, and nothing
+       *  else lands among them. */
+      pinned?: true;
     };
 
 /** A place as its caller describes it; the strip adds the label. */
@@ -44,7 +48,9 @@ export function acceptsDrop(
   dragged: StripDragData | undefined
 ): boolean {
   if (!dragged) return true;
-  if (dragged.kind === 'block') return target.kind === 'block';
+  if (dragged.kind === 'block') {
+    return target.kind === 'block' && !target.pinned === !dragged.pinned;
+  }
   return target.kind === 'member' && target.group === dragged.group;
 }
 

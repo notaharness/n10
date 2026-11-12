@@ -1,8 +1,9 @@
-import { FolderXIcon, XIcon } from 'lucide-react';
+import { FolderXIcon, PinIcon, XIcon } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import type { SidebarItem } from '../../../host/contract.js';
 import { itemWorktreeRemoved } from '../../lib/sidebar/sidebar-model.js';
 import { cn } from '../../lib/utils.js';
+import { Tip } from '../ui/tooltip.js';
 
 /**
  * The marks a tab carries, shared by the strip's tabs and the player
@@ -92,6 +93,24 @@ export function TabCloseButton({
         <XIcon className="size-3.5" />
       </button>
     </span>
+  );
+}
+
+/**
+ * A pinned tab's mark, where the close button would be and always
+ * shown: a mark, not a control — a pin closes like any tab, from its
+ * menu, a middle click, Delete or the close shortcut.
+ */
+export function PinnedMark() {
+  return (
+    <Tip label="Pinned">
+      <span
+        data-pinned-mark
+        className="flex size-5 shrink-0 items-center justify-center text-muted-foreground"
+      >
+        <PinIcon aria-label="Pinned" className="size-3" />
+      </span>
+    </Tip>
   );
 }
 

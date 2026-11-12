@@ -93,7 +93,7 @@ import type {
 // and those alive in other repositories.
 export type * from './contract-sessions.js';
 import type {
-  ForeignSessionSummary,
+  ForeignSessionsAnswer,
   SessionSummary,
 } from './contract-sessions.js';
 // Pull request diffs at exact commits.
@@ -333,6 +333,27 @@ export interface SyncState {
 
 // ── Desktop shell (native menus, prefs) ──────────────────────────
 
+/** The tab workspace as the renderer saves it. The host versions and
+ *  stores it (`services/workspace-file.ts`); its shape is the
+ *  renderer's (`lib/tabs/workspace-file.ts`), checked on restore. */
+export type SavedWorkspace = Readonly<Record<string, unknown>>;
+
+/** What a launch finds: a workspace to restore, none, a file this
+ *  build could not read, moved aside to `path`, or a file it could
+ *  neither read nor move. After `unreadable` the host refuses every
+ *  save for the rest of its run, so that file is never overwritten. */
+export type LoadedWorkspace =
+  | { status: 'none' }
+  | {
+      status: 'restored';
+      workspace: SavedWorkspace;
+      /** The repositories item tabs name whose directory is gone from
+       *  this machine: moved or deleted while n10 was closed. */
+      goneRepos: string[];
+    }
+  | { status: 'set-aside'; path: string }
+  | { status: 'unreadable' };
+
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 /** The theme in effect: Electron's `nativeTheme`, which folds the
@@ -377,6 +398,8 @@ export type ContextMenuItem =
       /** A radio item, one of the adjacent items that also have it:
        *  whether it is the one chosen. */
       checked?: boolean;
+      /** Where the platform shows one (macOS), a line on hover. */
+      toolTip?: string;
     };
 
 /** Mirror of app-core's ActivitySnapshot, redeclared so the renderer
@@ -557,8 +580,9 @@ export interface N10HostApi {
   listSessions(repo: string): Promise<SessionSummary[]>;
   /** Agents alive in other repositories, for the tab strip to give
    *  each a tab in its own group. The open repository's own are left
-   *  out — the sidebar describes those. */
-  listForeignSessions(): Promise<ForeignSessionSummary[]>;
+   *  out — the sidebar describes those — and the answer says which that
+   *  was. It names every live agent session too. */
+  listForeignSessions(): Promise<ForeignSessionsAnswer>;
   /** Debounced per-session agent activity (same registry as the TUI's
    *  sidebar spinner): `active` = producing output now, `flashing` =
    *  went idle after a real work streak and the user hasn't looked. */
@@ -594,6 +618,10 @@ export interface N10HostApi {
   /** Every terminal this host holds, whatever repository is open —
    *  terminals belong to directories, not to the open repo. */
   listTerminals(): Promise<TerminalSummary[]>;
+  /** The machines whose discovery scan has finished, its terminals
+   *  adopted: from then on, a terminal of theirs `listTerminals` does
+   *  not name is gone, not yet to be found. */
+  scannedTerminalMachines(): Promise<string[]>;
   /** Kill the terminal's session, on either backend, and forget it. */
   killTerminal(name: string): Promise<void>;
   /** The agents and terminals working in `branch`'s checkouts of the
@@ -703,6 +731,12 @@ export interface N10HostApi {
   onAutoFixChanged(cb: (event: AutoFixChangedEvent) => void): () => void;
   getDesktopPrefs(): Promise<DesktopPrefs>;
   setDesktopPrefs(patch: Partial<DesktopPrefs>): Promise<DesktopPrefs>;
+  /** The tab workspace saved last, if there is one this build can read;
+   *  one it cannot is set aside. */
+  loadWorkspace(): Promise<LoadedWorkspace>;
+  /** Save the tab workspace. Debounced and written whole; settles once
+   *  the write it ended up in landed, or rejects when that failed. */
+  saveWorkspace(workspace: SavedWorkspace): Promise<void>;
   /** The theme in effect; its changes arrive on `onThemeChanged`. */
   getTheme(): Promise<ResolvedTheme>;
   onThemeChanged(cb: (theme: ResolvedTheme) => void): () => void;
@@ -765,6 +799,7 @@ export const IPC = {
   saveClipboardImage: 'n10/session/clipboard-image',
   launchTerminal: 'n10/terminal/launch',
   listTerminals: 'n10/terminal/list',
+  scannedTerminalMachines: 'n10/terminal/scanned-machines',
   killTerminal: 'n10/terminal/kill',
   listBranchSessions: 'n10/branch-sessions/list',
   launchBranchTerminal: 'n10/branch-sessions/terminal',
@@ -802,6 +837,8 @@ export const IPC = {
   showAppMenu: 'n10/shell/app-menu',
   getDesktopPrefs: 'n10/shell/prefs/get',
   setDesktopPrefs: 'n10/shell/prefs/set',
+  loadWorkspace: 'n10/workspace/load',
+  saveWorkspace: 'n10/workspace/save',
   getTheme: 'n10/shell/theme',
   getKeybindings: 'n10/keybindings/get',
   setKeybinding: 'n10/keybindings/set',

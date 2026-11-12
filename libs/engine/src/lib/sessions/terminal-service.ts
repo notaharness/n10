@@ -36,8 +36,8 @@ export interface TerminalPorts {
   ended(name: string): void;
   /** What each terminal belongs to: the repository service's, so both
    *  share one answer, and a terminal no listing names yet is placed by
-   *  the same rule. */
-  affiliations?: Pick<AffiliationService, 'ofOrPlace'>;
+   *  the same rule. It also says when each listed session was created. */
+  affiliations?: Pick<AffiliationService, 'ofOrPlace' | 'createdOf'>;
 }
 
 function assertLaunchableCwd(cwd: string): void {
@@ -62,8 +62,11 @@ function directoryFor(req: TerminalLaunch, machine?: string): Promise<string> {
 /** Process-wide directory terminals survive repository selection changes. */
 export function createTerminalService(ports: TerminalPorts) {
   const facts = (name: string, record: TerminalRecord) =>
-    terminalFacts(name, record, (machine) =>
-      ports.affiliations?.ofOrPlace(name, record.cwd, machine)
+    terminalFacts(
+      name,
+      record,
+      (machine) => ports.affiliations?.ofOrPlace(name, record.cwd, machine),
+      ports.affiliations?.createdOf(name)
     );
   const known = new Map<string, TerminalRecord>();
   const starting = new Map<

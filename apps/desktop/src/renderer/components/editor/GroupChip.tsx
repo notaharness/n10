@@ -43,9 +43,12 @@ function Grip() {
 }
 
 /** The home's own tab, standing as the chip's body: it activates the
- *  home, and drags the group. */
+ *  home, and drags the group. It shows the group's name — the home's
+ *  label unless the user renamed the group — with the label as its
+ *  tooltip. */
 function HomeBody({
   face,
+  name,
   containsActive,
   setHandle,
   handle,
@@ -55,6 +58,7 @@ function HomeBody({
   justDropped,
 }: {
   face: TabFace;
+  name: string;
   containsActive: boolean;
   justDropped: () => boolean;
   setHandle: Sortable['setHandle'];
@@ -99,7 +103,7 @@ function HomeBody({
         menu.setCollapsed(false);
         tabs.activate(tab.id);
       }}
-      onDoubleClick={() => tabs.pin(tab.id)}
+      onDoubleClick={() => tabs.keep(tab.id)}
       onContextMenu={(e) => {
         e.preventDefault();
         runTabMenu(tab, tabs, closer, tabOverflow, menu).catch((err: unknown) =>
@@ -111,10 +115,10 @@ function HomeBody({
     >
       <span className="flex max-w-40 min-w-16">
         <TabLabel
-          label={label}
+          label={name}
           preview={tab.preview}
           foreignRepo={face.foreignRepo}
-          cut={cutSide(kind)}
+          cut={name === label ? cutSide(kind) : 'end'}
         />
       </span>
       <TabEnd item={face.item} unseen={face.unseen} />
@@ -265,6 +269,7 @@ export function GroupChip({
         {head ? (
           <HomeBody
             face={head}
+            name={label}
             containsActive={containsActive}
             closer={closer}
             {...body}

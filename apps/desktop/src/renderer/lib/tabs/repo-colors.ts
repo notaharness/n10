@@ -38,7 +38,7 @@ export function useRepoColors(): ReadonlyMap<string, string> {
   const qc = useQueryClient();
   const { data } = useRecentRepos();
   const foreign = useForeignSessions().data;
-  const foreignRepos = [...new Set(foreign?.map((s) => s.repo))]
+  const foreignRepos = [...new Set(foreign?.sessions.map((s) => s.repo))]
     .sort()
     .join('\n');
   useEffect(() => {

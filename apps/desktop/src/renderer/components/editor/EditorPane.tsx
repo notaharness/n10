@@ -29,13 +29,13 @@ function PaneBody({
   item,
   items,
   menuActive,
-  onPin,
+  onKeep,
 }: {
   tab: Tab;
   item: SidebarItem | undefined;
   items: SidebarItem[];
   menuActive: boolean;
-  onPin: () => void;
+  onKeep: () => void;
 }) {
   if (tab.kind === 'settings') return <SettingsView />;
   if (tab.kind === 'terminal') return <TerminalView tab={tab} />;
@@ -45,7 +45,7 @@ function PaneBody({
       items={items}
       itemKey={tab.itemKey}
       menuActive={menuActive}
-      onPin={onPin}
+      onKeep={onKeep}
     />
   );
 }
@@ -54,7 +54,7 @@ interface PaneProps {
   tab: Tab;
   shown: boolean;
   menuActive: boolean;
-  onPin: () => void;
+  onKeep: () => void;
 }
 
 /** A tab's pane frame: off screen and `inert` while it is the spare, so
@@ -89,7 +89,7 @@ function Pane({
   index,
   shown,
   menuActive,
-  onPin,
+  onKeep,
 }: PaneProps & { items: SidebarItem[]; index: ItemIndex }) {
   const item = tabItem(tab, index);
   const switched =
@@ -115,7 +115,7 @@ function Pane({
                 item={item}
                 items={items}
                 menuActive={menuActive}
-                onPin={onPin}
+                onKeep={onKeep}
               />
             </ErrorBoundary>
           </div>

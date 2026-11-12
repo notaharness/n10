@@ -1,7 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type { TerminalKind, TerminalSummary } from '../../../host/contract.js';
-import { useTerminals } from '../data/queries.js';
+import type {
+  MachineView,
+  TerminalKind,
+  TerminalSummary,
+} from '../../../host/contract.js';
+import { useMachines, useTerminalListing } from '../data/queries.js';
 import { useLaunchTerminal } from '../data/mutations-terminals.js';
 import { useLaunchProgress } from '../machines/launch-progress.js';
 import { useTabs, type TerminalEntry } from '../tabs/tabs.js';
@@ -9,8 +13,15 @@ import { estimateTerminalGrid, paneTerminalGrid } from '../terminal-grid.js';
 import { terminalLaunchRequest } from './terminal-launch-request.js';
 import { errorMessage } from '../utils.js';
 
-/** The host's summary, as the tab model keeps it. */
-function toEntry(t: TerminalSummary): TerminalEntry {
+/** The host's summary, as the tab model keeps it, with its machine's
+ *  name when the fleet knows it. */
+function toEntry(
+  t: TerminalSummary,
+  machines?: readonly MachineView[]
+): TerminalEntry {
+  const label = machines?.find(
+    (m) => !m.isLocal && m.peerId === t.machine
+  )?.label;
   return {
     name: t.name,
     kind: t.kind,
@@ -18,6 +29,9 @@ function toEntry(t: TerminalSummary): TerminalEntry {
     displayPath: t.displayPath,
     repo: t.repo,
     ...(t.branch ? { branch: t.branch } : {}),
+    ...(t.created !== undefined ? { created: t.created } : {}),
+    machine: t.machine,
+    ...(label ? { machineLabel: label } : {}),
   };
 }
 
@@ -51,7 +65,8 @@ function estimatePane(): { cols?: number; rows?: number } {
  */
 export function useTerminalTabs() {
   const tabs = useTabs();
-  const terminals = useTerminals();
+  const listing = useTerminalListing();
+  const machines = useMachines().data;
   const launch = useLaunchTerminal();
   const progress = useLaunchProgress();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -59,9 +74,16 @@ export function useTerminalTabs() {
 
   // `undefined` until the host has answered once — and it stays the
   // previous answer across a refetch (`placeholderData`) — so the strip
-  // never sees "no terminals" when the truth is "not asked yet". The
-  // reducer closes the tab of any terminal a listing does not name.
-  const entries = useMemo(() => terminals.data?.map(toEntry), [terminals.data]);
+  // never sees "no terminals" when the truth is "not asked yet". Beside
+  // it, `scanned` says which machines the listing is complete for: a
+  // terminal it lacks is gone only on one of those (a restored tab
+  // closes, a dismissal is forgotten); elsewhere it may not be found yet.
+  const data = listing.data;
+  const entries = useMemo(
+    () => data?.terminals.map((t) => toEntry(t, machines)),
+    [data, machines]
+  );
+  const scanned = data?.scanned;
 
   const launchMutate = launch.mutate;
   const openTerminal = tabs.openTerminal;
@@ -104,6 +126,8 @@ export function useTerminalTabs() {
     /** The host's terminal listing, for Workspace's sync effect;
      *  `undefined` before the first answer. */
     entries,
+    /** The machines the listing is complete for. */
+    scanned,
     dialogOpen,
     openDialog: useCallback(() => setDialogOpen(true), []),
     closeDialog: useCallback(() => {

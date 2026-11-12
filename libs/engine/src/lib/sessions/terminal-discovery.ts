@@ -51,10 +51,15 @@ export interface MachineScanPorts {
   retired: ReadonlySet<string>;
   /** Forget attach failures of `machine`'s names its listing lacks. */
   forgetFailures(machine: string, present: ReadonlySet<string>): void;
+  /** Whether one of `offered` failed to attach and will be retried. */
+  awaitingAttach(offered: readonly DiscoveredTerminal[]): boolean;
   adopt(terminal: DiscoveredTerminal): Promise<boolean>;
   onChanged(delta: DiscoveryDelta): void;
   /** Handed the machine's whole listing. */
   listed?(machine: string, sessions: readonly TaggedSession[]): void;
+  /** Told once a listing of the machine succeeded and its terminals
+   *  are adopted, none still waiting on a retried attach. */
+  scanned?(machine: string): void;
 }
 
 const EMPTY_SCAN: DiscoveryScan = {
@@ -101,13 +106,24 @@ export function createMachineScans(ports: MachineScanPorts) {
     );
     delta.endedTerminals = before.filter((name) => !present.has(name));
     // Attach first, announce second, as the local scan does.
-    let adopted = 0;
-    for (const terminal of delta.adoptableTerminals) {
-      if (!ports.live()) return;
-      if (await ports.adopt(terminal)) adopted += 1;
-    }
+    const adopted = await adoptAll(delta.adoptableTerminals);
+    if (adopted === null) return;
+    if (ports.live() && !ports.awaitingAttach(delta.adoptableTerminals))
+      ports.scanned?.(machine);
     if ((adopted > 0 || delta.endedTerminals.length > 0) && ports.live())
       ports.onChanged({ ...delta, changed: true });
+  }
+
+  /** How many of `terminals` attached; null once the scan went stale. */
+  async function adoptAll(
+    terminals: readonly DiscoveredTerminal[]
+  ): Promise<number | null> {
+    let adopted = 0;
+    for (const terminal of terminals) {
+      if (!ports.live()) return null;
+      if (await ports.adopt(terminal)) adopted += 1;
+    }
+    return adopted;
   }
 
   return {

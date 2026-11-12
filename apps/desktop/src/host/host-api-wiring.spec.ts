@@ -104,7 +104,12 @@ vi.mock('./services/sessions.js', () =>
   ])
 );
 vi.mock('./services/terminals.js', () =>
-  recorder('terminals', ['launchTerminal', 'listTerminals', 'killTerminal'])
+  recorder('terminals', [
+    'launchTerminal',
+    'listTerminals',
+    'scannedTerminalMachines',
+    'killTerminal',
+  ])
 );
 vi.mock('./services/branch-sessions.js', () =>
   recorder('branchSessions', [
@@ -159,6 +164,9 @@ vi.mock('./services/auto-fix.js', () =>
 );
 vi.mock('./services/desktop-prefs.js', () =>
   recorder('prefs', ['loadDesktopPrefs', 'saveDesktopPrefs'])
+);
+vi.mock('./services/workspace-file.js', () =>
+  recorder('workspaceFile', ['loadWorkspace', 'saveWorkspace'])
 );
 vi.mock('./services/theme.js', () => recorder('theme', ['getTheme']));
 vi.mock('./services/machines.js', () =>
@@ -344,6 +352,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'terminals.launchTerminal',
   ],
   ['listTerminals', [], 'branchSessions.listTerminals'],
+  ['scannedTerminalMachines', [], 'terminals.scannedTerminalMachines'],
   ['killTerminal', ['n10-shell'], 'terminals.killTerminal'],
   [
     'listBranchSessions',
@@ -364,6 +373,8 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
     'updates.setUpdatePreferences',
   ],
   ['getDesktopPrefs', [], 'prefs.loadDesktopPrefs'],
+  ['loadWorkspace', [], 'workspaceFile.loadWorkspace'],
+  ['saveWorkspace', [{ tabs: {} }], 'workspaceFile.saveWorkspace'],
   ['getTheme', [], 'theme.getTheme'],
   ['getKeybindings', [], 'keybindings.getDesktopKeybindings'],
   [

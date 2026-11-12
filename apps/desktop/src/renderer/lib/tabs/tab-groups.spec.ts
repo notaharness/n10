@@ -46,7 +46,10 @@ const parent = (
 const place = (path: string) => placeAffiliation(path);
 
 /** Tabs named by their session, each with the affiliation given. */
-function strip(entries: [string, Affiliation | null][]) {
+function strip(
+  entries: [string, Affiliation | null][],
+  pinned: readonly string[] = []
+) {
   const tabs = entries.map(([name]) =>
     name === 'settings' ? settings : terminal(name)
   );
@@ -55,7 +58,7 @@ function strip(entries: [string, Affiliation | null][]) {
     tab.kind === 'terminal'
       ? { affiliation: of.get(tab.name) ?? null, session: tab.name }
       : { affiliation: null };
-  return present(tabs, facts);
+  return present(tabs, facts, pinned.map(terminalTabId));
 }
 const shape = (groups: ReturnType<typeof present>) =>
   groups.map((g) => ({
@@ -64,6 +67,55 @@ const shape = (groups: ReturnType<typeof present>) =>
     tabs: g.tabs.map((t) => t.id.replace('terminal:', '')),
     chipped: g.chipped,
   }));
+
+describe('present with pins', () => {
+  it('puts pinned tabs first, alone, in their strip order, and out of their groups', () => {
+    const groups = strip(
+      [
+        ['a1', place('/a')],
+        ['p1', parent('codex:x')],
+        ['a2', place('/a')],
+        ['p2', parent('codex:x')],
+      ],
+      ['p2', 'a1']
+    );
+    expect(shape(groups)).toEqual([
+      { key: 'pin:terminal:a1', head: null, tabs: ['a1'], chipped: false },
+      { key: 'pin:terminal:p2', head: null, tabs: ['p2'], chipped: false },
+      { key: 'codex:x', head: null, tabs: ['p1'], chipped: true },
+      { key: 'place:/a', head: null, tabs: ['a2'], chipped: false },
+    ]);
+    expect(groups.slice(0, 2).every((g) => g.pinned)).toBe(true);
+    // Positional switching walks pins first.
+    expect(presentedIds(groups)[0]).toBe('terminal:a1');
+  });
+
+  it('leaves a stand-in for the rest of a group whose home is pinned', () => {
+    const groups = strip(
+      [
+        ['conductor', parent('claude:c', 'conductor')],
+        ['p1', parent('claude:c', 'conductor')],
+      ],
+      ['conductor']
+    );
+    expect(shape(groups)[1]).toEqual({
+      key: 'claude:c',
+      head: null,
+      tabs: ['p1'],
+      chipped: true,
+    });
+  });
+
+  it('puts an unpinned tab back in its group where it was', () => {
+    const entries: [string, Affiliation | null][] = [
+      ['a1', place('/a')],
+      ['a2', place('/a')],
+      ['a3', place('/a')],
+    ];
+    expect(shape(strip(entries, ['a2'])).at(-1)?.tabs).toEqual(['a1', 'a3']);
+    expect(shape(strip(entries)).at(-1)?.tabs).toEqual(['a1', 'a2', 'a3']);
+  });
+});
 
 describe('present', () => {
   it('groups by affiliation in the order of each group’s first tab, members in strip order', () => {

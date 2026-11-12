@@ -16,7 +16,8 @@ export type DesktopActionId =
   | 'desktop.tabs.cycle-next'
   | 'desktop.tabs.cycle-previous'
   | 'desktop.tabs.attention'
-  | 'desktop.groups.collapse-others';
+  | 'desktop.groups.collapse-others'
+  | 'desktop.tabs.toggle-pin';
 
 export const DESKTOP_ACTIONS: readonly {
   id: DesktopActionId;
@@ -53,6 +54,11 @@ export const DESKTOP_ACTIONS: readonly {
     label: 'Collapse others',
     description: 'Keep the active group open and collapse other groups.',
   },
+  {
+    id: 'desktop.tabs.toggle-pin',
+    label: 'Pin tab / Unpin tab',
+    description: 'The active tab. Pinned tabs sit at the start of the strip.',
+  },
 ];
 
 export type DesktopBindings = Record<DesktopActionId, KeyDescriptor[]>;
@@ -66,6 +72,7 @@ export const DESKTOP_DEFAULT_BINDINGS: DesktopBindings = {
   ],
   'desktop.tabs.attention': [{ ctrl: true, input: 'A' }],
   'desktop.groups.collapse-others': [{ ctrl: true, input: 'J' }],
+  'desktop.tabs.toggle-pin': [{ ctrl: true, meta: true, input: 'p' }],
 };
 
 export function isDesktopActionId(id: string): id is DesktopActionId {

@@ -24,6 +24,16 @@ describe('strip drag', () => {
     expect(acceptsDrop(block(['x'], 1), block(['a', 'b'], 0))).toBe(true);
     expect(acceptsDrop(member('g', 0), block(['a', 'b'], 0))).toBe(false);
   });
+  it('keeps pinned tabs among the pinned, and everything else out of them', () => {
+    const pin = (id: string, index: number): StripDragData =>
+      ({
+        ...block([id], index),
+        pinned: true,
+      } as StripDragData);
+    expect(acceptsDrop(pin('p', 0), pin('q', 1))).toBe(true);
+    expect(acceptsDrop(block(['x'], 2), pin('q', 1))).toBe(false);
+    expect(acceptsDrop(pin('p', 0), block(['x'], 2))).toBe(false);
+  });
   it('moves a member before or after its target by their places', () => {
     expect(dropMove('a', member('g', 0), 'c', member('g', 2), [])).toEqual({
       kind: 'move',

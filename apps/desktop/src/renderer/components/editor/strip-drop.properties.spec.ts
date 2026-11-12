@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { present, type TabFacts } from '../../lib/tabs/tab-groups.js';
 import { terminalTabId, type Tab } from '../../lib/tabs/tab-identity.js';
 import { arrangeTabs } from '../../lib/tabs/tab-order.js';
-import { EMPTY_TABS } from '../../lib/tabs/tabs-model.js';
+import { EMPTY_STRIP } from '../../lib/tabs/tabs-model.js';
 import { dropMove, type StripDragData } from './strip-drag.js';
 import { stripRuns } from './strip-blocks.js';
 
@@ -107,7 +107,7 @@ describe('a block dropped on the strip', () => {
           );
           expect(drop?.kind).toBe('arrange');
           const next = arrangeTabs(
-            { ...EMPTY_TABS, tabs },
+            { ...EMPTY_STRIP, tabs },
             drop?.kind === 'arrange' ? drop.ids : []
           );
           const expected = runs.map((r) => r.lead.key);

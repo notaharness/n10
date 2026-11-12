@@ -131,4 +131,18 @@ describe('affiliation service', () => {
     expect(service.ofOrPlace('new', `${checkout}/apps/x`).key).toBe(CLAUDE);
     expect(service.ofOrPlace('new', '/repo/apps/x').key).toBe('place:/repo');
   });
+
+  it('says when each listed session was created, by registry key', () => {
+    // A restored tab tells its session from a later one under the same
+    // name by this, so it follows the latest listing of each machine.
+    const service = createAffiliationService({ placeOf: (dir) => dir });
+    service.observe('local', [shell('a', { created: 100 })]);
+    service.observe(PEER, [shell('b', { machine: PEER, created: 200 })]);
+    expect(service.createdOf(terminalSessionKey('a'))).toBe(100);
+    expect(service.createdOf(terminalSessionKey('b', PEER))).toBe(200);
+    service.observe('local', [shell('a', { created: 300 })]);
+    expect(service.createdOf(terminalSessionKey('a'))).toBe(300);
+    service.observe('local', []);
+    expect(service.createdOf(terminalSessionKey('a'))).toBeUndefined();
+  });
 });

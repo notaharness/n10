@@ -69,6 +69,18 @@ export async function adoptTerminal(
 ): Promise<void> {
   noteRepository(summarize(await terminals.adopt(terminal), homedir()));
 }
+/** The machines whose discovery scan has finished, terminals adopted. */
+const scanned = new Set<string>();
+
+/** Discovery finished a scan of `machine`. */
+export function noteTerminalsScanned(machine: string): void {
+  scanned.add(machine);
+}
+
+export function scannedTerminalMachines(): string[] {
+  return [...scanned];
+}
+
 export function listTerminals(home: string = homedir()): TerminalSummary[] {
   return terminals.list().map((facts) => summarize(facts, home));
 }

@@ -84,7 +84,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
         repo: repo.cwd,
         sessions: sessionRows,
         terminals: terminals.data ?? [],
-        foreign: foreign.data ?? [],
+        foreign: foreign.data?.sessions ?? [],
       }),
     [repo.cwd, sessionRows, terminals.data, foreign.data]
   );
@@ -123,8 +123,10 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     };
   };
 
-  const groups = present(tabs.tabs, (tab) =>
-    tabFacts(tab, sessionOf(tab), affiliations)
+  const groups = present(
+    tabs.tabs,
+    (tab) => tabFacts(tab, sessionOf(tab), affiliations),
+    tabs.pinned
   );
   const colorOf = (group: TabGroup): string | null => {
     if (group.head) return colorOfTab(group.head);
@@ -144,8 +146,8 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
 
   // A tab activated from anywhere shows: its group expands. So does a
   // collapsed group the active tab joins behind its chip (its
-  // affiliation came with a later scan). Collapsing the active tab's
-  // group leaves it collapsed until either changes.
+  // affiliation came with a later scan, or it was unpinned). Collapsing
+  // the active tab's group leaves it collapsed until either changes.
   const active = groupOf(groups, tabs.activeId);
   const activeGroup = active?.key;
   const collapsed = !!active && isCollapsed(active, tabs.collapsed);
