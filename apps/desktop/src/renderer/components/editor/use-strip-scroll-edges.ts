@@ -42,10 +42,10 @@ export function useStripScrollEdges(blockKey: string, wrap: boolean) {
   return { track, edges, update };
 }
 
-/** Wrapped, the strip scrolls past its row cap: keep the active tab (or
- *  its collapsed group's home) in view when it changes, when the blocks
- *  around it do (`blockKey`), and when the strip's room does (a split, a
- *  resize). */
+/** Keep the active tab (or its collapsed group's home) in view on the
+ *  strip, which scrolls sideways in its one row, or down past its row cap
+ *  when wrapped: when it changes, when the blocks around it do
+ *  (`blockKey`), and when the strip's room does (a split, a resize). */
 export function useActiveTabInView(
   track: RefObject<HTMLDivElement | null>,
   wrap: boolean,
@@ -54,22 +54,31 @@ export function useActiveTabInView(
 ) {
   useEffect(() => {
     const el = track.current;
-    if (!wrap || !el || activeId === null) return;
+    if (!el || activeId === null) return;
     const reveal = () => {
       const key = CSS.escape(activeId);
       const tab = el.querySelector(
         `[data-tab-id="${key}"], [data-home-tab="${key}"]`
       );
       if (!tab) return;
-      const row = tab.getBoundingClientRect();
-      const box = el.getBoundingClientRect();
-      const above = Math.min(0, row.top - box.top);
-      const below = Math.max(0, row.bottom - box.bottom);
-      if (above || below) el.scrollBy({ top: above || below });
+      const by = past(tab.getBoundingClientRect(), el.getBoundingClientRect());
+      if (wrap && by.y) el.scrollBy({ top: by.y });
+      if (!wrap && by.x) el.scrollBy({ left: by.x });
     };
     const observer = new ResizeObserver(reveal);
     observer.observe(el);
     reveal();
     return () => observer.disconnect();
   }, [track, wrap, activeId, blockKey]);
+}
+
+/** How far `row` lies outside `box` on each axis: negative before its
+ *  start, positive past its end, 0 inside. */
+function past(row: DOMRect, box: DOMRect) {
+  const by = (start: number, end: number, from: number, to: number) =>
+    Math.min(0, start - from) || Math.max(0, end - to);
+  return {
+    x: by(row.left, row.right, box.left, box.right),
+    y: by(row.top, row.bottom, box.top, box.bottom),
+  };
 }
