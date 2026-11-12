@@ -612,6 +612,39 @@ describe('startSessionDiscovery', () => {
       expect(order).toEqual([`adopt ${shellTerm.name}`, 'scanned local']);
     });
 
+    // A failed attach leaves the terminal out of the shell's listing
+    // while its session is still there: a restored tab bound to it
+    // would read that as an end.
+    it('says nothing of this machine while a failed attach is to be retried', async () => {
+      listTerminalsMock.mockReturnValue([shellTerm]);
+      const scanned = vi.fn();
+      const adoptTerminal = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('pty spawn'))
+        .mockImplementation((t: DiscoveredTerminal) => {
+          alive.add(t.name);
+          sessionNamesMock.mockReturnValue([t.name]);
+        });
+      const { discovery } = start({ adoptTerminal, scanned });
+      await discovery.scanNow();
+      expect(scanned).not.toHaveBeenCalled();
+      await discovery.scanNow();
+      expect(adoptTerminal).toHaveBeenCalledTimes(2);
+      expect(scanned).toHaveBeenCalledWith('local');
+    });
+
+    it('speaks for this machine again once a failing terminal is retired', async () => {
+      listTerminalsMock.mockReturnValue([shellTerm]);
+      const scanned = vi.fn();
+      const adoptTerminal = vi.fn().mockRejectedValue(new Error('gone'));
+      const { discovery } = start({ adoptTerminal, scanned });
+      for (let i = 0; i < 2; i++) await discovery.scanNow();
+      expect(scanned).not.toHaveBeenCalled();
+      await discovery.scanNow();
+      expect(adoptTerminal).toHaveBeenCalledTimes(3);
+      expect(scanned).toHaveBeenCalledWith('local');
+    });
+
     it('says nothing of a scan tmux could not list', async () => {
       listHeldMock.mockReturnValue(null);
       const scanned = vi.fn();
@@ -738,6 +771,25 @@ describe('startSessionDiscovery', () => {
         await discovery.scanNow();
         await settle();
         expect(scanned).not.toHaveBeenCalledWith(PEER);
+      });
+
+      it('says nothing of its machine while a failed attach is to be retried', async () => {
+        remoteTerminalsMock.mockResolvedValue([remoteTerm]);
+        const scanned = vi.fn();
+        const adoptTerminal = vi
+          .fn()
+          .mockRejectedValueOnce(new Error('beam attach'))
+          .mockImplementation((t: DiscoveredTerminal) => {
+            alive.add(t.name);
+          });
+        const { discovery } = start({ ...connected, adoptTerminal, scanned });
+        await discovery.scanNow();
+        await settle();
+        expect(scanned).not.toHaveBeenCalledWith(PEER);
+        await discovery.scanNow();
+        await settle();
+        expect(adoptTerminal).toHaveBeenCalledTimes(2);
+        expect(scanned).toHaveBeenCalledWith(PEER);
       });
 
       it('never ends one launched while the listing was out', async () => {
