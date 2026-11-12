@@ -360,6 +360,22 @@ test.describe('Split panes', () => {
       timeout: 15_000,
     });
 
+    // Focus moved onto its strip from elsewhere makes the pane the
+    // focused one and stays on the strip: the terminal does not take it.
+    await pane(page, 0).getByRole('tab').first().focus();
+    await expect(pane(page, 0)).toHaveAttribute('data-pane-focused', 'true');
+    const strip = pane(page, 1).getByRole('tab', { selected: true });
+    await strip.focus();
+    await expect(pane(page, 1)).toHaveAttribute('data-pane-focused', 'true');
+    await page.evaluate(
+      () =>
+        new Promise((done) =>
+          requestAnimationFrame(() => requestAnimationFrame(done))
+        )
+    );
+    await expect(strip).toBeFocused();
+    await expect(keys).not.toBeFocused();
+
     // Closing its pane hands it back, still running, and it takes the
     // keys again.
     await page.keyboard.press('Control+Alt+w');

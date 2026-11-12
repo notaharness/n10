@@ -15,6 +15,12 @@ import { errorMessage } from '../../lib/utils.js';
 
 /** The grid that fills the pane, by `FitAddon`'s reckoning; null
  *  before the pane has a box. */
+/** Whether focus is already somewhere in the editor pane `el` is in. */
+function focusInOwnPane(el: HTMLElement | null): boolean {
+  const at = document.activeElement;
+  return !!at && !!el?.closest('[data-pane-id]')?.contains(at);
+}
+
 function paneGrid(el: HTMLElement, xterm: DesktopTerminal) {
   const rect = el.getBoundingClientRect();
   if (rect.width < 2 || rect.height < 2) return null;
@@ -216,11 +222,18 @@ export function SessionTerminal({
   // spare pane is inert and cannot hold it; being swapped on screen
   // gives it — a frame later, once the press that swapped it has
   // finished moving focus itself (a tab's lets go of it, a sidebar
-  // row's takes it).
+  // row's takes it). A pane that became the focused one because focus
+  // moved into it (Tab onto its strip) leaves that focus where it is.
+  const wasFocusedPane = useRef(focusedPane);
   useEffect(() => {
+    const gained = focusedPane && !wasFocusedPane.current;
+    wasFocusedPane.current = focusedPane;
     if (!xterm) return undefined;
     if (!blocked && shown && focusedPane && demoMayFocus()) {
-      const raf = requestAnimationFrame(() => xterm.term.focus());
+      const raf = requestAnimationFrame(() => {
+        if (gained && focusInOwnPane(wrapRef.current)) return;
+        xterm.term.focus();
+      });
       return () => cancelAnimationFrame(raf);
     }
     const focused = document.activeElement;
