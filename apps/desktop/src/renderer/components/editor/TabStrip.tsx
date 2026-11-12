@@ -266,6 +266,11 @@ function selectsOnPress(e: PointerEvent<HTMLElement>): boolean {
   return !(e.target as Element).closest('button');
 }
 
+const roleDescriptionOf = (data: StripDragData) =>
+  data.kind === 'block' && data.ids.length > 1
+    ? 'sortable tab group'
+    : 'sortable tab';
+
 /**
  * What a sortable place on the strip spreads onto its elements: a tab,
  * or a group's block with its chip body as the handle. `data` says what
@@ -324,10 +329,7 @@ export function useSortableTab({
     },
     attributes: {
       role,
-      roleDescription:
-        data.kind === 'block' && data.ids.length > 1
-          ? 'sortable tab group'
-          : 'sortable tab',
+      roleDescription: roleDescriptionOf(data),
       // A button is always reachable with Tab; tabs share one stop.
       tabIndex: role === 'button' || tabStop ? 0 : -1,
     },
@@ -336,6 +338,9 @@ export function useSortableTab({
   });
   const handle = {
     ...attributes,
+    // dnd-kit says a draggable it may not lift is disabled; a fixed chip
+    // still takes presses, Enter and its menu.
+    ...{},
     ...listeners,
     onPointerDown: (e: PointerEvent<HTMLElement>) => {
       listeners?.onPointerDown?.(e);

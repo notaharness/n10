@@ -187,6 +187,35 @@ test.describe('Tab groups', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  test('a group shown behind the one it follows is carried, not disabled', async ({
+    desktop,
+  }) => {
+    const { page, repoPath, homeDir } = desktop;
+    branches.push(spawnAgent(repoPath, homeDir));
+    // The orchestrator reports to another, which has no tab here but a
+    // player of its own, so it has a chip to follow.
+    branches.push(spawnAgent(repoPath, homeDir, CODEX));
+    tagTmuxSession(
+      ORCHESTRATOR,
+      orchestraTags({ target: CLAUDE, orchestrator: CODEX }),
+      homeDir
+    );
+    await expect(countOf(page, CLAUDE)).toHaveText('2', { timeout: 30_000 });
+    await expect(countOf(page, CODEX)).toHaveText('1', { timeout: 30_000 });
+    // Shown behind the group it follows, which carries it.
+    const xOf = (key: string) =>
+      chipOf(page, key).evaluate((el) => el.getBoundingClientRect().x);
+    await expect
+      .poll(async () => (await xOf(CODEX)) < (await xOf(CLAUDE)))
+      .toBe(true);
+    const home = chipOf(page, CLAUDE).getByRole('tab');
+    await expect(home).toHaveAttribute('aria-roledescription', /sortable/);
+    await expect(home).not.toHaveAttribute('aria-disabled', 'true');
+    await home.click();
+    await expect(home).toHaveAttribute('aria-selected', 'true');
+    await expect(shownTerminal(page)).toContainText(CONDUCTOR_READY);
+  });
+
   test('groups other tabs by repository, and gives a lone directory tab no chip', async ({
     desktop,
   }) => {
