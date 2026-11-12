@@ -790,11 +790,12 @@ and when Settings → Keyboard opens; a read begun before a write is dropped.
 
 The fixed All tabs control sits outside the tab track, so it remains available
 whether tabs wrap or scroll. Its popover is a plain roster in presented strip
-order, including members hidden behind a collapsed chip. It has no search or
+order, including the members behind each chip. It has no search or
 filter: the roster gives a complete account of the strip. The same row
-component serves chip rosters. Selecting a row expands its group, reveals its
-tab and focuses its terminal when present, else the tab itself. The control's
-badge counts tabs needing attention, currently new output only.
+component serves chip rosters. Selecting a row shows its tab, reveals it
+(or its chip) and focuses its terminal when present, else the tab itself.
+The control carries no badge; its accessible name counts the tabs needing
+attention, currently new output only.
 
 Next attention (Ctrl+Shift+A) walks a stable snapshot: blocked, error,
 unseen completion, then new output, each tier in presented order. Only new
@@ -804,9 +805,7 @@ skips tabs closed or cleared since its start and leaves newly active tabs for
 the next round. Manual activation resets the round; its own jump preserves
 it. A jump to a new-output item tab selects its agent pane so the output is
 visible. With no other pending tab, the command reports the current tab or
-toasts “Nothing needs attention.” Collapse others (Ctrl+Shift+J) keeps the
-active group expanded while collapsing the rest. Both commands are
-rebindable; a saved override on a conflicting chord wins and leaves the new
+toasts “Nothing needs attention.” The command is rebindable; a saved override on a conflicting chord wins and leaves the new
 default unassigned. On desktop a capital-letter chord requires the physical
 Shift modifier, because Caps Lock can capitalize a DOM key without Shift.
 
