@@ -24,7 +24,6 @@ export interface FollowLineState {
  *  callbacks, which outlive a render. */
 interface Latest {
   order: readonly string[];
-  activeId: string | null;
   show: ((id: string) => void) | null;
 }
 
@@ -57,11 +56,10 @@ export function useFollowPane(strip: {
     .join('\n');
   const paused = tabs.focused;
 
-  const latest = useRef<Latest>({ order, activeId: null, show: null });
+  const latest = useRef<Latest>({ order, show: null });
   useEffect(() => {
     latest.current = {
       order,
-      activeId: tabs.activeId,
       show: (id) => {
         // Its agent's output, not a pull request's overview.
         if (tabs.tabs.find((t) => t.id === id)?.kind === 'item')
@@ -75,7 +73,6 @@ export function useFollowPane(strip: {
   useEffect(() => {
     const s = followScheduler({
       rank: (id) => latest.current.order.indexOf(id),
-      shown: () => latest.current.activeId,
       show: (id) => latest.current.show?.(id),
     });
     scheduler.current = s;

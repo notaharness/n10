@@ -11,6 +11,9 @@
  * - Paused (the user is in the pane), nothing switches and events
  *   wait. 500 ms after the pause lifts, the latest still-waiting event
  *   is shown.
+ * - The winner is shown even when it is the pane's active tab: an item
+ *   tab there may be showing its diff, and showing it brings up its
+ *   agent's output (the owner's `show`); the older events still wait.
  * - An event stops waiting once its tab's output is no longer new or the
  *   tab leaves the pane (`forget`).
  * - `observe` turns what has new output now into those events: only a
@@ -26,9 +29,7 @@ export const RESUME_AFTER_MS = 500;
 export interface FollowSchedulerOptions {
   /** Presented order: the lower, the earlier. */
   rank(id: string): number;
-  /** The tab the pane shows now. */
-  shown(): string | null;
-  /** Switch the pane to `id`. */
+  /** Switch the pane to `id`'s output, which it may be on already. */
   show(id: string): void;
 }
 
@@ -73,7 +74,6 @@ export function followScheduler(opts: FollowSchedulerOptions): FollowScheduler {
     const id = winner();
     if (id === null) return;
     waiting.delete(id);
-    if (id === opts.shown()) return;
     opts.show(id);
     lastSwitch = Date.now();
   };

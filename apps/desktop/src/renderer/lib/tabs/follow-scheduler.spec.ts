@@ -7,7 +7,6 @@ function setup(shown: string | null = null) {
   const state = { shown, switches: [] as string[] };
   const s = followScheduler({
     rank: (id) => ORDER.indexOf(id),
-    shown: () => state.shown,
     show: (id) => {
       state.shown = id;
       state.switches.push(id);
@@ -81,11 +80,29 @@ describe('a follow pane’s switching', () => {
     expect(state.switches).toEqual(['b', 'c']);
   });
 
-  it('does not switch to the tab it already shows', () => {
-    const { s, state } = setup('b');
+  it('shows the latest even when the pane is on it, and the older event stays beaten', () => {
+    // An item tab on its diff: showing it brings up its agent's output.
+    const { s, state } = setup('c');
+    s.setPaused(true);
     s.note('b');
-    vi.advanceTimersByTime(1000);
-    expect(state.switches).toEqual([]);
+    vi.advanceTimersByTime(300);
+    s.note('c');
+    s.setPaused(false);
+    vi.advanceTimersByTime(500);
+    expect(state.switches).toEqual(['c']);
+    vi.advanceTimersByTime(5000);
+    expect(state.switches).toEqual(['c']);
+  });
+
+  it('counts showing the tab it is on toward the 2 s limit', () => {
+    const { s, state } = setup('a');
+    s.note('a');
+    vi.advanceTimersByTime(250);
+    s.note('b');
+    vi.advanceTimersByTime(1999);
+    expect(state.switches).toEqual(['a']);
+    vi.advanceTimersByTime(1);
+    expect(state.switches).toEqual(['a', 'b']);
   });
 
   it('waits while paused, and shows the latest 500 ms after the pause lifts', () => {
