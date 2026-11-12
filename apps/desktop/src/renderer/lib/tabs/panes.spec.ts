@@ -531,11 +531,13 @@ describe('pane geometry', () => {
   });
   const layout: LayoutNode = {
     kind: 'split',
+    id: 'split-3',
     direction: 'row',
     sizes: [0.5, 0.5],
     children: [
       {
         kind: 'split',
+        id: 'split-4',
         direction: 'column',
         sizes: [0.5, 0.5],
         children: [pane('1'), pane('3')],
@@ -576,12 +578,14 @@ describe('pane geometry', () => {
     // └───┴───┘
     const beside: LayoutNode = {
       kind: 'split',
+      id: 'split-5',
       direction: 'row',
       sizes: [0.5, 0.5],
       children: [
         pane('4'),
         {
           kind: 'split',
+          id: 'split-6',
           direction: 'column',
           sizes: [0.4, 0.2, 0.4],
           children: [pane('5'), pane('6'), pane('7')],

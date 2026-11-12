@@ -16,7 +16,7 @@ import {
   type LayoutChangedMeta,
 } from 'react-resizable-panels';
 import type { SidebarItem } from '../../../host/contract.js';
-import { nodeId, panesOf, splitKey } from '../../lib/tabs/layout.js';
+import { panesOf, splitKey } from '../../lib/tabs/layout.js';
 import { minExtent } from '../../lib/tabs/layout-geometry.js';
 import { PaneFocusedContext } from '../../lib/tabs/pane-shown.js';
 import { usePrewarm } from '../../lib/tabs/prewarm.js';
@@ -151,13 +151,13 @@ function LayoutView({ node, shared }: { node: LayoutNode; shared: Shared }) {
 /** The layout a split's sizes describe, by panel id, in percent. */
 function layoutOf(split: SplitNode): Layout {
   return Object.fromEntries(
-    split.children.map((c, i) => [nodeId(c), split.sizes[i]! * 100])
+    split.children.map((c, i) => [c.id, split.sizes[i]! * 100])
   );
 }
 
 /**
  * One split: a `Group` of its children, a separator between each two.
- * A child's panel is named by its node's id (`nodeId`), which it keeps
+ * A child's panel is named by its node's id, which it keeps
  * while its siblings come and go, so content that did not move is not
  * remounted. When the children change, the
  * group is told the reducer's sizes; only a resize the user made is
@@ -169,7 +169,7 @@ function SplitView({ split, shared }: { split: SplitNode; shared: Shared }) {
   const group = useRef<GroupImperativeHandle | null>(null);
   const horizontal = split.direction === 'row';
   const axis = horizontal ? 'width' : 'height';
-  const ids = split.children.map(nodeId);
+  const ids = split.children.map((c) => c.id);
   const panels = ids.join('|');
   const sizes = split.sizes.join(',');
   useEffect(() => {

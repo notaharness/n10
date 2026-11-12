@@ -27,10 +27,6 @@ export function setPaneDropTarget(next: PaneDropTarget | null): void {
   for (const notify of listeners) notify();
 }
 
-export function paneDropTarget(): PaneDropTarget | null {
-  return current;
-}
-
 function subscribe(notify: () => void): () => void {
   listeners.add(notify);
   return () => listeners.delete(notify);

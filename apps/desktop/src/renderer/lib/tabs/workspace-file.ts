@@ -193,7 +193,8 @@ function savedSplit(v: Json, free: Set<string>, depth: number) {
     keptSizes.push(typeof size === 'number' ? size : 0);
   });
   if (kept.length === 0) return null;
-  return makeSplit(direction, kept, keptSizes, str(v.id) ? v.id : undefined);
+  // A missing or malformed id is given a free one (`named`).
+  return makeSplit(direction, kept, keptSizes, str(v.id) ? v.id : '');
 }
 
 /** The saved layout; one empty pane when nothing usable was saved. */
@@ -207,8 +208,8 @@ function restoredLayout(v: unknown, tabs: Record<string, Tab>): LayoutNode {
  *  free number, so no pane loses its tabs to a clash. */
 function named(node: LayoutNode): LayoutNode {
   const taken = { pane: new Set<number>(), split: new Set<number>() };
-  const claim = (kind: 'pane' | 'split', id: string | undefined) => {
-    const n = Number(new RegExp(`^${kind}-(\\d+)$`).exec(id ?? '')?.[1]);
+  const claim = (kind: 'pane' | 'split', id: string) => {
+    const n = Number(new RegExp(`^${kind}-(\\d+)$`).exec(id)?.[1]);
     if (!Number.isInteger(n) || n < 1 || taken[kind].has(n)) return null;
     taken[kind].add(n);
     return id!;

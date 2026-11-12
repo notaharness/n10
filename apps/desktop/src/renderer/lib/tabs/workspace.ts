@@ -27,8 +27,8 @@ export interface PaneNode {
 export interface SplitNode {
   kind: 'split';
   /** Its name for as long as it stands (`split-N`), whatever its
-   *  children do; absent only in a file saved before splits had one. */
-  id?: string;
+   *  children do. */
+  id: string;
   direction: 'row' | 'column';
   /** Two or more. */
   children: readonly LayoutNode[];

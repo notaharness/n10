@@ -28,18 +28,12 @@ export function splitKey(node: SplitNode): string {
   return node.children.map(firstPane).join('|');
 }
 
-/** A node's name among its siblings, for as long as it stands: a
- *  pane's id, a split's own id (its key, in a file saved without one). */
-export function nodeId(node: LayoutNode): string {
-  return node.kind === 'pane' ? node.id : node.id ?? splitKey(node);
-}
-
 /** The id for a split added to `layout`, as `nextPaneId` for panes. */
 export function nextSplitId(layout: LayoutNode): string {
   const used: number[] = [];
   const visit = (n: LayoutNode) => {
     if (n.kind === 'pane') return;
-    used.push(Number(/^split-(\d+)$/.exec(n.id ?? '')?.[1] ?? 0) || 0);
+    used.push(Number(/^split-(\d+)$/.exec(n.id)?.[1] ?? 0) || 0);
     n.children.forEach(visit);
   };
   visit(layout);
@@ -83,7 +77,7 @@ export function makeSplit(
   direction: SplitNode['direction'],
   children: readonly LayoutNode[],
   sizes: readonly number[],
-  id?: string
+  id: string
 ): LayoutNode {
   const shares = normalSizes(sizes, children.length);
   const flat: LayoutNode[] = [];
@@ -102,7 +96,7 @@ export function makeSplit(
   if (flat.length === 1) return flat[0]!;
   return {
     kind: 'split',
-    ...(id === undefined ? {} : { id }),
+    id,
     direction,
     children: flat,
     sizes: normalSizes(flatSizes, flat.length),
