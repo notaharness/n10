@@ -170,12 +170,16 @@ function SplitView({ split, shared }: { split: SplitNode; shared: Shared }) {
   const horizontal = split.direction === 'row';
   const axis = horizontal ? 'width' : 'height';
   const ids = split.children.map(nodeId);
+  const panels = ids.join('|');
   const sizes = split.sizes.join(',');
   useEffect(() => {
     group.current?.setLayout(layoutOf(split));
-    // Only when the children or their sizes change in the reducer.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `split` is read through `key` and `sizes`, its identity changes on every dispatch
-  }, [key, sizes]);
+    // Only when the children or their sizes change in the reducer. A
+    // child pane turned split, or a split giving way to its survivor,
+    // changes the panels and not `key`; the library would lay that set
+    // out as it last saw it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `split` is read through `panels` and `sizes`, its identity changes on every dispatch
+  }, [key, panels, sizes]);
   const onLayoutChanged = (layout: Layout, meta: LayoutChangedMeta) => {
     if (!meta.isUserInteraction) return;
     panes.resize(
@@ -185,11 +189,13 @@ function SplitView({ split, shared }: { split: SplitNode; shared: Shared }) {
   };
   return (
     <Group
-      // The library keeps a layout per group id, by panel id: a new set
-      // of panels is a new group to it, laid out afresh from
-      // `defaultLayout`. React keys stay the nodes' own, so panels whose
-      // node stayed keep their content.
-      id={`split:${ids.join('|')}`}
+      // The library keeps the last layout of each set of panels it has
+      // held, for as long as the group is mounted, and lays a set it
+      // knows out from that rather than `defaultLayout`; the effect
+      // above sets the reducer's sizes whenever the panels change. React
+      // keys stay the nodes' own, so panels whose node stayed keep their
+      // content.
+      id={`split:${panels}`}
       groupRef={group}
       orientation={horizontal ? 'horizontal' : 'vertical'}
       defaultLayout={layoutOf(split)}

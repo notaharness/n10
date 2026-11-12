@@ -42,6 +42,12 @@ async function carryTo(
   });
 }
 
+/** `a`'s share of the width `a` and `b` take together. */
+async function widthShare(a: Locator, b: Locator): Promise<number> {
+  const [x, y] = await Promise.all([a.boundingBox(), b.boundingBox()]);
+  return x && y ? x.width / (x.width + y.width) : 0;
+}
+
 /** The saved layout, once the host has written one. */
 function savedLayout(homeDir: string): Record<string, unknown> | null {
   try {
@@ -178,6 +184,44 @@ test.describe('Split panes', () => {
     await page.mouse.up();
     await expect(page.locator('[data-drag-overlay]')).toHaveCount(0);
     await expect.poll(() => tabNames(page)).toEqual(['alpha', 'beta', 'gamma']);
+  });
+
+  test('a divider stays where it was left when a pane beside it splits and closes again', async ({
+    desktop,
+  }) => {
+    const { page, homeDir } = desktop;
+    for (const branch of ['alpha', 'beta', 'gamma'])
+      await createWorktree(page, branch);
+    await tab(page, /^gamma/).click();
+    await page.keyboard.press('Control+\\');
+    await expect(panes(page)).toHaveCount(2);
+    const outer = page.locator('[data-pane-separator]').first();
+    const share = () => savedLayout(homeDir)?.sizes as number[] | undefined;
+
+    // Narrow the left column, then split the right one down.
+    await outer.focus();
+    for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowLeft');
+    await expect.poll(() => share()?.[0]).toBeLessThan(0.45);
+    await carryTo(page, tab(page, /^beta/), content(pane(page, 1)), 0.5, 0.97);
+    await page.mouse.up();
+    await expect(panes(page)).toHaveCount(3);
+
+    // Widen the left column past half, then close the lower-right pane.
+    await outer.focus();
+    for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowRight');
+    await expect.poll(() => share()?.[0]).toBeGreaterThan(0.55);
+    await tab(page, /^beta/).click();
+    await page.keyboard.press('Control+Alt+w');
+    await expect(panes(page)).toHaveCount(2);
+
+    // The divider shows the sizes the workspace holds, not the ones its
+    // two panes last had together.
+    const saved = share()![0]!;
+    expect(saved).toBeGreaterThan(0.55);
+    const gamma = page.locator('[data-pane-id]', { has: tab(page, /^gamma/) });
+    await expect
+      .poll(() => widthShare(pane(page, 0), gamma))
+      .toBeCloseTo(saved, 1);
   });
 
   test('comes back split, at the sizes it was left at, after a restart', async ({
