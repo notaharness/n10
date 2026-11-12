@@ -80,8 +80,8 @@ export interface TabsApi extends Strip {
   /** Close every unpinned tab; `repo` is the one in view. */
   closeAll: (repo?: string) => void;
   closeActive: () => void;
-  /** Drag-reorder within a group: place `ids` before or after
-   *  `targetId`. */
+  /** A drop on the strip or a roster: place `ids` before or after
+   *  `targetId`, in its pane. */
   moveTabs: (
     ids: readonly string[],
     targetId: string,

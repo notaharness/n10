@@ -234,9 +234,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   shows it (`showSession`), which is what marks output seen.
 - The tab strip wraps or scrolls as the `tabOverflow` desktop pref says,
   chosen from a tab's menu (radio items). Wrapped, dnd-kit sorts it with
-  `rectSortingStrategy` and no axis lock; plain flex-wrap leaves space
-  after each row's tabs, and the strip's end (`StripEnd`) takes the last
-  row's remaining room. Either way the
+  `rectSortingStrategy` and no axis lock; a full row's tabs grow to share
+  its width, and the strip's end (`StripEnd`) takes the last row's
+  remaining room. Either way the
   dragged tab stays inside the strip (`holdInStrip`, `drag-preview.ts`):
   past its end it would widen a scrolling box that auto-scroll then
   chases. Carried out of the strip it stays in its place, faded, and a

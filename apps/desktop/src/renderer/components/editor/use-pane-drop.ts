@@ -17,7 +17,7 @@ import { rebuildsLayout } from '../../lib/tabs/pane-moves.js';
 import { showPreview, type StripBox } from './drag-preview.js';
 import { canSplit, zoneAt } from './pane-drop.js';
 import { paneFrame, revealFocusedPane } from './reveal-tab.js';
-import { draggedIds, isStripDragData } from './strip-drag.js';
+import { isStripDragData } from './strip-drag.js';
 
 /**
  * A tab or group dragged from a strip onto a pane's content: a side
@@ -91,7 +91,7 @@ function dropAt({ over, active }: Drag, ws: Workspace): DropAt {
   if (!pointer) return null;
   const pane = String(over.id).slice(PREFIX.length);
   const zone = zoneAt(over.rect, pointer.x, pointer.y);
-  const ids = draggedIds(dragged);
+  const ids = dragged.ids;
   const from = dragged.pane;
   if (zone === 'centre') return { pane, zone, ids, allowed: from !== pane };
   return { pane, zone, ids, ...edgeDrop(ws, pane, zone, ids, from) };

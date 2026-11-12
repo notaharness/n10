@@ -33,11 +33,6 @@ export interface StripDragData {
 /** A place as its caller describes it; the strip adds the label. */
 export type StripPlace = Omit<StripDragData, 'label' | 'pane'>;
 
-/** The tabs a drag carries. */
-export function draggedIds(dragged: StripDragData): readonly string[] {
-  return dragged.ids;
-}
-
 export function isStripDragData(data: unknown): data is StripDragData {
   return (data as { kind?: unknown } | undefined)?.kind === 'block';
 }

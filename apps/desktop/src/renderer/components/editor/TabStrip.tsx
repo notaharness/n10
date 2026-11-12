@@ -135,8 +135,8 @@ export function TabStrip({
 
 /**
  * The room after the last tab. Its growth outweighs the tabs', so it
- * takes the last row's remaining room; plain flex-wrap keeps each tab
- * at its natural width. A drop target only for its rect, and only under the
+ * takes the last row's remaining room; the tabs of a full row grow to
+ * share its width (`tabClassName`). A drop target only for its rect, and only under the
  * pointer: collisions resolve it to the last place the drag may land
  * (`strip-collisions.ts`), and a keyboard drag, which steps from
  * droppable to droppable, skips it.
@@ -191,7 +191,8 @@ const roleDescriptionOf = (data: StripDragData) =>
  * starts watching the pointer: the tab lifts once it has travelled
  * `DRAG_THRESHOLD_PX` (`TabDragProvider`), so a press that becomes a
  * drag has selected the tab it drags. A group's chip, which stands for
- * no one tab, opens its roster on click instead.
+ * no one tab, shows its first tab on a click, as `GroupBlock` handles
+ * it, and opens its roster on a rest or from the keyboard.
  */
 export function useSortableTab({
   id,
