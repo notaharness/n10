@@ -53,6 +53,7 @@ it('keeps collision and chip ordinals separate for each pane', () => {
     },
     layout: {
       kind: 'split' as const,
+      id: 'split-1',
       direction: 'row' as const,
       children: [
         { kind: 'pane' as const, id: 'left', order: ['a'], activeId: 'a' },

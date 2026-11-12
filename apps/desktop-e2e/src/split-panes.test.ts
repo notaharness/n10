@@ -224,7 +224,13 @@ test.describe('Split panes', () => {
     await outer.focus();
     for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowLeft');
     await expect.poll(() => share()?.[0]).toBeLessThan(0.45);
-    await carryTo(page, tab(page, /^beta/), content(pane(page, 1)), 0.5, 0.97);
+    await carryTo(
+      page,
+      namedTab(page, 'beta'),
+      content(pane(page, 1)),
+      0.5,
+      0.97
+    );
     await page.mouse.up();
     await expect(panes(page)).toHaveCount(3);
 
@@ -232,7 +238,7 @@ test.describe('Split panes', () => {
     await outer.focus();
     for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowRight');
     await expect.poll(() => share()?.[0]).toBeGreaterThan(0.55);
-    await tab(page, /^beta/).click();
+    await namedTab(page, 'beta').click();
     await page.keyboard.press('Control+Alt+w');
     await expect(panes(page)).toHaveCount(2);
 
@@ -240,7 +246,9 @@ test.describe('Split panes', () => {
     // two panes last had together.
     const saved = share()![0]!;
     expect(saved).toBeGreaterThan(0.55);
-    const gamma = page.locator('[data-pane-id]', { has: tab(page, /^gamma/) });
+    const gamma = page.locator('[data-pane-id]', {
+      has: namedTab(page, 'gamma'),
+    });
     await expect
       .poll(() => widthShare(pane(page, 0), gamma))
       .toBeCloseTo(saved, 1);
