@@ -141,8 +141,13 @@ export function resolveDesktopAction(
   // platform's or another shortcut's, never one of these.
   if (event.metaKey) return null;
   const { input, key } = keyPressFromDom(event);
+  // Ink treats uppercase input as implicit Shift. A DOM key can also be
+  // uppercase from Caps Lock, so desktop requires the actual Shift modifier.
+  const matches = (desc: KeyDescriptor) =>
+    (!/^[A-Z]$/.test(desc.input ?? '') || event.shiftKey) &&
+    matchesKey(desc, input, key);
   const hit = DESKTOP_ACTIONS.find((action) =>
-    bindings[action.id].some((desc) => matchesKey(desc, input, key))
+    bindings[action.id].some(matches)
   );
   return hit?.id ?? null;
 }

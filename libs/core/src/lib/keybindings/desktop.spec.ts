@@ -39,6 +39,8 @@ describe('desktop default bindings', () => {
   it.each([
     ['Tab', {}],
     ['Tab', { shiftKey: true }],
+    ['A', { ctrlKey: true }],
+    ['J', { ctrlKey: true }],
     ['PageDown', {}],
     ['PageDown', { ctrlKey: true, altKey: true }],
     ['Tab', { ctrlKey: true, metaKey: true }],
