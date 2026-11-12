@@ -88,6 +88,10 @@ export function useFirstRowReserve(
     observer.observe(end);
     for (const child of el.children) observer.observe(child);
     // A slot opens and closes by its margin, which no box's size shows.
+    // During a drag the margin slides, and the reserve is placed again
+    // when it stops. A drag that ends closes its slot at once; the room
+    // goes to a block that grows into it or to the strip's end, and the
+    // observer sees their sizes change.
     el.addEventListener('transitionend', run);
     return () => {
       observer.disconnect();
