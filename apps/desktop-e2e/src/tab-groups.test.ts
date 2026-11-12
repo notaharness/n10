@@ -518,9 +518,9 @@ test.describe('Tab groups', () => {
     await expect(currentRow).toBeFocused();
     await expect(currentRow).toContainText('Orchestrator');
     // The chip names its roster, whose rows carry the tree's levels.
-    const rosterId = roster(page);
-    await expect(rosterId).toHaveAttribute('id', );
-    await expect(chip).toHaveAttribute('aria-controls', rosterId!);
+    await expect(roster(page)).toHaveAttribute('id', /.+/);
+    const rosterId = String(await roster(page).getAttribute('id'));
+    await expect(chip).toHaveAttribute('aria-controls', rosterId);
     await expect(roster(page).locator('li[aria-level="1"]')).toContainText(
       'Orchestrator'
     );
