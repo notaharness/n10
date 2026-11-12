@@ -7,7 +7,6 @@ import {
   showTab,
   sidebar,
   stripTab,
-  tab,
   visibleText,
 } from './setup/app.js';
 import {
@@ -16,6 +15,7 @@ import {
   startLoneShells,
   terminalTabs,
 } from './setup/terminals.js';
+import { namedTabs } from './setup/tab-row.js';
 import { tmuxAvailable } from './setup/external.js';
 
 /**
@@ -200,27 +200,28 @@ test.describe('Split panes', () => {
   test('a tab let go of outside every strip and pane stays where it was', async ({
     desktop,
   }) => {
-    const { page } = desktop;
-    for (const branch of ['alpha', 'beta', 'gamma'])
-      await createWorktree(page, branch);
-    await expect.poll(() => tabNames(page)).toEqual(['alpha', 'beta', 'gamma']);
+    const { page, homeDir } = desktop;
+    const names = ['alpha', 'beta', 'gamma'];
+    startLoneShells(homeDir, names);
+    await expect(stripTab(page, /^gamma/)).toBeVisible({ timeout: 30_000 });
+    await expect.poll(() => namedTabs(page, names)).toEqual(names);
 
     // Over the sidebar the drag is over nothing: letting go abandons it,
     // rather than dropping gamma on the place nearest the pointer.
-    await carryTo(page, tab(page, /^gamma/), sidebar(page), 0.5, 0.5);
+    await carryTo(page, stripTab(page, /^gamma/), sidebar(page), 0.5, 0.5);
     await expect(page.locator('[data-drag-overlay]')).toHaveText(/^gamma/);
     await page.mouse.up();
     await expect(page.locator('[data-drag-overlay]')).toHaveCount(0);
-    await expect.poll(() => tabNames(page)).toEqual(['alpha', 'beta', 'gamma']);
+    await expect.poll(() => namedTabs(page, names)).toEqual(names);
   });
 
   test('a divider stays where it was left when a pane beside it splits and closes again', async ({
     desktop,
   }) => {
     const { page, homeDir } = desktop;
-    for (const branch of ['alpha', 'beta', 'gamma'])
-      await createWorktree(page, branch);
-    await tab(page, /^gamma/).click();
+    startLoneShells(homeDir, ['alpha', 'beta', 'gamma']);
+    await expect(stripTab(page, /^gamma/)).toBeVisible({ timeout: 30_000 });
+    await stripTab(page, /^gamma/).click();
     await page.keyboard.press('Control+\\');
     await expect(panes(page)).toHaveCount(2);
     const outer = page.locator('[data-pane-separator]').first();
@@ -232,7 +233,7 @@ test.describe('Split panes', () => {
     await expect.poll(() => share()?.[0]).toBeLessThan(0.45);
     await carryTo(
       page,
-      namedTab(page, 'beta'),
+      stripTab(page, /^beta/),
       content(pane(page, 1)),
       0.5,
       0.97
@@ -244,7 +245,7 @@ test.describe('Split panes', () => {
     await outer.focus();
     for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowRight');
     await expect.poll(() => share()?.[0]).toBeGreaterThan(0.55);
-    await namedTab(page, 'beta').click();
+    await stripTab(page, /^beta/).click();
     await page.keyboard.press('Control+Alt+w');
     await expect(panes(page)).toHaveCount(2);
 
@@ -253,7 +254,7 @@ test.describe('Split panes', () => {
     const saved = share()![0]!;
     expect(saved).toBeGreaterThan(0.55);
     const gamma = page.locator('[data-pane-id]', {
-      has: namedTab(page, 'gamma'),
+      has: stripTab(page, /^gamma/),
     });
     await expect
       .poll(() => widthShare(pane(page, 0), gamma))
