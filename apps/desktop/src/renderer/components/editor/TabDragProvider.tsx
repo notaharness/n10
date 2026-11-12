@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { setStripDragging } from '../../lib/tabs/tab-switching.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
-import { holdInStrip } from './drag-preview.js';
+import { holdInStrip, type StripBox } from './drag-preview.js';
 import { stripAnnouncements } from './strip-announcements.js';
 import { StripBlocksReport } from './strip-blocks.js';
 import { collisionsEndingAt } from './strip-collisions.js';
@@ -125,10 +125,26 @@ function PaneDropFollower({
       activatorEvent instanceof KeyboardEvent
         ? null
         : activeNode?.closest('[role="tablist"]');
-    follow(
-      active ? { active, over } : null,
-      strip?.getBoundingClientRect() ?? null
-    );
+    follow(active ? { active, over } : null, strip ? stripBox(strip) : null);
   });
   return null;
+}
+
+/** The strip's box, and its row: as tall as the strip, as wide as its
+ *  pane. */
+function stripBox(strip: Element): StripBox {
+  const { top, bottom, left, right, width, height } =
+    strip.getBoundingClientRect();
+  const pane = strip.closest('[data-pane-id]')?.getBoundingClientRect();
+  return {
+    strip: { top, bottom, left, right, width, height },
+    row: {
+      top,
+      bottom,
+      height,
+      left: pane?.left ?? left,
+      right: pane?.right ?? right,
+      width: pane?.width ?? width,
+    },
+  };
 }

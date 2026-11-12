@@ -172,9 +172,15 @@ describe('collisionsEndingAt', () => {
     const active = { id: 't1', data: { current: own } } as never;
     const containers = [container('t0', 0, { ...own, ids: ['t0'], index: 0 })];
     const rects = new Map(containers.map((c) => [c.id, c.rect.current!]));
-    /** The drag under way started in a strip 600 wide and 30 high. */
+    /** The drag under way started in a strip 600 wide and 30 high, in
+     *  a pane 800 wide. */
     const startedIn = (pointer: { x: number; y: number }) =>
-      showPreview({ active, over: null }, rect(0, 600), pointer, () => 'after');
+      showPreview(
+        { active, over: null },
+        { strip: rect(0, 600), row: rect(0, 800) },
+        pointer,
+        () => 'after'
+      );
     const at = (pointer: { x: number; y: number }) =>
       collisionsEndingAt({
         active,
@@ -193,6 +199,11 @@ describe('collisionsEndingAt', () => {
     it('still finds the nearest place while the pointer is inside the strip', () => {
       startedIn({ x: 300, y: 15 });
       expect(at({ x: 300, y: 15 }).map((c) => c.id)).toEqual(['t0']);
+    });
+
+    it('still finds the nearest place past the strip’s end in its row', () => {
+      startedIn({ x: 750, y: 15 });
+      expect(at({ x: 750, y: 15 }).map((c) => c.id)).toEqual(['t0']);
     });
   });
 });

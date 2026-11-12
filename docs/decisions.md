@@ -978,8 +978,11 @@ dropped among its own pane's blocks arranges that pane as presented;
 carried over another pane's strip, a tab or block (a member too, beside a
 block or its own group's member) opens the slot it would land in there, on
 the side the pointer is on, and moves there on drop. Another pane's places
-are targets only under the pointer, never the nearest place. Each pane
-reports its own blocks, and end rooms resolve within their pane.
+are targets only under the pointer, never the nearest place. Let go over
+nothing outside its strip's row (the strip's height across its pane), a
+drag is abandoned; within the row, past the strip's ends, it lands on the
+nearest place. Each pane reports its own blocks, and end rooms resolve
+within their pane.
 
 `dismissed` replaces auto-open history. Every running agent, listed terminal
 and foreign agent has a tab unless its session is dismissed. Every close

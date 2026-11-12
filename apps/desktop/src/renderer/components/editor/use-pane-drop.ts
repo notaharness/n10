@@ -1,10 +1,5 @@
 import { useEffect } from 'react';
-import {
-  useDndContext,
-  useDroppable,
-  type ClientRect,
-  type DragEndEvent,
-} from '@dnd-kit/core';
+import { useDndContext, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import {
   setPaneDropTarget,
   type PaneDropTarget,
@@ -19,7 +14,7 @@ import {
 import type { Edge } from '../../lib/tabs/layout.js';
 import { NO_ROOM } from '../../lib/tabs/pane-commands.js';
 import { rebuildsLayout } from '../../lib/tabs/pane-moves.js';
-import { showPreview } from './drag-preview.js';
+import { showPreview, type StripBox } from './drag-preview.js';
 import { canSplit, zoneAt } from './pane-drop.js';
 import { paneFrame, revealFocusedPane } from './reveal-tab.js';
 import { draggedIds, isStripDragData } from './strip-drag.js';
@@ -61,8 +56,8 @@ export function pointerSide(rect: {
 let following: {
   drag: Drag;
   ws: Workspace;
-  /** The box of the strip the drag started in. */
-  strip: ClientRect | null;
+  /** Where the drag started (`StripBox`). */
+  strip: StripBox | null;
 } | null = null;
 
 function followPointer(e: PointerEvent) {
@@ -136,7 +131,7 @@ export function usePaneDrop() {
   return {
     /** The drag context changed: what is dragged, over what, and the
      *  box of the strip it started in. */
-    follow(drag: Drag | null, strip: ClientRect | null) {
+    follow(drag: Drag | null, strip: StripBox | null) {
       following = drag && { drag, ws: workspace, strip };
       show(drag && dropAt(drag, workspace));
       showPreview(drag, strip, pointer, pointerSide);

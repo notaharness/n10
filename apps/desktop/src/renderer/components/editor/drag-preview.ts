@@ -39,10 +39,17 @@ interface Preview {
   landing: Landing | null;
 }
 
+/** Where the drag under way started: its strip's box, and that strip's
+ *  row across its pane (the strip with its controls, and any room past
+ *  its ends). */
+export interface StripBox {
+  strip: ClientRect;
+  row: ClientRect;
+}
+
 const NONE: Preview = { out: false, landing: null };
 let current: Preview = NONE;
-/** The box of the strip the drag under way started in. */
-let strip: ClientRect | null = null;
+let started: StripBox | null = null;
 const listeners = new Set<() => void>();
 
 const keyOf = (p: Preview) =>
@@ -68,11 +75,26 @@ const inside = (rect: ClientRect, p: Point) =>
   p.y <= rect.bottom;
 
 /** Whether a strip drag with the pointer at `pointer` is out of the
- *  strip it started in. A keyboard drag never is: it has no pointer, and
- *  no strip box (`TabDragProvider`). */
-export function carriedOut(data: unknown, pointer: Point | null): boolean {
+ *  strip it started in. */
+function carriedOut(data: unknown, pointer: Point | null): boolean {
   return (
-    isStripDragData(data) && !!strip && !!pointer && !inside(strip, pointer)
+    isStripDragData(data) &&
+    !!started &&
+    !!pointer &&
+    !inside(started.strip, pointer)
+  );
+}
+
+/** Whether a strip drag with the pointer at `pointer` has left its
+ *  strip's row: over the sidebar, the title or status bar, another
+ *  pane. Let go there over nothing, it lands nowhere. A keyboard drag
+ *  never has: it has no pointer, and no strip box (`TabDragProvider`). */
+export function leftStripRow(data: unknown, pointer: Point | null): boolean {
+  return (
+    isStripDragData(data) &&
+    !!started &&
+    !!pointer &&
+    !inside(started.row, pointer)
   );
 }
 
@@ -108,11 +130,11 @@ function landingOf(
  *  changed: what to show now. */
 export function showPreview(
   drag: Drag | null,
-  from: ClientRect | null,
+  from: StripBox | null,
   pointer: Point | null,
   side: (rect: ClientRect) => 'before' | 'after'
 ): void {
-  strip = drag ? from : null;
+  started = drag ? from : null;
   if (!drag) return set(NONE);
   const out = carriedOut(drag.active.data.current, pointer);
   set({ out, landing: out ? landingOf(drag, side) : null });

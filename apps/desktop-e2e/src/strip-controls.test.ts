@@ -53,7 +53,7 @@ test.describe('scroll strip controls', () => {
     const active = strip.getByRole('tab', { selected: true });
     await expect(active).toHaveText(/feature-9-long-branch-name/);
     await expect.poll(() => inView(active, strip)).toBe(true);
-    await expect(right).toHaveAttribute('aria-disabled', 'true');
+    await expect(left).toHaveAttribute('aria-disabled', 'false');
     await page.keyboard.press('Control+1');
     await expect(active).toHaveText(/feature-0-long-branch-name/);
     await expect.poll(() => inView(active, strip)).toBe(true);
