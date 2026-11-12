@@ -340,7 +340,7 @@ export function useSortableTab({
     ...attributes,
     // dnd-kit says a draggable it may not lift is disabled; a fixed chip
     // still takes presses, Enter and its menu.
-    ...{},
+    ...(fixed ? { 'aria-disabled': undefined } : {}),
     ...listeners,
     onPointerDown: (e: PointerEvent<HTMLElement>) => {
       listeners?.onPointerDown?.(e);
