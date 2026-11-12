@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   type ComponentProps,
+  type FocusEvent,
   type RefObject,
 } from 'react';
 import {
@@ -47,6 +48,7 @@ function SortableRow({
  * active row, else the first.
  */
 export function GroupRoster({
+  id,
   groupKey,
   label,
   faces,
@@ -58,6 +60,8 @@ export function GroupRoster({
   homeId,
   players,
 }: {
+  /** What the chip's `aria-controls` names. */
+  id: string;
   groupKey: string;
   label: string;
   faces: readonly TabFace[];
@@ -86,6 +90,17 @@ export function GroupRoster({
   useEffect(() => {
     if (keyboard) focusRows();
   }, [keyboard]);
+  // The place of the row focus is on. When its tab leaves the group
+  // (closed, pinned onto the strip), focus goes to the row now there,
+  // not to the page.
+  const focusedAt = useRef<number | null>(null);
+  const noteFocus = (e: FocusEvent<HTMLUListElement>) => {
+    const rows = [
+      ...(list.current?.querySelectorAll('[data-roster-row]') ?? []),
+    ];
+    const row = (e.target as Element).closest('[data-roster-row]');
+    focusedAt.current = row ? rows.indexOf(row) : null;
+  };
   const jump = (tab: Tab) => {
     // Choosing the tab already shown changes nothing to take focus: it
     // goes back to the chip, not to the page.
@@ -97,11 +112,20 @@ export function GroupRoster({
   const entries = rosterEntries(faces, homeId, players);
   const rowId = (face: TabFace) => rosterRowId(pane, face.tab.id);
   const summary = rosterSummary(statuses);
+  const rowIds = entries.map(({ face }) => face.tab.id).join('\n');
+  useEffect(() => {
+    const at = focusedAt.current;
+    if (at === null || document.activeElement !== document.body) return;
+    const rows =
+      list.current?.querySelectorAll<HTMLElement>('[data-roster-row]');
+    rows?.[Math.min(at, rows.length - 1)]?.focus();
+  }, [rowIds]);
   // While a row is dragged by the keyboard, the arrows move it, not
   // the focus.
   const dragging = useDndContext().active !== null;
   return (
     <PopoverContent
+      id={id}
       data-group-roster
       role="dialog"
       aria-label={`Tabs in ${label}`}
@@ -114,7 +138,13 @@ export function GroupRoster({
         e.preventDefault();
         if (keyboard) focusRows();
       }}
-      onEscapeKeyDown={() => {
+      onEscapeKeyDown={(e) => {
+        // Escape during a drag puts the dragged tab back; the roster
+        // stays open.
+        if (dragging) {
+          e.preventDefault();
+          return;
+        }
         // A roster resting open over a terminal leaves focus there: only
         // focus taken into it, or opened by a press, goes back.
         escaped.current =
@@ -172,6 +202,10 @@ export function GroupRoster({
             ref={list}
             data-roster-list
             onKeyDown={dragging ? undefined : walkRows}
+            onFocus={noteFocus}
+            onBlur={(e) => {
+              if (e.relatedTarget) focusedAt.current = null;
+            }}
             className="flex flex-col"
           >
             {entries.map(({ face, depth, tree }, index) => (

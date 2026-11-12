@@ -1,7 +1,7 @@
 import { useDndMonitor } from '@dnd-kit/core';
-import { useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import type { TabGroup } from '../../lib/tabs/tab-groups.js';
+import { rosterOrder, type TabGroup } from '../../lib/tabs/tab-groups.js';
 import type { ChipSignal } from '../../lib/tabs/group-status.js';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
 import { useTabs, type Tab } from '../../lib/tabs/tabs.js';
@@ -19,6 +19,18 @@ import { useRosterOpen } from './use-roster-open.js';
 import type { TabFace } from './use-strip-groups.js';
 
 type Closer = ReturnType<typeof useCloseTabs>;
+
+/** Focus left on the page (a row's tab gone with its roster, or its
+ *  chip with the group) goes to the pane's shown tab, or its chip. */
+function keepFocus(pane: string): void {
+  if (document.activeElement && document.activeElement !== document.body)
+    return;
+  document
+    .querySelector<HTMLElement>(
+      `[data-pane-id="${CSS.escape(pane)}"] [role="tab"][aria-selected="true"]`
+    )
+    ?.focus();
+}
 
 /** Alt+ArrowDown on a group's chip opens its roster. */
 function opensRoster(e: KeyboardEvent<HTMLElement>): boolean {
@@ -92,6 +104,7 @@ export function GroupBlock({
   });
   // A drop on the chip ends in a click there, which is the drop's, not
   // a press of the chip: the flag lasts until that click has passed.
+  const rosterId = useId();
   const dropped = useRef(false);
   const noteDrop = ({ active }: { active: { id: unknown } }) => {
     if (active.id !== id) return;
@@ -109,9 +122,9 @@ export function GroupBlock({
   const rowMenu = (tab: Tab) => {
     // Open while its menu is: a hover-open roster would close under it.
     roster.hold();
-    runTabMenu(tab, tabs, closer, tabOverflow, undefined, tabMenu).catch(
-      (err: unknown) => toast.error(errorMessage(err))
-    );
+    runTabMenu(tab, tabs, closer, tabOverflow, undefined, tabMenu)
+      .then(() => requestAnimationFrame(() => keepFocus(tabs.paneId)))
+      .catch((err: unknown) => toast.error(errorMessage(err)));
   };
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     if (!opensRoster(e)) return;
@@ -144,16 +157,18 @@ export function GroupBlock({
           setHandle={setHandle}
           handle={handle}
           roster={roster}
+          rosterId={rosterId}
           chipRef={chip}
           menu={groupMenu}
           onKeyDown={onKeyDown}
           onPress={() => {
             if (dropped.current) return;
-            const first = group.tabs[0];
+            const first = rosterOrder(group)[0];
             if (first) jump(first);
           }}
         />
         <GroupRoster
+          id={rosterId}
           groupKey={group.key}
           label={label}
           faces={faces}

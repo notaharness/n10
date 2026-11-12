@@ -1,7 +1,8 @@
-import { useDndContext } from '@dnd-kit/core';
+import { useDndContext, useDndMonitor } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useContext, useRef } from 'react';
+import { useContext, useRef, type PointerEvent } from 'react';
+import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
 import { PaneScopeContext } from '../../lib/tabs/tabs.js';
 import { useSlotStyle } from './drag-preview.js';
 import {
@@ -19,13 +20,15 @@ export const rosterRowId = (pane: string, tabId: string) =>
 /**
  * A row of `group`'s roster as a sortable place (`strip-drag.ts`): its
  * tab, at `index` among the rows, in the pane the roster's chip is on.
- * The click a drop ends in is no press (`justDropped`).
+ * The click a drag ends in, dropped or put back with Escape, is no
+ * press (`justDropped`).
  */
 export function useRosterRowDrag(group: string, face: TabFace, index: number) {
   const pane = useContext(PaneScopeContext) ?? '';
   const id = rosterRowId(pane, face.tab.id);
   const slot = useSlotStyle(id);
   const dragging = useDndContext().active?.data.current;
+  const reducedMotion = usePrefersReducedMotion();
   const data: StripDragData = {
     kind: 'block',
     label: face.label,
@@ -52,8 +55,17 @@ export function useRosterRowDrag(group: string, face: TabFace, index: number) {
         isStripDragData(dragging) ? dragging : undefined
       ),
     },
+    // `null` turns the slide off; the rows then jump to their places.
+    transition: reducedMotion ? null : undefined,
   });
   const dropped = useRef(false);
+  // Lifted since the pointer went down on it.
+  const carried = useRef(false);
+  useDndMonitor({
+    onDragStart({ active }) {
+      if (active.id === id) carried.current = true;
+    },
+  });
   return {
     setNode: setNodeRef,
     handle: {
@@ -61,9 +73,13 @@ export function useRosterRowDrag(group: string, face: TabFace, index: number) {
       'aria-roledescription': 'movable tab row',
       'aria-describedby': attributes['aria-describedby'],
       ...listeners,
+      onPointerDown: (e: PointerEvent<HTMLElement>) => {
+        carried.current = false;
+        listeners?.onPointerDown?.(e);
+      },
       onPointerUp: () => {
-        // Moved far enough to drag: the click that follows is the drop's.
-        dropped.current = isDragging;
+        // Moved far enough to drag: the click that follows is the drag's.
+        dropped.current = isDragging || carried.current;
         setTimeout(() => (dropped.current = false), 0);
       },
     },

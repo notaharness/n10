@@ -249,7 +249,13 @@ export function RosterRow({
 }) {
   const { label, flashing, status, where } = rowFacts(face, home, active);
   return (
-    <li ref={drag?.setNode} style={drag?.style} className="relative">
+    <li
+      ref={drag?.setNode}
+      style={drag?.style}
+      // An orchestrator's tree, to a screen reader as to the eye.
+      aria-level={depth + 1}
+      className="relative"
+    >
       <button
         type="button"
         {...drag?.handle}

@@ -897,8 +897,10 @@ checkout) under the player (`roster-order.ts`); a place's roster is flat.
 Resting on the chip opens it without focus (400 ms, closing 180 ms after
 the pointer leaves chip and roster); Enter or Alt+ArrowDown opens it with
 its rows focused; Escape returns focus to the chip unless a rest opened it
-over a terminal. Pressing the chip shows the group's first tab, the home
-for an orchestrator's. Choosing a row shows that tab and closes the roster,
+over a terminal. Pressing the chip shows the group's first tab in its
+roster's order (`rosterOrder`), the home for an orchestrator's. A row
+whose tab leaves the group while it has focus hands focus to the row now
+in its place, or to the pane's shown tab when the chip goes too. Choosing a row shows that tab and closes the roster,
 and the row of tabs does not change. A row's native menu is the tab's own (pin, split,
 move to a pane, close); the chip's is the group's (show tabs, rename, tile,
 follow). Pinning is how a member is kept in view: a pinned tab stands
@@ -913,7 +915,9 @@ one only among the pinned. A roster row is a sortable place of its own: it
 moves its tab among the group's rows, or carries it to another pane's strip
 or a pane's side, never onto its own pane's strip, where the group would
 gather it back. The roster is ours to hold open: a drag of one of its rows
-pins it until the row lands back in it or is carried away, and the copy
+pins it until the row lands back in it (or Escape puts it back, which
+leaves the roster open), then holds it as it was opened; carried away,
+the roster closes. The click a row's drag ends in is no press. The copy
 under the pointer is the strip's `CarriedOverlay`, drawn by `DragOverlay`.
 Illegal places are disabled droppables (`useSortable`'s `disabled.droppable`),
 so pointer and keyboard drags meet only legal slots and the slot the strip

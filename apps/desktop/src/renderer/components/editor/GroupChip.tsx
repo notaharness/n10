@@ -56,6 +56,7 @@ export function GroupChip({
   setHandle,
   handle,
   roster,
+  rosterId,
   chipRef,
   menu,
   onKeyDown,
@@ -73,6 +74,8 @@ export function GroupChip({
   setHandle: Sortable['setHandle'];
   handle: Sortable['handle'];
   roster: ReturnType<typeof useRosterOpen>;
+  /** The roster's element id, for `aria-controls`. */
+  rosterId: string;
   /** The chip itself, where focus returns from the roster. */
   chipRef: RefObject<HTMLDivElement | null>;
   menu: GroupMenu;
@@ -99,6 +102,7 @@ export function GroupChip({
         aria-selected={containsActive}
         aria-haspopup="dialog"
         aria-expanded={roster.open}
+        aria-controls={roster.open ? rosterId : undefined}
         aria-description={containsActive ? 'Contains active tab' : undefined}
         data-group-chip={group.key}
         data-home-tab={group.head?.id}

@@ -27,6 +27,9 @@ const rowOf = (active: Active | null | undefined): string | undefined => {
 export function useRosterOpen(group?: string) {
   const [mode, setMode] = useState<RosterMode | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // How it was open when one of its rows was picked up: a row landing
+  // back in it, or put back with Escape, leaves it open that way again.
+  const before = useRef<RosterMode | null>(null);
   const dragging = useDndContext().active !== null;
 
   const clear = () => {
@@ -39,19 +42,26 @@ export function useRosterOpen(group?: string) {
     clear();
     setMode(null);
   }, []);
+  const own = (active: Active) =>
+    group !== undefined && rowOf(active) === group;
+  const putBack = () => setMode(before.current ?? 'pinned');
   // A drag is no rest: a pending open is dropped, and a hover-open
   // roster closes, unless the drag is one of its own rows, which holds
   // it open until the row is dropped back in it or carried away.
   useDndMonitor({
     onDragStart({ active }) {
       clear();
-      const own = group !== undefined && rowOf(active) === group;
-      setMode((now) => (own ? 'pinned' : now === 'hover' ? null : now));
+      if (own(active)) before.current = mode;
+      setMode((now) => (own(active) ? 'pinned' : now === 'hover' ? null : now));
     },
     onDragEnd({ active, over }) {
-      if (group === undefined || rowOf(active) !== group) return;
+      if (!own(active)) return;
       const data = over?.data.current;
-      if (!isStripDragData(data) || data.row !== group) close();
+      if (isStripDragData(data) && data.row === group) putBack();
+      else close();
+    },
+    onDragCancel({ active }) {
+      if (own(active)) putBack();
     },
   });
 

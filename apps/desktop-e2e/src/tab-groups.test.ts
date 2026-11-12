@@ -462,15 +462,22 @@ test.describe('Tab groups', () => {
     markOrchestrator(homeDir);
     await expect(countOf(page, CLAUDE)).toHaveText('3', { timeout: 30_000 });
 
-    await openRoster(page, chipOf(page, CLAUDE));
+    const chip = chipOf(page, CLAUDE);
+    await chip.focus();
+    await page.keyboard.press('Alt+ArrowDown');
+    await expect(roster(page)).toBeVisible();
+    const row = rosterRows(page).filter({ hasText: first });
+    await row.focus();
     await armContextMenuChoice(app, 'Pin tab');
-    await rosterRows(page).filter({ hasText: first }).click({
-      button: 'right',
-    });
+    await row.click({ button: 'right' });
     const pinned = page.locator('[data-pinned]', { hasText: first });
     await expect(pinned).toBeVisible();
     await expect(countOf(page, CLAUDE)).toHaveText('2');
     await expect(stripTab(page, new RegExp(second))).toHaveCount(0);
+    // Its row gone, focus goes to the row now in its place.
+    await expect(roster(page)).toBeVisible();
+    await expect(rosterRows(page).nth(1)).toContainText(second);
+    await expect(rosterRows(page).nth(1)).toBeFocused();
   });
 
   test('opens the roster on a rest, not on focus, and from the keyboard', async ({
@@ -510,6 +517,16 @@ test.describe('Tab groups', () => {
     await expect(roster(page)).toBeVisible();
     await expect(currentRow).toBeFocused();
     await expect(currentRow).toContainText('Orchestrator');
+    // The chip names its roster, whose rows carry the tree's levels.
+    const rosterId = roster(page);
+    await expect(rosterId).toHaveAttribute('id', );
+    await expect(chip).toHaveAttribute('aria-controls', rosterId!);
+    await expect(roster(page).locator('li[aria-level="1"]')).toContainText(
+      'Orchestrator'
+    );
+    await expect(roster(page).locator('li[aria-level="2"]')).toContainText(
+      player
+    );
     await page.keyboard.press('Escape');
     await expect(roster(page)).toHaveCount(0);
     await expect(chip).toBeFocused();
@@ -659,6 +676,25 @@ test.describe('Tab groups', () => {
     await expect.poll(names).toEqual([home, c, a, b]);
     await expect(roster(page)).toBeVisible();
 
+    // Escape while a row is carried puts it back and leaves the roster
+    // open as the rest opened it, so leaving it closes it.
+    const from = await rosterRows(page).nth(3).boundingBox();
+    await page.mouse.move(
+      from!.x + from!.width / 2,
+      from!.y + from!.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(onto!.x + onto!.width / 2, onto!.y + 6, {
+      steps: 15,
+    });
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await expect(roster(page)).toBeVisible();
+    await expect.poll(names).toEqual([home, c, a, b]);
+    await page.mouse.move(0, 600);
+    await expect(roster(page)).toHaveCount(0);
+    await openRoster(page, chip);
+
     // Carried to the pane's right side, a row splits it off there.
     const pane = await page.locator('[data-editor-panes]').boundingBox();
     await drag(
@@ -673,5 +709,42 @@ test.describe('Tab groups', () => {
     await expect(
       page.locator('[data-pane-id]').nth(1).locator(`[data-tab-id="${c}"]`)
     ).toHaveCount(1);
+
+    // A row carried onto the other pane's strip joins that pane, behind
+    // a chip of its own group there.
+    const panes = page.locator('[data-pane-id]');
+    const paneCount = (i: number) =>
+      panes.nth(i).locator(`[data-group-chip="${CLAUDE}"] [data-group-count]`);
+    await openRoster(
+      page,
+      panes.nth(0).locator(`[data-group-chip="${CLAUDE}"]`)
+    );
+    const there = await panes
+      .nth(1)
+      .locator(`[data-tab-id="${c}"]`)
+      .boundingBox();
+    await drag(
+      page,
+      roster(page).locator(`[data-roster-row="${b}"]`),
+      there!.x + there!.width - 8,
+      there!.y + there!.height / 2
+    );
+    await expect(paneCount(1)).toHaveText('2');
+    await expect(paneCount(0)).toHaveText('2');
+
+    // That chip, carried onto the first pane's strip, takes its whole
+    // group there, and the pane it leaves empty closes.
+    const here = await panes
+      .nth(0)
+      .locator(`[data-group-chip="${CLAUDE}"]`)
+      .boundingBox();
+    await drag(
+      page,
+      panes.nth(1).locator(`[data-group-chip="${CLAUDE}"]`),
+      here!.x + here!.width - 8,
+      here!.y + here!.height / 2
+    );
+    await expect(panes).toHaveCount(1);
+    await expect(countOf(page, CLAUDE)).toHaveText('4');
   });
 });
