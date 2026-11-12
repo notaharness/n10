@@ -131,6 +131,20 @@ describe('a file this run must not overwrite', () => {
     );
     expect(asideFiles()).toEqual([]);
   });
+
+  // The window reloads in the same host; the read-only run ends with
+  // its cause.
+  it('is written to again once a later load reads it', async () => {
+    mkdirSync(file(), { recursive: true });
+    expect(loadWorkspace()).toEqual({ status: 'unreadable' });
+    rmSync(file(), { recursive: true });
+    write(JSON.stringify({ version: WORKSPACE_VERSION, workspace: { a: 1 } }));
+    expect(loadWorkspace()).toMatchObject({ status: 'restored' });
+    const saved = saveWorkspace({ a: 2 });
+    flushWorkspace();
+    await saved;
+    expect(loadWorkspace()).toMatchObject({ workspace: { a: 2 } });
+  });
 });
 
 describe('saveWorkspace', () => {

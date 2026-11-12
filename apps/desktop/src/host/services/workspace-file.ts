@@ -29,8 +29,8 @@ import type { LoadedWorkspace, SavedWorkspace } from '../contract.js';
  * A file that does not parse, or carries a version this build does not
  * know, is set aside under a dated name rather than overwritten, and the
  * workspace starts empty. A file that cannot be read, or set aside,
- * makes this run read-only: every save is refused, so the file is left
- * for a person to look at.
+ * makes the run read-only until a later load reads it: every save is
+ * refused, so the file is left for a person to look at.
  */
 
 export const WORKSPACE_VERSION = 1;
@@ -79,7 +79,7 @@ function goneRepos(workspace: SavedWorkspace): string[] {
   return [...repos].filter((repo) => !existsSync(repo));
 }
 
-/** Set once a file was found that this run must not overwrite. */
+/** Whether the last load found a file this run must not overwrite. */
 let readOnly = false;
 
 /** Move an unreadable file out of the way, keeping it for a person to
@@ -101,26 +101,32 @@ function isMissing(error: unknown): boolean {
 }
 
 /** The saved workspace, or why there is none to restore. A save still
- *  waiting out its debounce lands first, so a reload reads it. */
+ *  waiting out its debounce lands first, so a reload reads it. Each load
+ *  decides afresh whether this run may save: a file a person fixed
+ *  between two window loads is written to again. */
 export function loadWorkspace(): LoadedWorkspace {
   flushWorkspace();
-  const path = workspacePath();
+  const loaded = readWorkspace(workspacePath());
+  readOnly = loaded.status === 'unreadable';
+  return loaded;
+}
+
+function readWorkspace(path: string): LoadedWorkspace {
   let raw: string;
   try {
     raw = readFileSync(path, 'utf8');
   } catch (error) {
     if (isMissing(error)) return { status: 'none' };
     console.error('[host] workspace read', error);
-    readOnly = true;
     return { status: 'unreadable' };
   }
   const workspace = readable(raw);
   if (workspace !== null)
     return { status: 'restored', workspace, goneRepos: goneRepos(workspace) };
   const aside = setAside(path);
-  if (aside !== null) return { status: 'set-aside', path: aside };
-  readOnly = true;
-  return { status: 'unreadable' };
+  return aside === null
+    ? { status: 'unreadable' }
+    : { status: 'set-aside', path: aside };
 }
 
 interface Waiter {
