@@ -936,6 +936,15 @@ so a window that clamps panes does not overwrite their ratios. Restore reads
 the saved tree as it is, less panes left without tabs; a pane or split whose
 id is malformed or taken is given the next free one, keeping its tabs.
 
+A pane keeps its selection. Focus moving onto a pane leaves its active tab
+as it is, none included, and a repository coming into view acts on the
+focused pane only (`repoTab`, then the strip's `focusRepo`). So a pane left
+blank while another repository was in view is still blank when focus comes
+back to it, even holding a tab of the repository in view now; a click on one
+of its tabs fills it. Re-running `focusRepo` on every focus change would
+change a pane the user did not touch. With one pane, the editor goes blank
+only where the repository in view has no tab (`tabs.properties.spec.ts`).
+
 The editor draws the tree with nested `react-resizable-panels` groups
 (`EditorLayout.tsx`), each leaf an `EditorArea` under `PaneScopeContext`,
 which `useTabs` reads to give that pane's strip. Every pane shows its active

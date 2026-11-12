@@ -521,10 +521,14 @@ describe('tab reducer invariants', () => {
     );
   });
 
-  it('goes without an active tab only when the repo in view has none', () => {
+  it('a sole pane goes without an active tab only when the repo in view has none', () => {
     fc.assert(
       fc.property(sequence, (actions) => {
-        const { state, inView } = replay(actions);
+        const { ws, inView } = replayWorkspace(actions);
+        // With panes, focus moving onto a pane keeps the selection it had,
+        // none included (docs/decisions.md, "A pane keeps its selection").
+        if (panesOf(ws.layout).length !== 1) return;
+        const state = view(ws);
         if (state.activeId !== null) return;
         // Nothing active is legitimate in exactly one situation: the
         // repository in view has no tab on the strip, so the editor
@@ -537,6 +541,56 @@ describe('tab reducer invariants', () => {
       }),
       { numRuns: 500 }
     );
+  });
+
+  // Counterexample seed -162001443, path 326:4:3:3:3:6:0:3:3:2:1:4:2:2:7.
+  // Focus returning to a pane keeps its blank selection, even when it
+  // still holds a tab of the repository in view.
+  it('keeps a focused pane blank after a repo switch and close', () => {
+    const open = (repo: string, itemKey: string): TabsAction => ({
+      type: 'open-item',
+      repo,
+      itemKey,
+      preview: false,
+    });
+    const split = (edge: 'left' | 'bottom'): TabsAction => ({
+      type: 'split',
+      ids: ['#0'],
+      target: '#0',
+      edge,
+    });
+    const actions: TabsAction[] = [
+      open(REPOS[0], 'branch:b'),
+      open(REPOS[0], 'branch:a'),
+      open(REPOS[0], 'pr:2'),
+      { type: 'repo-opened', repo: REPOS[1] },
+      open(REPOS[1], 'pr:2'),
+      open(REPOS[1], 'branch:b'),
+      split('left'),
+      split('left'),
+      {
+        type: 'open-terminal',
+        terminal: {
+          name: 'n10-shell-2',
+          kind: 'shell',
+          cwd: REPOS[1],
+          displayPath: REPOS[1],
+          repo: REPOS[1],
+        },
+      },
+      { type: 'close', id: 'terminal:n10-shell-2', repo: REPOS[0] },
+      split('bottom'),
+      { type: 'repo-opened', repo: REPOS[0] },
+      { type: 'focus-pane', pane: '#0' },
+    ];
+    const { ws, inView } = replayWorkspace(actions);
+    const focused = focusedPaneOf(ws);
+    expect(focused.activeId).toBeNull();
+    expect(
+      focused.order.some(
+        (id) => ws.tabs[id]?.kind === 'item' && ws.tabs[id]?.repo === inView
+      )
+    ).toBe(true);
   });
 
   it('activates one of a repository’s own tabs when it comes into view', () => {
