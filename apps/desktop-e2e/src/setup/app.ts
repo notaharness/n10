@@ -90,6 +90,23 @@ async function rosterRowFor(page: Page, name: RegExp): Promise<Locator> {
 }
 
 /**
+ * Open All tabs and give its dialog once it lists rows. A press that
+ * lands while a drop is still settling can leave it shut, so it is
+ * pressed again until the dialog shows.
+ */
+export async function openAllTabs(page: Page): Promise<Locator> {
+  const dialog = page.getByRole('dialog', { name: 'All tabs' });
+  await expect(async () => {
+    if (!(await dialog.isVisible()))
+      await page.getByRole('button', { name: 'All tabs' }).click();
+    await expect(dialog.locator('[data-roster-row]').first()).toBeVisible({
+      timeout: 1_000,
+    });
+  }).toPass({ timeout: 10_000 });
+  return dialog;
+}
+
+/**
  * Show the tab `name` names wherever it stands: its own tab on the
  * strip, else its row in its group's roster, the dropdown its chip
  * opens. For a test that needs the tab open, not the strip's mechanics.

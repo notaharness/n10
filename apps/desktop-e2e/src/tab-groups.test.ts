@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/desktop.js';
 import {
   createWorktree,
   focusTerminal,
+  openAllTabs,
   openRoster,
   stripTab,
   tab,
@@ -444,10 +445,7 @@ test.describe('Tab groups', () => {
     // Its player went with it: every tab, in order, is home, player,
     // then alpha.
     const home = await chip.getAttribute('data-home-tab');
-    await page.getByRole('button', { name: 'All tabs' }).click();
-    const listed = page
-      .getByRole('dialog', { name: 'All tabs' })
-      .locator('[data-roster-row]');
+    const listed = (await openAllTabs(page)).locator('[data-roster-row]');
     await expect(listed).toHaveCount(3);
     const ids = await listed.evaluateAll((rows) =>
       rows.map((r) => r.getAttribute('data-roster-row') ?? '')
