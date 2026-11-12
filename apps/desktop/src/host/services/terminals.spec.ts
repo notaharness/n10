@@ -50,6 +50,7 @@ vi.mock('@n10/core', () => ({
   isGitRepo: (cwd: string) => state.repoRoots.has(cwd),
   // A terminal no listing names yet is placed by its directory.
   mainCheckoutOf: () => null,
+  enclosingCheckout: () => undefined,
   placeAffiliation: (path: string) => ({
     kind: 'place',
     key: `place:${path}`,
