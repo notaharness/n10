@@ -37,12 +37,20 @@ export function resolveRepositoryRoot(path: string): string {
   }
 }
 
-/** `git rev-parse` in `dir`, trimmed; throws outside a repository. */
+/** How long a `rev-parse` may block the caller: it runs synchronously,
+ *  on whatever event loop asked, for a directory that may sit on a mount
+ *  that no longer answers. */
+const REV_PARSE_TIMEOUT_MS = 3_000;
+
+/** `git rev-parse` in `dir`, trimmed; throws outside a repository, or
+ *  once Git has taken `REV_PARSE_TIMEOUT_MS`. */
 function revParse(dir: string, ...args: string[]): string {
   return execFileSync('git', ['rev-parse', ...args], {
     cwd: dir,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: REV_PARSE_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
   }).trim();
 }
 
@@ -51,7 +59,8 @@ function revParse(dir: string, ...args: string[]): string {
  * itself, a subdirectory or a linked worktree of it — or `null` outside
  * one. Git's common directory is the main checkout's `.git`; a bare
  * repository's is the repository itself. A submodule's lives in its
- * superproject's `.git/modules`, so its checkout is its top level.
+ * superproject's `.git/modules`, so its checkout is its top level. A
+ * Git that does not answer in time answers `null` too.
  */
 export function mainCheckoutOf(dir: string): string | null {
   try {
