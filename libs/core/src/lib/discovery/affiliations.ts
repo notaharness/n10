@@ -187,7 +187,7 @@ export function affiliations(
   const inherited = (session: TaggedSession) =>
     session.type === 'worktree'
       ? undefined
-      : worktrees.get(checkoutKey(session.path, session.machine));
+      : enclosingCheckout(worktrees, session.path, session.machine);
   const result = new Map<string, Affiliation>();
   for (const session of sessions) {
     result.set(
@@ -204,4 +204,23 @@ export function affiliations(
 export function checkoutKey(path: string, machine = LOCAL_MACHINE): string {
   const trimmed = path.replace(/[\\/]+$/, '') || path;
   return machine === LOCAL_MACHINE ? trimmed : `${machine}:${trimmed}`;
+}
+
+/** The entry for the innermost checkout that holds `path`, the directory
+ *  itself or any directory above it on that machine, as
+ *  `Affiliations.worktrees` keys them. */
+export function enclosingCheckout<T>(
+  checkouts: ReadonlyMap<string, T>,
+  path: string,
+  machine = LOCAL_MACHINE
+): T | undefined {
+  let dir = path.replace(/[\\/]+$/, '');
+  while (dir) {
+    const found = checkouts.get(checkoutKey(dir, machine));
+    if (found !== undefined) return found;
+    const cut = dir.search(/[\\/][^\\/]*$/);
+    if (cut <= 0) return undefined;
+    dir = dir.slice(0, cut);
+  }
+  return undefined;
 }

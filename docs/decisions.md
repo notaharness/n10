@@ -813,12 +813,14 @@ or chosen.
   group carries the same affiliation, `follows` included. A parent with no
   home here is labelled by harness and its players' common place
   (`Codex · skolakerfi`).
-- **Inheritance.** A terminal in a player's checkout takes the player's
-  parent; so does any tab whose session, or checkout, is the player's.
+- **Inheritance.** A terminal anywhere in a player's checkout, its
+  subdirectories included, takes the player's parent; of checkouts nested
+  in one another, the innermost holding it decides (`enclosingCheckout`).
+  So does any tab whose session, or checkout, is the player's.
 - **Place.** Everything else: a worktree session's main checkout, a
   directory's repository main checkout, else the directory. A terminal no
-  listing names yet is placed by that same rule from where it was launched,
-  so it starts in the group it stays in. A tab no session describes (a pull
+  listing names yet is grouped by these same rules from where it was
+  launched, so it starts in the group it stays in. A tab no session describes (a pull
   request with no agent) takes its repository. Settings belongs to nothing.
 
 Core `discovery/affiliations.ts` derives them over a listing, pure. The

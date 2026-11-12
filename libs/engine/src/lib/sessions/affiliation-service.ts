@@ -2,6 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 import {
   affiliations,
   checkoutKey,
+  enclosingCheckout,
   LOCAL_MACHINE,
   mainCheckoutOf,
   placeAffiliation,
@@ -132,11 +133,13 @@ export function createAffiliationService(options: { placeOf?: PlaceOf } = {}) {
     of(key: string): Affiliation | undefined {
       return snapshot.sessions.get(key);
     },
-    /** A session's affiliation, else, before any listing names it, the
-     *  place of the directory it runs in, by the rule listings use. */
+    /** A session's affiliation, else, before any listing names it, what
+     *  the directory it runs in gives it by the rule listings use: the
+     *  parent of the player whose checkout holds it, else its place. */
     ofOrPlace(key: string, dir: string, machine = LOCAL_MACHINE): Affiliation {
       return (
         snapshot.sessions.get(key) ??
+        enclosingCheckout(snapshot.worktrees, dir, machine) ??
         placeAffiliation(launchPlaceOf(dir, machine), machine)
       );
     },

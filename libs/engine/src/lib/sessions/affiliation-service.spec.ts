@@ -115,4 +115,20 @@ describe('affiliation service', () => {
       service.ofOrPlace(terminalSessionKey('new'), '/repo/apps/x').key
     ).toBe(CLAUDE);
   });
+
+  it('gives a session no listing names yet its checkout’s player’s parent', () => {
+    const service = createAffiliationService({ placeOf: () => '/repo' });
+    const checkout = '/repo/.claude/worktrees/a';
+    service.observe('local', [
+      shell('conductor', { target: CLAUDE }),
+      shell('repo-a', {
+        type: 'worktree',
+        path: checkout,
+        worktreePath: checkout,
+        orchestrator: CLAUDE,
+      }),
+    ]);
+    expect(service.ofOrPlace('new', `${checkout}/apps/x`).key).toBe(CLAUDE);
+    expect(service.ofOrPlace('new', '/repo/apps/x').key).toBe('place:/repo');
+  });
 });

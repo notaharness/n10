@@ -204,6 +204,26 @@ describe('affiliations', () => {
     expect(result.worktrees.get(checkoutKey(a.worktreePath))?.key).toBe(CODEX);
   });
 
+  it('gives a terminal anywhere in a checkout the innermost checkout’s parent', () => {
+    // A player in the main checkout, another in a worktree nested in it.
+    const outer = player('main', CLAUDE, { path: REPO, worktreePath: REPO });
+    const inner = player('a', CODEX);
+    const deep = shell('deep', { path: `${inner.worktreePath}/apps/x` });
+    const beside = shell('beside', { path: `${REPO}/apps/x` });
+    const sibling = shell('sibling', { path: `${inner.worktreePath}-b` });
+    const far = shell('far', {
+      machine: PEER,
+      path: `${inner.worktreePath}/x`,
+    });
+    const groups = of([outer, inner, deep, beside, sibling, far]);
+    expect(groups.get(key(deep))?.key).toBe(CODEX);
+    expect(groups.get(key(beside))?.key).toBe(CLAUDE);
+    // A name that only starts like the checkout's is not inside it.
+    expect(groups.get(key(sibling))?.key).toBe(CLAUDE);
+    // Another machine's directory is not this machine's checkout.
+    expect(groups.get(key(far))?.kind).toBe('place');
+  });
+
   it('puts everything else in its place: the main checkout, else the directory', () => {
     const wt = player('plain', undefined);
     const inRepo = shell('repo-shell', { path: `${REPO}/apps/x` });
