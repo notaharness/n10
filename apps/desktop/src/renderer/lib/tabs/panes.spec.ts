@@ -560,9 +560,34 @@ describe('pane geometry', () => {
     expect(paneToward(layout, '1', 'left')).toBeNull();
   });
 
-  it('gives a closed pane’s tabs to the neighbour sharing most of its side', () => {
+  it('breaks a tie between neighbours level with its sides left, right, up, down', () => {
     // Level on both sides it touches: left, right, up, down breaks the tie.
     expect(closeNeighbour(layout, '1')).toBe('2');
     expect(closeNeighbour(layout, '2')).toBe('1');
+  });
+
+  it('gives a closed pane’s tabs to the neighbour centred nearest its side, not the one sharing most of it', () => {
+    // ┌───┬───┐  4 meets 5, 6 and 7 along its right side: 5 and 7 share
+    // │   │ 5 │  more of it and come first, but 6 sits level with its
+    // │ 4 ├───┤  middle.
+    // │   │ 6 │
+    // │   ├───┤
+    // │   │ 7 │
+    // └───┴───┘
+    const beside: LayoutNode = {
+      kind: 'split',
+      direction: 'row',
+      sizes: [0.5, 0.5],
+      children: [
+        pane('4'),
+        {
+          kind: 'split',
+          direction: 'column',
+          sizes: [0.4, 0.2, 0.4],
+          children: [pane('5'), pane('6'), pane('7')],
+        },
+      ],
+    };
+    expect(closeNeighbour(beside, '4')).toBe('6');
   });
 });
