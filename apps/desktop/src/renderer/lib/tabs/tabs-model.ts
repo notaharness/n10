@@ -33,7 +33,11 @@ import {
 import { dismissClosed, pruneDismissed, undismiss } from './tab-dismissed.js';
 import { openForeign, type ForeignSessionEntry } from './tab-foreign.js';
 import { openItem, openRunning, openSettings } from './tab-open.js';
-import { assignOrdinals, presentationOrder } from './tab-label-state.js';
+import {
+  assignOrdinals,
+  presentationOrder,
+  type LabelAction,
+} from './tab-label-state.js';
 import { pinLive, rekey } from './tab-sync.js';
 import {
   arrangeTabs,
@@ -120,16 +124,7 @@ export type TabsAction =
   /** Name a group, by affiliation key; `null` (or a blank name) gives it
    *  back its derived label. */
   | { type: 'rename-group'; key: string; name: string | null }
-  | {
-      type: 'assign-collision-ordinals';
-      values: Readonly<Record<string, { base: string; ordinal: number }>>;
-    }
-  | {
-      type: 'assign-chip-ordinals';
-      values: Readonly<
-        Record<string, { label: string; ordinal: number; home?: boolean }>
-      >;
-    }
+  | LabelAction
   /** The one reconciliation dispatched from Workspace's effect: the
    *  repo's sidebar items *and* the host's terminal listing, applied as
    *  one pure step. Terminals ride along on every sync rather than

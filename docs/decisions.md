@@ -899,6 +899,27 @@ announce "Moving", "Position n of m", "Moved" and "Move cancelled". A home's
 tab selects on click, not on press, so dragging its group does not activate
 it.
 
+### Contextual tab labels
+
+The strip names a tab by what distinguishes it where it appears. A chipped
+group supplies the place, so its tabs show the primary label alone. A lone
+place tab and a pinned tab have no chip and carry a `{place} ·` prefix;
+remote tabs carry the machine first. An agent's primary label is its task
+title when available, then its branch or directory; a pull request uses its
+title, and a shell uses its directory. A chip names its harness and place,
+unless the user renamed the group. Equal full labels are disambiguated before
+text is cut, with allocations kept per pane and in opening order. Tooltips
+and rosters keep the whole label and identify repository, branch and directory
+details rather than repeating path prefixes in the strip.
+
+Discovery reads the primary tmux pane's `pane_title` as optional agent
+metadata; it never attaches a terminal to learn a title. The engine removes
+status spinners, harness decoration and a trailing ` | {cwd basename}` when
+the basename matches exactly, and rejects generic titles, hostnames and
+shell paths or prompts. It compares the normalized task title across scans,
+so animation frames do not trigger a tab refresh. The renderer only presents
+that metadata and reserves a stable width for an agent's changing title.
+
 ### Tab workspace
 
 The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): tabs by id, a

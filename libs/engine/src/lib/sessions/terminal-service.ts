@@ -37,7 +37,10 @@ export interface TerminalPorts {
   /** What each terminal belongs to: the repository service's, so both
    *  share one answer, and a terminal no listing names yet is placed by
    *  the same rule, when it was created, and its agent's task title. */
-  affiliations?: Pick<AffiliationService, 'ofOrPlace' | 'createdOf' | 'titleOf'>;
+  affiliations?: Pick<
+    AffiliationService,
+    'ofOrPlace' | 'createdOf' | 'titleOf'
+  >;
 }
 
 function assertLaunchableCwd(cwd: string): void {

@@ -26,16 +26,14 @@ import {
 } from '../../lib/tabs/tab-groups.js';
 import { tabItem } from '../../lib/tabs/tab-item.js';
 import {
-  collisionLabel,
-  groupPlacePath,
-  placeLabels,
-  tabPresentation,
   tabRepo,
+  type tabPresentation,
 } from '../../lib/tabs/tab-presentation.js';
 import { notePresentedOrder } from '../../lib/tabs/tab-switching.js';
 import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
-import { bucketTabs, canShowTask } from './strip-labels.js';
+import { canShowTask } from './strip-labels.js';
 import { useTabFacts } from './use-tab-facts.js';
+import { useStripLabels } from './use-strip-labels.js';
 
 /** What a tab's button shows, wherever it is drawn: on the strip or as
  *  a roster row. */
@@ -129,26 +127,6 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     return (r && repoColors.get(r)) ?? null;
   };
   const groups = present(tabs.tabs, factsOf, tabs.pinned);
-  const groupByTab = useMemo(
-    () =>
-      new Map(
-        groups.flatMap((group) =>
-          group.tabs.map((tab) => [tab.id, group] as const)
-        )
-      ),
-    [groups]
-  );
-  const groupFor = (tab: Tab) => groupByTab.get(tab.id);
-  const placeNames = useMemo(
-    () =>
-      placeLabels(
-        groups.flatMap((group) => {
-          const path = groupPlacePath(group);
-          return path ? [path] : [];
-        })
-      ),
-    [groups]
-  );
   const taskOf = (tab: Tab): string | undefined => {
     if (tab.kind === 'terminal' && tab.terminalKind === 'shell')
       return undefined;
@@ -166,77 +144,16 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
       foreignByCheckout.get(`${tab.repo}\0${tab.worktree}`)?.agent
     );
   };
-  const presentations = new Map<string, ReturnType<typeof tabPresentation>>();
-  const presentationOf = (tab: Tab) => {
-    const cached = presentations.get(tab.id);
-    if (cached) return cached;
-    const group = groupFor(tab);
-    const presentation = tabPresentation(
-      tab,
-      tabItem(tab, index),
-      machineLabelFor(tab),
-      {
-        chipped: group?.chipped,
-        taskTitle: taskOf(tab),
-        place:
-          group?.affiliation?.kind === 'place'
-            ? placeNames.get(groupPlacePath(group) ?? '')
-            : undefined,
-        branch:
-          tab.kind === 'terminal'
-            ? terminalByName.get(tab.name)?.branch
-            : undefined,
-      }
-    );
-    presentations.set(tab.id, presentation);
-    return presentation;
-  };
-  const unchipped = 'unchipped';
-  const bucketKey = (tab: Tab) =>
-    `${
-      groupFor(tab)?.chipped ? groupFor(tab)!.key : unchipped
-    }\0${presentationOf(tab).label.trim().replace(/\s+/g, ' ').toLowerCase()}`;
-  const buckets = bucketTabs(tabs.tabs, bucketKey);
-  const collisions = new Map<string, ReturnType<typeof collisionLabel>>();
-  const openedIds = tabs.openedIds ?? tabs.tabs.map((tab) => tab.id);
-  const labelOf = (tab: Tab) => {
-    const cached = collisions.get(tab.id);
-    if (cached) return cached;
-    const result = collisionLabel(
-      tab,
-      buckets.get(bucketKey(tab)) ?? [tab],
-      (peer) => presentationOf(peer).label,
-      openedIds,
-      (id) => tabs.collisionOrdinals?.[id],
-      (peer) =>
-        peer.kind === 'terminal'
-          ? terminalByName.get(peer.name)?.branch
-          : undefined
-    );
-    collisions.set(tab.id, result);
-    return result;
-  };
-  const pendingOrdinals = Object.fromEntries(
-    tabs.tabs.flatMap((tab) => {
-      const base = presentationOf(tab).label;
-      const result = labelOf(tab);
-      if (!result.ordinal) return [];
-      const value = { base, ordinal: result.ordinal };
-      const old = tabs.collisionOrdinals?.[tab.id];
-      return old?.base === base && old.ordinal === value.ordinal
-        ? []
-        : [[tab.id, value] as const];
-    })
-  );
-  const pendingKey = JSON.stringify(pendingOrdinals);
-  const { assignCollisionOrdinals } = tabs;
-  useEffect(() => {
-    const values = JSON.parse(pendingKey) as Record<
-      string,
-      { base: string; ordinal: number }
-    >;
-    if (Object.keys(values).length) assignCollisionOrdinals(values);
-  }, [pendingKey, assignCollisionOrdinals]);
+  const branchOf = (tab: Tab): string | undefined =>
+    tab.kind === 'terminal' ? terminalByName.get(tab.name)?.branch : undefined;
+  const { groupFor, presentationOf, labelOf } = useStripLabels({
+    groups,
+    tabs,
+    index,
+    machineLabelFor,
+    taskOf,
+    branchOf,
+  });
   const faces = new Map<string, TabFace>();
   const faceOf = (tab: Tab): TabFace => {
     const cached = faces.get(tab.id);

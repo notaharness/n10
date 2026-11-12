@@ -57,7 +57,10 @@ export interface MachineScanPorts {
   onChanged(delta: DiscoveryDelta): void;
   onLabelsChanged?: () => void;
   /** Handed the machine's whole listing. */
-  listed?(machine: string, sessions: readonly TaggedSession[]): boolean | 'labels' | undefined;
+  listed?(
+    machine: string,
+    sessions: readonly TaggedSession[]
+  ): boolean | 'labels' | undefined;
   /** Told once a listing of the machine succeeded and its terminals
    *  are adopted, none still waiting on a retried attach. */
   scanned?(machine: string): void;
