@@ -13,6 +13,7 @@ import {
   groupOf,
   isCollapsed,
   presentedIds,
+  shownTabIds,
   tabStopOf,
   type TabGroup,
 } from '../../lib/tabs/tab-groups.js';
@@ -35,18 +36,8 @@ import { PaneDropZone } from './PaneDropZone.js';
 import { usePaneMenus } from './use-pane-menus.js';
 import { derivedLabel, useGroupRename } from './use-group-rename.js';
 import { useStripGroups } from './use-strip-groups.js';
-
-/** The real tabs the strip shows: a group's home, and its members
- *  unless it is collapsed. */
-function shownTabIds(
-  groups: readonly TabGroup[],
-  choices: Readonly<Record<string, boolean>>
-): string[] {
-  return groups.flatMap((g) => {
-    if (!g.chipped || !isCollapsed(g, choices)) return g.tabs.map((t) => t.id);
-    return g.head ? [g.head.id] : [];
-  });
-}
+import { FollowController } from './FollowController.js';
+import { useSupervise } from './use-supervise.js';
 
 /**
  * Tab strip + the active tab's pane, and at most one spare.
@@ -78,7 +69,8 @@ export function EditorArea({
   const requestAgentView = useRequestAgentView();
   const closer = useCloseTabs(items);
   const index = indexItems(repo.cwd, items);
-  const { groups, faceOf, colorOf } = useStripGroups(items);
+  const { groups, faceOf, colorOf, factsOf, activitySource } =
+    useStripGroups(items);
   const [announced, announce] = useState('');
   const round = useRef<AttentionRound | null>(null);
   const attentionActivation = useRef<string | null>(null);
@@ -91,6 +83,7 @@ export function EditorArea({
     groups,
     faceOf
   );
+  const supervise = useSupervise({ groups, faceOf, factsOf, labelOf });
   const pins = groups.filter((g) => g.pinned).length;
   const { stripMenu } = usePaneMenus();
 
@@ -165,6 +158,8 @@ export function EditorArea({
         if (id !== null) tabs.setPinned([id], !tabs.pinned.includes(id));
       },
       renameGroup: renameActive,
+      tileGroup: supervise.tileActive,
+      followGroup: supervise.followActive,
     });
     return () => setStripCommands(null);
   });
@@ -198,6 +193,7 @@ export function EditorArea({
         collapseOthers,
         rename: () => rename(group.key, derivedLabel(group, faceOf)),
         setCollapsed: (collapsed) => tabs.setCollapsed([group.key], collapsed),
+        ...supervise.menuFor(group),
       }}
     />
   );
@@ -271,6 +267,12 @@ export function EditorArea({
               )),
         ])}
       </TabStrip>
+      <FollowController
+        nameOf={supervise.nameOf}
+        groups={groups}
+        faceOf={faceOf}
+        activitySource={activitySource}
+      />
       <div aria-live="polite" className="sr-only">
         {announced}
       </div>

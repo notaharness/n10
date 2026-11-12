@@ -65,6 +65,18 @@ export interface Workspace {
    *  opening a repository again land where it was left rather than on
    *  whichever of its tabs happens to be rightmost. */
   lastActiveByRepo: Readonly<Record<string, string>>;
+  /** The panes following a group (`supervise.ts`): at most one pane
+   *  per group. Not saved, so following ends with the run. */
+  follows: Readonly<Record<PaneId, Following>>;
+}
+
+/** What a follow pane follows: a group, by affiliation key, and the
+ *  tabs of it the pane holds and switches between. A tab leaves `ids`
+ *  when it is pinned, moved out or closed, and joins it when a sync
+ *  opens it there; with none left, following ends. */
+export interface Following {
+  key: string;
+  ids: readonly string[];
 }
 
 export const FIRST_PANE: PaneId = 'pane-1';
@@ -79,6 +91,7 @@ export const EMPTY_WORKSPACE: Workspace = {
   groupNames: {},
   unseen: [],
   lastActiveByRepo: {},
+  follows: {},
 };
 
 /** The pane that has focus, or the first one if the id names none. */
@@ -98,7 +111,10 @@ export function paneOf(ws: Workspace, id: string): PaneNode | undefined {
  * tabs as one ordered list and its active tab, and the workspace-wide
  * sets as they are.
  */
-export type Strip = Omit<Workspace, 'tabs' | 'layout' | 'focusedPane'> & {
+export type Strip = Omit<
+  Workspace,
+  'tabs' | 'layout' | 'focusedPane' | 'follows'
+> & {
   tabs: Tab[];
   activeId: string | null;
   /** The tabs in the other panes, read only: an open must not take an

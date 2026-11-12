@@ -29,6 +29,11 @@ export interface GroupMenu {
   showTabs(): void;
   setCollapsed(collapsed: boolean): void;
   collapseOthers(): void;
+  /** The supervising layouts (`use-supervise.ts`). */
+  canTile: boolean;
+  tile(): void;
+  canFollow: boolean;
+  follow(): void;
 }
 
 function groupItems(group: GroupMenu): ContextMenuItem[] {
@@ -43,6 +48,9 @@ function groupItems(group: GroupMenu): ContextMenuItem[] {
       label: 'Collapse others',
       enabled: group.canCollapseOthers,
     },
+    { type: 'separator' },
+    { id: 'group-tile', label: 'Tile group', enabled: group.canTile },
+    { id: 'group-follow', label: 'Follow group', enabled: group.canFollow },
   ];
 }
 
@@ -54,6 +62,8 @@ function runGroupChoice(chosen: string | null, group?: GroupMenu): boolean {
   else if (chosen === 'group-expand') group.setCollapsed(false);
   else if (chosen === 'group-collapse') group.setCollapsed(true);
   else if (chosen === 'group-collapse-others') group.collapseOthers();
+  else if (chosen === 'group-tile') group.tile();
+  else if (chosen === 'group-follow') group.follow();
   else return false;
   return true;
 }

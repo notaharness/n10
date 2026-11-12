@@ -196,6 +196,18 @@ export function presentedIds(groups: readonly TabGroup[]): string[] {
   return groups.flatMap((g) => g.tabs.map((t) => t.id));
 }
 
+/** The real tabs the strip shows: a group's home, and its members
+ *  unless it is collapsed. */
+export function shownTabIds(
+  groups: readonly TabGroup[],
+  choices: Readonly<Record<string, boolean>>
+): string[] {
+  return groups.flatMap((g) => {
+    if (!g.chipped || !isCollapsed(g, choices)) return g.tabs.map((t) => t.id);
+    return g.head ? [g.head.id] : [];
+  });
+}
+
 /** The row's one Tab stop: the active tab when it shows, else the
  *  shown tab nearest it in strip order (behind a collapsed chip, its
  *  home or a neighbour), else the first. */
@@ -214,6 +226,25 @@ export function tabStopOf(
     if (near) return near;
   }
   return shown[0];
+}
+
+/**
+ * The collapsed group to expand now that `now` is the active tab and its
+ * group, where it was `before`: a tab activated from anywhere shows, so
+ * its collapsed group expands; and so does a collapsed group the active
+ * tab joins behind its chip (`hidden`: its affiliation came with a later
+ * scan, or it was unpinned). Collapsing the active tab's group leaves it
+ * collapsed until either changes. Only in the focused pane: a pane that
+ * changes in the background (a follow pane's switch) expands nothing.
+ */
+export function expandsOnShow(
+  before: { id: string | null; group: string | undefined },
+  now: { id: string | null; group: string | undefined },
+  state: { collapsed: boolean; hidden: boolean; focused: boolean }
+): string | null {
+  if (before.id === now.id && before.group === now.group) return null;
+  const expands = before.id !== now.id ? state.collapsed : state.hidden;
+  return now.group && expands && state.focused ? now.group : null;
 }
 
 /** The group `tabId` stands in, if any. */

@@ -9,20 +9,28 @@ export interface StripCommands {
   togglePin(): void;
   /** Rename the active tab's group (the dialog). */
   renameGroup(): void;
+  /** Tile or follow the active tab's group (`use-supervise.ts`). */
+  tileGroup(): void;
+  followGroup(): void;
 }
 
-/** The strip's commands with a shortcut, and the palette's rename. */
+/** The strip's commands with a shortcut, and the palette's own: rename,
+ *  tile and follow. */
 export type StripCommand =
   | 'desktop.tabs.attention'
   | 'desktop.groups.collapse-others'
   | 'desktop.tabs.toggle-pin'
-  | 'rename-group';
+  | 'rename-group'
+  | 'tile-group'
+  | 'follow-group';
 
 const RUN: Record<StripCommand, (c: StripCommands) => void> = {
   'desktop.tabs.attention': (c) => c.attention(),
   'desktop.groups.collapse-others': (c) => c.collapseOthers(),
   'desktop.tabs.toggle-pin': (c) => c.togglePin(),
   'rename-group': (c) => c.renameGroup(),
+  'tile-group': (c) => c.tileGroup(),
+  'follow-group': (c) => c.followGroup(),
 };
 
 let commands: StripCommands | null = null;

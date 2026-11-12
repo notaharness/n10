@@ -56,14 +56,22 @@ export function setCollapsed(
   keys: readonly string[],
   collapsed: boolean
 ): Strip {
-  if (keys.every((key) => state.collapsed[key] === collapsed)) return state;
+  const next = chooseCollapsed(state.collapsed, keys, collapsed);
+  return next === state.collapsed ? state : { ...state, collapsed: next };
+}
+
+/** `choices` with `keys` collapsed (or expanded), the latest choices
+ *  kept; the same record when nothing changes. */
+export function chooseCollapsed(
+  choices: Readonly<Record<string, boolean>>,
+  keys: readonly string[],
+  collapsed: boolean
+): Readonly<Record<string, boolean>> {
+  if (keys.every((key) => choices[key] === collapsed)) return choices;
   const chosen = new Set(keys);
-  const kept = Object.entries(state.collapsed).filter(([k]) => !chosen.has(k));
+  const kept = Object.entries(choices).filter(([k]) => !chosen.has(k));
   const next = [...kept, ...keys.map((k) => [k, collapsed] as const)];
-  return {
-    ...state,
-    collapsed: Object.fromEntries(next.slice(-COLLAPSED_LIMIT)),
-  };
+  return Object.fromEntries(next.slice(-COLLAPSED_LIMIT));
 }
 
 /** End `id`'s preview. Unchanged state when it is no preview. */

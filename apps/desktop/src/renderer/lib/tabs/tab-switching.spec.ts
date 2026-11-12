@@ -118,6 +118,8 @@ describe('keyboard tab switching', () => {
         collapseOthers: () => commands++,
         togglePin: () => commands++,
         renameGroup: () => commands++,
+        tileGroup: () => commands++,
+        followGroup: () => commands++,
       });
       target.addEventListener('keydown', () => delivered++);
       const first = press(key, { ctrl: true, shift: true });
@@ -141,6 +143,8 @@ describe('keyboard tab switching', () => {
       collapseOthers: () => runs++,
       togglePin: () => runs++,
       renameGroup: () => runs++,
+      tileGroup: () => runs++,
+      followGroup: () => runs++,
     });
     const composing = Object.assign(
       keyEvent('keydown', 'A', { ctrl: true, shift: true }),

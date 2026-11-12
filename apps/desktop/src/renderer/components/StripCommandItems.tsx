@@ -1,9 +1,11 @@
 import {
   BellIcon,
+  Columns2Icon,
   PanelsTopLeftIcon,
   PencilIcon,
   PinIcon,
   PinOffIcon,
+  RadioIcon,
 } from 'lucide-react';
 import { keysToDisplayString } from '@n10/core/ui';
 import { useDesktopBindings } from '../lib/keybindings.js';
@@ -16,8 +18,8 @@ function shortcutText(keys: Parameters<typeof keysToDisplayString>[0]): string {
 }
 
 /** The palette's commands on the strip: the attention walk, collapsing
- *  other groups, and — with a tab active — pinning it and renaming its
- *  group. */
+ *  other groups, and — with a tab active — pinning it, and renaming,
+ *  tiling or following its group. */
 export function StripCommandItems({ close }: { close: () => void }) {
   const tabs = useTabs();
   const bindings = useDesktopBindings();
@@ -67,6 +69,20 @@ export function StripCommandItems({ close }: { close: () => void }) {
           >
             <PencilIcon />
             Rename group…
+          </CommandItem>
+          <CommandItem
+            value="command tile group orchestrator players panes"
+            onSelect={run('tile-group')}
+          >
+            <Columns2Icon />
+            Tile group
+          </CommandItem>
+          <CommandItem
+            value="command follow group new output pane"
+            onSelect={run('follow-group')}
+          >
+            <RadioIcon />
+            Follow group
           </CommandItem>
         </>
       )}

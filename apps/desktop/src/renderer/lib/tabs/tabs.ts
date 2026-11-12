@@ -27,9 +27,11 @@ export type {
 export { activeTabRepo } from './tabs-model.js';
 
 /** A sync's listings, and the group a tab it opens belongs to: such a
- *  tab joins the pane already holding its group. */
+ *  tab joins the pane following its group, else the one holding its
+ *  group's players (`isHome` tells the orchestrator's tab from them). */
 export type SyncRequest = SyncListings & {
   groupOf?: (tab: Tab) => string | null;
+  isHome?: (tab: Tab) => boolean;
 };
 export {
   foreignRepoOf,

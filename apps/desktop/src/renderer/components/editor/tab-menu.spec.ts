@@ -41,6 +41,10 @@ const group = (collapsed = false, canCollapseOthers = true): GroupMenu => ({
   rename: vi.fn(),
   setCollapsed: vi.fn(),
   collapseOthers: vi.fn(),
+  canTile: true,
+  tile: vi.fn(),
+  canFollow: false,
+  follow: vi.fn(),
 });
 
 function menu(g?: GroupMenu) {
@@ -132,8 +136,28 @@ describe('a chip’s own menu', () => {
       'Rename group…',
       'Collapse group',
       'Collapse others',
+      'Tile group',
+      'Follow group',
     ]);
     expect(g.showTabs).toHaveBeenCalled();
+  });
+
+  it('offers Tile group and Follow group as they can run, and runs them', async () => {
+    const g = group();
+    choose = 'group-tile';
+    await runGroupMenu(g);
+    const item = (label: string) =>
+      shown.find((i) => 'label' in i && i.label === label);
+    expect(item('Tile group')).toEqual(
+      expect.objectContaining({ enabled: true })
+    );
+    expect(item('Follow group')).toEqual(
+      expect.objectContaining({ enabled: false })
+    );
+    expect(g.tile).toHaveBeenCalled();
+    choose = 'group-follow';
+    await runGroupMenu(g);
+    expect(g.follow).toHaveBeenCalled();
   });
 
   it('opens the rename dialog on Rename group…', async () => {

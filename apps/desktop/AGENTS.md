@@ -138,8 +138,11 @@ Every rule below has its reasoning in `docs/decisions.md`.
   restores it before the strip draws. Only tmux's `alive` answer ends an
   agent's dismissal, and only a terminal listing complete for its machine
   (`scanned`) ends a terminal's or closes a restored tab; the sidebar's
-  `running` is "attached here". `dismissed`, pins, group names, restore
-  binding and splits: decisions.md "Tab workspace".
+  `running` is "attached here". Tile group and Follow group are layout
+  actions (`lib/tabs/supervise.ts`); a follow pane owns its tabs, and its
+  switching is `follow-scheduler.ts`. `dismissed`, pins, group names,
+  restore binding, splits and the supervising layouts: decisions.md "Tab
+  workspace".
 - A PR tab is a review workspace (`components/review/PrWorkspace.tsx`): a
   collapsible rail (Sessions · Files) beside one content pane that
   swaps between Overview, diff, a session's terminal (mounted only while shown) and

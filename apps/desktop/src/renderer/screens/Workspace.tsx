@@ -23,7 +23,7 @@ import {
 } from '../lib/sidebar/sidebar-model.js';
 import { CommandPalette } from '../components/CommandPalette.js';
 import { EditorLayout } from '../components/editor/EditorLayout.js';
-import { useGroupOf } from '../components/editor/use-strip-groups.js';
+import { useGrouping } from '../components/editor/use-strip-groups.js';
 import { prefetchPanes } from '../components/editor/lazy-panes.js';
 import { ShortcutsDialog } from '../components/ShortcutsDialog.js';
 import { Sidebar } from '../components/sidebar/Sidebar.js';
@@ -189,13 +189,14 @@ function WorkspaceInner({
   // reason to re-run, since the branch it lands on may already be
   // live. Re-running settles — every step above is idempotent and
   // returns the same state object once there is nothing left to do. A
-  // tab the sync opens joins the pane already holding its group.
-  const groupOf = useGroupOf(items);
+  // tab the sync opens joins the pane following its group, else the one
+  // holding its players.
+  const group = useGrouping(items);
   const { entries: terminals, scanned } = terminalTabs;
   useRestoredNotice(tabs.allTabs, terminals, scanned);
   useEffect(() => {
-    tabs.syncItems({ entries, terminals, foreign, alive, scanned, groupOf });
-  }, [tabs, entries, terminals, foreign, alive, scanned, groupOf]);
+    tabs.syncItems({ ...group, entries, terminals, foreign, alive, scanned });
+  }, [tabs, entries, terminals, foreign, alive, scanned, group]);
 
   // Boot milestones (see lib/perf.ts): the shell is on screen once this
   // mounts, and the sidebar is real once the host's first model lands —
