@@ -17,6 +17,8 @@ const state = vi.hoisted(() => ({
     detached: boolean;
     sessionName: string;
   }[],
+  /** What the one tmux read answers. */
+  tagged: [] as { name: string }[],
   realpaths: {} as Record<string, string>,
   recents: [] as string[],
   tmuxFails: false,
@@ -26,9 +28,11 @@ vi.mock('node:fs', () => ({
   realpathSync: (p: string) => state.realpaths[p] ?? p,
 }));
 vi.mock('@n10/core', () => ({
-  readOurSessions: () => (state.tmuxFails ? null : []),
+  readOurSessions: () => (state.tmuxFails ? null : state.tagged),
   listLiveWorktreeSessions: () => state.live,
-  aliveWorktreeSessionNames: () => state.live.map((l) => l.sessionName),
+  // Answers from what it is handed, so a test sees what the host passed.
+  aliveWorktreeSessionNames: (sessions: { name: string }[]) =>
+    sessions.map((s) => `alive:${s.name}`),
 }));
 vi.mock('./repo.js', () => ({
   requireRepo: () => state.open,
@@ -70,6 +74,7 @@ const BETA_DETACHED = {
 beforeEach(async () => {
   state.open = '/repos/alpha';
   state.live = [];
+  state.tagged = [];
   state.realpaths = {};
   state.recents = [];
   state.tmuxFails = false;
@@ -145,10 +150,11 @@ describe('listForeignSessions', () => {
 
   it('names every live agent, the open repository’s and detached ones too', () => {
     state.live = [ALPHA_AGENT, BETA_AGENT, BETA_DETACHED];
+    state.tagged = state.live.map((l) => ({ name: l.tmuxName }));
     expect(foreign.listForeignSessions().alive).toEqual([
-      'feat-a',
-      'feat-b',
-      'hotfix',
+      'alive:alpha-feat-a',
+      'alive:beta-feat-b',
+      'alive:beta-hotfix',
     ]);
   });
 
