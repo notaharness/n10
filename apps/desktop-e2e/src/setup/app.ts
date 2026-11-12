@@ -46,6 +46,114 @@ export function tabs(page: Page): Locator {
   return page.getByRole('tab');
 }
 
+/** A tab of its own on the strip, never a group's chip: a chip is a
+ *  tab too, and its name carries its active member's. */
+export function stripTab(
+  page: Page,
+  name: string | RegExp,
+  exact = false
+): Locator {
+  return tab(page, name, exact).and(page.locator('[data-tab-id]'));
+}
+
+/** Open `chip`'s roster by resting the pointer on it: a press shows
+ *  its group's first tab instead, and focusing a chip in another pane
+ *  hands that pane's terminal the keys. */
+export async function openRoster(page: Page, chip: Locator): Promise<void> {
+  const roster = page.locator('[data-group-roster]');
+  // Come onto it from elsewhere: a pointer already resting on the chip
+  // comes to rest on it no more, nor on a chip a sync drew again under
+  // it. Again, if a redraw dropped the rest.
+  await expect(async () => {
+    await page.mouse.move(0, 0);
+    await chip.hover();
+    await expect(roster).toBeVisible({ timeout: 2_000 });
+    // This chip's, not another's still open.
+    await expect(chip).toHaveAttribute('aria-expanded', 'true', {
+      timeout: 500,
+    });
+  }).toPass({ timeout: 20_000 });
+}
+
+/** Open the roster of the chip `name`'s tab stands behind, and give
+ *  its row there; the roster stays open. */
+async function rosterRowFor(page: Page, name: RegExp): Promise<Locator> {
+  const roster = page.locator('[data-group-roster]');
+  for (const chip of await page.locator('[data-group-chip]').all()) {
+    await openRoster(page, chip);
+    const row = roster.getByRole('button', { name });
+    if ((await row.count()) > 0) return row.first();
+    await page.keyboard.press('Escape');
+    await roster.waitFor({ state: 'hidden' });
+  }
+  throw new Error(`no tab or roster row named ${String(name)}`);
+}
+
+/**
+ * Open All tabs and give its dialog once it lists rows. A press that
+ * lands while a drop is still settling can leave it shut, so it is
+ * pressed again until the dialog shows.
+ */
+export async function openAllTabs(page: Page): Promise<Locator> {
+  const dialog = page.getByRole('dialog', { name: 'All tabs' });
+  await expect(async () => {
+    if (!(await dialog.isVisible()))
+      await page.getByRole('button', { name: 'All tabs' }).click();
+    await expect(dialog.locator('[data-roster-row]').first()).toBeVisible({
+      timeout: 1_000,
+    });
+  }).toPass({ timeout: 10_000 });
+  return dialog;
+}
+
+/**
+ * Show the tab `name` names wherever it stands: its own tab on the
+ * strip, else its row in its group's roster, the dropdown its chip
+ * opens. For a test that needs the tab open, not the strip's mechanics.
+ */
+export async function showTab(page: Page, name: RegExp): Promise<void> {
+  const own = stripTab(page, name);
+  if ((await own.count()) > 0) {
+    await own.click();
+    return;
+  }
+  await (await rosterRowFor(page, name)).click();
+  await page.locator('[data-group-roster]').waitFor({ state: 'hidden' });
+}
+
+/**
+ * Choose `label` from the native menu of tab `name`: its own tab's, else
+ * its roster row's in its group's dropdown, which has the same items.
+ */
+export async function chooseFromTabMenu(
+  page: Page,
+  app: ElectronApplication,
+  name: RegExp,
+  label: string
+): Promise<void> {
+  const own = stripTab(page, name);
+  const target = (await own.count()) > 0 ? own : await rosterRowFor(page, name);
+  await armContextMenuChoice(app, label);
+  await target.click({ button: 'right' });
+  const roster = page.locator('[data-group-roster]');
+  if ((await roster.count()) > 0) {
+    await page.keyboard.press('Escape');
+    await roster.waitFor({ state: 'hidden' });
+  }
+}
+
+/** Keep a preview tab open, as a double click on its own tab does; a
+ *  tab behind its group's chip is kept from its roster row's menu. */
+export async function keepOpen(
+  page: Page,
+  app: ElectronApplication,
+  name: RegExp
+): Promise<void> {
+  const own = stripTab(page, name);
+  if ((await own.count()) > 0) await own.dblclick();
+  else await chooseFromTabMenu(page, app, name, 'Keep Open');
+}
+
 /**
  * The spinner the tab strip and sidebar show while an agent is
  * actively producing output.
@@ -326,12 +434,8 @@ export function fileTreeFolder(page: Page, name: string): Locator {
   return fileTree(page).getByRole('button', { name, exact: true });
 }
 
-/** The room between two blocks on the strip (groups, or tabs standing
- *  alone); a group's members sit 1px apart. */
-export const BLOCK_GAP_PX = 8;
-
-/** Two neighbouring blocks of the strip, one row: `right` starts the
- *  block gap after `left` ends, with nothing else between them. */
+/** Two neighbouring blocks of the strip (chips, or tabs standing
+ *  alone), one row: `right` starts where `left` ends, as tabs touch. */
 export async function expectNextBlock(
   left: Locator,
   right: Locator
@@ -339,7 +443,7 @@ export async function expectNextBlock(
   const [a, b] = await Promise.all([left.boundingBox(), right.boundingBox()]);
   if (!a || !b) throw new Error('tab is not laid out');
   expect(b.y).toBeCloseTo(a.y, 0);
-  expect(b.x - (a.x + a.width)).toBeCloseTo(BLOCK_GAP_PX, 0);
+  expect(b.x - (a.x + a.width)).toBeCloseTo(0, 0);
 }
 
 /** Open the session menu from the agent card's native menu. */

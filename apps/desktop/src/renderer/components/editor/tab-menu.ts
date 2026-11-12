@@ -18,17 +18,11 @@ export interface PaneMenu {
   run(chosen: string | null, tab: Tab): boolean;
 }
 
-/** What a group offers in a native menu: its chip's, and below a
- *  member's own items. */
+/** What a group offers in its chip's native menu. */
 export interface GroupMenu {
-  collapsed: boolean;
   /** Name the group (the rename dialog). */
   rename(): void;
-  /** Another group could collapse. */
-  canCollapseOthers: boolean;
   showTabs(): void;
-  setCollapsed(collapsed: boolean): void;
-  collapseOthers(): void;
   /** The supervising layouts (`use-supervise.ts`). */
   canTile: boolean;
   tile(): void;
@@ -40,38 +34,25 @@ function groupItems(group: GroupMenu): ContextMenuItem[] {
   return [
     { id: 'group-show', label: 'Show tabs' },
     { id: 'group-rename', label: 'Rename group…' },
-    group.collapsed
-      ? { id: 'group-expand', label: 'Expand group' }
-      : { id: 'group-collapse', label: 'Collapse group' },
-    {
-      id: 'group-collapse-others',
-      label: 'Collapse others',
-      enabled: group.canCollapseOthers,
-    },
     { type: 'separator' },
     { id: 'group-tile', label: 'Tile group', enabled: group.canTile },
     { id: 'group-follow', label: 'Follow group', enabled: group.canFollow },
   ];
 }
 
-/** Run a group's own choice; false for any other. */
-function runGroupChoice(chosen: string | null, group?: GroupMenu): boolean {
-  if (!group) return false;
-  if (chosen === 'group-show') group.showTabs();
-  else if (chosen === 'group-rename') group.rename();
-  else if (chosen === 'group-expand') group.setCollapsed(false);
-  else if (chosen === 'group-collapse') group.setCollapsed(true);
-  else if (chosen === 'group-collapse-others') group.collapseOthers();
-  else if (chosen === 'group-tile') group.tile();
-  else if (chosen === 'group-follow') group.follow();
-  else return false;
-  return true;
-}
+const GROUP_CHOICES: Record<string, (group: GroupMenu) => void> = {
+  'group-show': (g) => g.showTabs(),
+  'group-rename': (g) => g.rename(),
+  'group-tile': (g) => g.tile(),
+  'group-follow': (g) => g.follow(),
+};
 
-/** The native menu of a chip with no tab of its own (a stand-in, a
- *  place): the group's actions alone. */
+/** The native menu of a group's chip: the group's actions. Its tabs'
+ *  own menus are on their roster rows. */
 export async function runGroupMenu(group: GroupMenu): Promise<void> {
-  runGroupChoice(await window.n10.showContextMenu(groupItems(group)), group);
+  const chosen = await window.n10.showContextMenu(groupItems(group));
+  if (chosen && Object.hasOwn(GROUP_CHOICES, chosen))
+    GROUP_CHOICES[chosen]!(group);
 }
 
 const PINS_STAY = 'Pinned tabs stay open';
@@ -109,21 +90,19 @@ function ownItems(
   return items;
 }
 
-/** The native context menu a tab offers: its own items, its pane's,
- *  its group's actions — or, for a tab alone in its place, Rename
- *  group — and what the whole strip does when its tabs overflow. */
+/** The native context menu a tab offers, on the strip or as a roster
+ *  row: its own items, its pane's, Rename group for a tab alone in its
+ *  place, and what the whole strip does when its tabs overflow. */
 function tabMenuItems(
   tab: Tab,
   tabs: ReturnType<typeof useTabs>,
   overflow: TabOverflow,
-  group: GroupMenu | undefined,
   rename: (() => void) | undefined,
   panes: PaneMenu | undefined
 ): ContextMenuItem[] {
   const items = ownItems(tab, tabs);
   if (panes) items.push({ type: 'separator' }, ...panes.items(tab));
-  if (group) items.push({ type: 'separator' }, ...groupItems(group));
-  else if (rename) items.push({ id: 'group-rename', label: 'Rename group…' });
+  if (rename) items.push({ id: 'group-rename', label: 'Rename group…' });
   items.push(
     { type: 'separator' },
     {
@@ -162,15 +141,13 @@ export async function runTabMenu(
   tabs: ReturnType<typeof useTabs>,
   closer: Closer,
   overflow: TabOverflow,
-  group?: GroupMenu,
   rename?: () => void,
   panes?: PaneMenu
 ): Promise<void> {
   const chosen = await window.n10.showContextMenu(
-    tabMenuItems(tab, tabs, overflow, group, rename, panes)
+    tabMenuItems(tab, tabs, overflow, rename, panes)
   );
   if (panes?.run(chosen, tab)) return;
-  if (runGroupChoice(chosen, group)) return;
   if (chosen === 'group-rename') rename?.();
   else if (runOwnChoice(chosen, tab, tabs, closer)) return;
   else if (chosen && chosen in OVERFLOW) {

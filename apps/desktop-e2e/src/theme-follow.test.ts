@@ -2,11 +2,11 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { focusTerminal, visibleText } from './setup/app.js';
+import { focusTerminal, openRoster, visibleText } from './setup/app.js';
 import {
   confirmNewTerminal,
   openNewTerminalDialog,
-  terminalTabs,
+  terminalSessions,
 } from './setup/terminals.js';
 import { SHOWN_TERMINAL } from './setup/terminal-grid.js';
 
@@ -62,15 +62,27 @@ async function switchSystemTheme(
 }
 
 /** A new shell tab, once its prompt is up: a keystroke sent while the
- *  shell is still starting is read in cooked mode and lost. */
-async function openShell(app: ElectronApplication, page: Page) {
-  const before = await terminalTabs(page).count();
+ *  shell is still starting is read in cooked mode and lost. Counted by
+ *  their sessions: shells in one directory stand behind one chip. */
+async function openShell({
+  app,
+  page,
+  homeDir,
+}: {
+  app: ElectronApplication;
+  page: Page;
+  homeDir: string;
+}) {
+  const before = terminalSessions(homeDir);
   await openNewTerminalDialog(app, page);
   await confirmNewTerminal(page, 'Shell');
-  await expect(terminalTabs(page)).toHaveCount(before + 1);
+  await expect
+    .poll(() => terminalSessions(homeDir).length, { timeout: 15_000 })
+    .toBe(before.length + 1);
   await expect(
     page.locator(`${SHOWN_TERMINAL} .xterm-rows`).getByText(/\S/).first()
   ).toBeVisible({ timeout: 15_000 });
+  return terminalSessions(homeDir).find((name) => !before.includes(name))!;
 }
 
 async function painted(
@@ -92,7 +104,7 @@ test.describe('Theme', () => {
     const { app, page } = desktop;
     await page.emulateMedia({ colorScheme: 'light' });
 
-    await openShell(app, page);
+    await openShell(desktop);
 
     for (const theme of ['dark', 'light', 'dark'] as const) {
       await switchSystemTheme(app, theme);
@@ -116,7 +128,7 @@ test.describe('Theme', () => {
       ['light', 'rgb:ffff/ffff/ffff'],
     ] as const) {
       await switchSystemTheme(app, theme);
-      await openShell(app, page);
+      await openShell(desktop);
       await focusTerminal(page);
       await page.keyboard.type('node ask-background.cjs\n', { delay: 20 });
       await expect(
@@ -136,7 +148,7 @@ test.describe('Theme', () => {
     const { app, page, repoPath } = desktop;
     writeFileSync(join(repoPath, 'watch-scheme.cjs'), WATCH_SCHEME);
     await switchSystemTheme(app, 'dark');
-    await openShell(app, page);
+    const watching = await openShell(desktop);
     await focusTerminal(page);
     await page.keyboard.type('node watch-scheme.cjs\n', { delay: 20 });
     await expect(visibleText(page, 'watching')).toBeVisible({
@@ -144,8 +156,8 @@ test.describe('Theme', () => {
     });
 
     // Two more tabs: the first is neither on screen nor held ready.
-    await openShell(app, page);
-    await openShell(app, page);
+    await openShell(desktop);
+    await openShell(desktop);
     await expect(page.locator('[data-terminal-grid]')).toHaveCount(2);
     await switchSystemTheme(app, 'light');
     await expect
@@ -155,7 +167,11 @@ test.describe('Theme', () => {
         terminal: 'light',
       });
 
-    await terminalTabs(page).first().click();
+    // That shell, from the roster of the chip the three stand behind.
+    await openRoster(page, page.locator('[data-group-chip]'));
+    await page
+      .locator(`[data-group-roster] [data-roster-row*='"${watching}"']`)
+      .click();
     await expect(visibleText(page, 'scheme light')).toBeVisible({
       timeout: 15_000,
     });

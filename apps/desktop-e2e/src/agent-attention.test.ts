@@ -1,5 +1,15 @@
 import { test, expect, fakeAgent } from './fixtures/desktop.js';
+import type { Page } from '@playwright/test';
 import { createWorktree, launchAgentFromRail, tab } from './setup/app.js';
+import { startLoneShells } from './setup/terminals.js';
+
+/** Show another tab: a shell alone in its directory, so the agent's
+ *  worktree stays a tab of its own on the strip, not a chip's member. */
+async function lookElsewhere(page: Page, homeDir: string): Promise<void> {
+  startLoneShells(homeDir, ['elsewhere']);
+  await tab(page, /elsewhere/).click({ timeout: 30_000 });
+  await expect(tab(page, /elsewhere/)).toHaveAttribute('aria-selected', 'true');
+}
 
 /**
  * How you find out an agent finished while you were looking elsewhere.
@@ -34,8 +44,7 @@ test.describe('An agent that finishes while you are elsewhere', () => {
 
     // Look away: while its terminal is on screen the session is marked
     // seen continuously, so it could never be flagged.
-    await createWorktree(page, 'elsewhere');
-    await expect(tab(page, /elsewhere/)).toBeVisible();
+    await lookElsewhere(page, desktop.homeDir);
 
     // The agent keeps working, then stops. Once it has been quiet for
     // the idle window, the tab we are not looking at asks for us.
@@ -63,6 +72,41 @@ test.describe('An agent that finishes while you are elsewhere', () => {
     });
   });
 
+  test('marks the chip it is behind, and the attention key shows it there', async ({
+    desktop,
+  }) => {
+    const { page } = desktop;
+    await createWorktree(page, 'worker');
+    await launchAgentFromRail(page);
+    await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
+      timeout: 30_000,
+    });
+    // A second worktree of the repository: the two are one chip, the
+    // worker a member behind it.
+    await createWorktree(page, 'other');
+    const chip = page.locator('[data-group-chip^="place:"]');
+    await expect(chip.locator('[data-group-count]')).toHaveText('2');
+    await lookElsewhere(page, desktop.homeDir);
+
+    await expect(chip).toHaveClass(/tab-attention/, { timeout: 30_000 });
+    await page.keyboard.press('Control+Shift+KeyA');
+    await expect(chip).toHaveAttribute('aria-selected', 'true');
+    await expect(chip.locator('[data-group-active-label]')).toContainText(
+      'worker'
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.activeElement?.classList.contains('xterm-helper-textarea')
+        )
+      )
+      .toBe(true);
+    await expect(chip).not.toHaveClass(/tab-attention/, { timeout: 20_000 });
+    await expect(
+      page.getByRole('button', { name: 'All tabs', exact: true })
+    ).toBeVisible();
+  });
+
   test('clears the mark when the agent tab is clicked', async ({ desktop }) => {
     const { page } = desktop;
     await createWorktree(page, 'worker');
@@ -70,7 +114,7 @@ test.describe('An agent that finishes while you are elsewhere', () => {
     await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
       timeout: 30_000,
     });
-    await createWorktree(page, 'elsewhere');
+    await lookElsewhere(page, desktop.homeDir);
     await expect(tab(page, /worker/)).toHaveClass(/tab-attention/, {
       timeout: 30_000,
     });
@@ -97,7 +141,7 @@ test.describe('An agent still working', () => {
       timeout: 30_000,
     });
 
-    await createWorktree(page, 'elsewhere');
+    await lookElsewhere(page, desktop.homeDir);
 
     // Busy and finished are different states and must look different:
     // a spinner while it works, the attention mark only once it stops.

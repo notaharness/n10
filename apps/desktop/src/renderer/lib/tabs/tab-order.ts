@@ -18,7 +18,9 @@ export function focusRepo(state: Strip, repo: string): Strip {
 
 /**
  * What the user does to tabs and groups short of opening and closing
- * them: moving, keeping a preview, pinning, collapsing and naming.
+ * them: moving, keeping a preview, pinning and naming. An arrangement
+ * (a drop among the strip's blocks or a group's rows) marks the pane
+ * `arranged`: its order is the user's now.
  */
 
 /**
@@ -49,44 +51,19 @@ export function moveTabs(
 /** Put the tabs `ids` name first, in that order, and the rest after
  *  them as they were: a block dropped among the strip's blocks, which
  *  the strip hands over as its whole presented order. Unknown ids are
- *  ignored; unchanged state when the order is. */
+ *  ignored. The pane is the user's to order from then on. */
 export function arrangeTabs(state: Strip, ids: readonly string[]): Strip {
   const rank = new Map(ids.map((id, i) => [id, i]));
   const placed = state.tabs
     .filter((t) => rank.has(t.id))
     .sort((a, b) => rank.get(a.id)! - rank.get(b.id)!);
   const tabs = [...placed, ...state.tabs.filter((t) => !rank.has(t.id))];
-  if (tabs.every((t, i) => t === state.tabs[i])) return state;
-  return { ...state, tabs };
-}
-
-/** How many collapse choices are kept. Parent groups are keyed by an
- *  orchestrator run, so their keys keep coming; the oldest choices go. */
-export const COLLAPSED_LIMIT = 64;
-
-/** Collapse or expand the groups `keys` name, as the latest choices.
- *  Unchanged state when nothing changes. */
-export function setCollapsed(
-  state: Strip,
-  keys: readonly string[],
-  collapsed: boolean
-): Strip {
-  const next = chooseCollapsed(state.collapsed, keys, collapsed);
-  return next === state.collapsed ? state : { ...state, collapsed: next };
-}
-
-/** `choices` with `keys` collapsed (or expanded), the latest choices
- *  kept; the same record when nothing changes. */
-export function chooseCollapsed(
-  choices: Readonly<Record<string, boolean>>,
-  keys: readonly string[],
-  collapsed: boolean
-): Readonly<Record<string, boolean>> {
-  if (keys.every((key) => choices[key] === collapsed)) return choices;
-  const chosen = new Set(keys);
-  const kept = Object.entries(choices).filter(([k]) => !chosen.has(k));
-  const next = [...kept, ...keys.map((k) => [k, collapsed] as const)];
-  return Object.fromEntries(next.slice(-COLLAPSED_LIMIT));
+  // The stored order may already be the one dropped: the strip showed
+  // another, orchestrators first. The drop still makes the order the
+  // user's.
+  if (tabs.every((t, i) => t === state.tabs[i]))
+    return state.arranged ? state : { ...state, arranged: true };
+  return { ...state, tabs, arranged: true };
 }
 
 /** End `id`'s preview. Unchanged state when it is no preview. */

@@ -79,6 +79,13 @@ export function usePlanCount(prId: number | undefined): number {
   return prId == null ? 0 : snapshot.get(prId)?.length ?? 0;
 }
 
+/** How many comments are in the plans of `prIds` together: a group's,
+ *  shown on its chip. */
+export function usePlanTotal(prIds: readonly number[]): number {
+  const { snapshot } = usePlanStore();
+  return prIds.reduce((n, id) => n + (snapshot.get(id)?.length ?? 0), 0);
+}
+
 /**
  * One comment's plan controls: whether it is queued, and the note
  * composer that opens beside it.

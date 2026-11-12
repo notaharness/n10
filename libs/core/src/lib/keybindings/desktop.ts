@@ -16,7 +16,6 @@ export type DesktopActionId =
   | 'desktop.tabs.cycle-next'
   | 'desktop.tabs.cycle-previous'
   | 'desktop.tabs.attention'
-  | 'desktop.groups.collapse-others'
   | 'desktop.tabs.toggle-pin'
   | `desktop.tabs.select-${TabOrdinal}`
   | 'desktop.panes.split-right'
@@ -70,11 +69,6 @@ export const DESKTOP_ACTIONS: readonly {
     description: 'Visit tabs with new output.',
   },
   {
-    id: 'desktop.groups.collapse-others',
-    label: 'Collapse others',
-    description: 'Keep the active group open and collapse other groups.',
-  },
-  {
     id: 'desktop.tabs.toggle-pin',
     label: 'Pin tab / Unpin tab',
     description: 'The active tab. Pinned tabs sit at the start of the strip.',
@@ -126,7 +120,6 @@ export const DESKTOP_DEFAULT_BINDINGS: DesktopBindings = {
     { ctrl: true, shift: true, flags: { tab: true } },
   ],
   'desktop.tabs.attention': [{ ctrl: true, input: 'A' }],
-  'desktop.groups.collapse-others': [{ ctrl: true, input: 'J' }],
   'desktop.tabs.toggle-pin': [{ ctrl: true, meta: true, input: 'p' }],
   ...(Object.fromEntries(
     ORDINALS.map((n) => [

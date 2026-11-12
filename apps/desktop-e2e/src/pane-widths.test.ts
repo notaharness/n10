@@ -1,6 +1,6 @@
 import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, switchRepo, tab } from './setup/app.js';
+import { createWorktree, showTab, switchRepo, tab } from './setup/app.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 
 /**
@@ -198,7 +198,7 @@ test.describe('Pane widths', () => {
     const dragged = before + 90;
     await expect.poll(() => paneWidth(page, 'review-rail')).toBe(dragged);
 
-    await tab(page, /first-work/).click();
+    await showTab(page, /first-work/);
     await expect.poll(() => paneWidth(page, 'review-rail')).toBe(dragged);
 
     await createWorktree(page, 'third-work');

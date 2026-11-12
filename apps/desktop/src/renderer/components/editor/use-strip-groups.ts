@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import type {
   SessionActivitySnapshot,
   SidebarItem,
@@ -12,11 +12,10 @@ import {
 } from '../../lib/data/queries.js';
 import { resolveMachineLabel } from '../../lib/machines/machine-model.js';
 import { useRepo } from '../../lib/repo-context.js';
+import { chipSignal, type ChipSignal } from '../../lib/tabs/group-status.js';
 import { useRepoColors } from '../../lib/tabs/repo-colors.js';
 import {
-  expandsOnShow,
-  groupOf,
-  isCollapsed,
+  homeOpenAmong,
   present,
   presentedIds,
   statusFromActivity,
@@ -34,6 +33,14 @@ import { foreignRepoOf, useTabs, type Tab } from '../../lib/tabs/tabs.js';
 import { canShowTask } from './strip-labels.js';
 import { useTabFacts } from './use-tab-facts.js';
 import { useStripLabels } from './use-strip-labels.js';
+
+/** Where `tab` stands in its group: behind a chip, and its home. */
+function groupMarks(group: TabGroup | undefined, tab: Tab) {
+  return {
+    chipped: group?.chipped ?? false,
+    home: group?.head?.id === tab.id,
+  };
+}
 
 /** What a tab's button shows, wherever it is drawn: on the strip or as
  *  a roster row. */
@@ -57,6 +64,8 @@ export interface TabFace {
   branch?: string;
   harness?: string;
   chipped: boolean;
+  /** An orchestrator's own tab: the home its group's players report to. */
+  home: boolean;
 }
 
 export interface StripGroups {
@@ -65,6 +74,8 @@ export interface StripGroups {
   /** The repository colour a group's chip carries: its home's, else the
    *  one repository every member naming one shares, else none. */
   colorOf(group: TabGroup): string | null;
+  /** What a group's chip blinks and spins for (`chipSignal`). */
+  signalOf(group: TabGroup): ChipSignal;
   /** What the strip groups a tab by (`useTabFacts`). */
   factsOf(tab: Tab): TabFacts;
   /** Which repository's activity `faceOf`'s statuses come from; `null`
@@ -75,9 +86,7 @@ export interface StripGroups {
 /**
  * The strip's groups and every tab's face, from the open repository's
  * items, the host's session listings and the tabs. Notes the presented
- * order for positional switching, and expands a collapsed group when one
- * of its tabs becomes active from anywhere (the palette, Ctrl+Tab, a
- * roster row).
+ * order for positional switching.
  */
 export function useStripGroups(items: SidebarItem[]): StripGroups {
   const { repo } = useRepo();
@@ -126,7 +135,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     const r = tabRepo(tab);
     return (r && repoColors.get(r)) ?? null;
   };
-  const groups = present(tabs.tabs, factsOf, tabs.pinned);
+  const groups = present(tabs.tabs, factsOf, tabs.pinned, !tabs.arranged);
   const taskOf = (tab: Tab): string | undefined => {
     if (tab.kind === 'terminal' && tab.terminalKind === 'shell')
       return undefined;
@@ -189,7 +198,7 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
           ? terminalByName.get(tab.name)?.branch
           : undefined,
       harness: harnessOf(tab),
-      chipped: groupFor(tab)?.chipped ?? false,
+      ...groupMarks(groupFor(tab), tab),
     };
     faces.set(tab.id, face);
     return face;
@@ -203,8 +212,19 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     return colors.size === 1 ? only ?? null : null;
   };
 
+  const signalOf = (group: TabGroup) => {
+    const faces = group.tabs.map(faceOf);
+    const home = group.head !== null;
+    const homeElsewhere = !home && homeOpenAmong(group, tabs.allTabs, factsOf);
+    return chipSignal(
+      faces.map((f) => f.snapshot),
+      { home, homeElsewhere },
+      faces.map((f) => f.unseen)
+    );
+  };
+
   // Positional keyboard switching walks the order the strip presents,
-  // collapsed members included.
+  // the members behind chips included.
   // Only the focused pane's: the shortcuts walk the pane they act in.
   const presented = presentedIds(groups).join('\n');
   const focused = tabs.focused;
@@ -212,30 +232,11 @@ export function useStripGroups(items: SidebarItem[]): StripGroups {
     if (focused) notePresentedOrder(presented ? presented.split('\n') : []);
   }, [presented, focused]);
 
-  // A tab activated from anywhere shows: its group expands
-  // (`expandsOnShow`). Only the focused pane's: a follow pane's switch
-  // must not reflow the strip the user is in.
-  const active = groupOf(groups, tabs.activeId);
-  const activeGroup = active?.key;
-  const collapsed = !!active && isCollapsed(active, tabs.collapsed);
-  const hidden = collapsed && active.head?.id !== tabs.activeId;
-  const { activeId, setCollapsed } = tabs;
-  const shownFor = useRef({ id: activeId, group: activeGroup });
-  useEffect(() => {
-    const now = { id: activeId, group: activeGroup };
-    const key = expandsOnShow(shownFor.current, now, {
-      collapsed,
-      hidden,
-      focused,
-    });
-    shownFor.current = now;
-    if (key) setCollapsed([key], false);
-  }, [activeId, activeGroup, collapsed, hidden, focused, setCollapsed]);
-
   return {
     groups,
     faceOf,
     colorOf,
+    signalOf,
     factsOf,
     // The activity answer for the repository open now, when there is
     // one: a placeholder carried over from another is none.

@@ -1,20 +1,17 @@
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
-import { test, expect, fakeAgent } from './fixtures/desktop.js';
-import {
-  createWorktree,
-  launchAgentFromRail,
-  switchRepo,
-  tab,
-} from './setup/app.js';
+import { test, expect } from './fixtures/desktop.js';
+import { createWorktree, stripTab, switchRepo } from './setup/app.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
+import { startLoneShells } from './setup/terminals.js';
 
 /**
  * The tab strip, pixel for pixel in the pinned container (see
- * `visual.test.ts`): tabs of two repositories, each with its colour
- * along the bottom, wrapped onto a second row or scrolled in one; a
- * long branch cut from the front; and the close button over the end of
- * a hovered tab. The strip alone is in shot: the window around it is
- * covered by the other visual tests.
+ * `visual.test.ts`): two repositories' chips, each with its colour
+ * along the bottom, the active one reading `{group} / {member}` with a
+ * long branch, and shells standing alone, wrapped onto a second row or
+ * scrolled in one; and the close button over the end of a hovered tab.
+ * The strip alone is in shot: the window around it is covered by the
+ * other visual tests.
  */
 
 const shot = {
@@ -23,24 +20,35 @@ const shot = {
   maxDiffPixels: 0,
 } as const;
 
-const HOME = [
-  'feature-tab-strip-keeps-the-end-in-view',
-  'fix-login-loop',
-  'docs',
-];
-const OTHER = ['beam-relay-backoff', 'beam-passkey-ceremony'];
+const HOME = ['fix-login-loop', 'docs'];
+const OTHER = ['beam-relay-backoff', 'feature-tab-strip-keeps-the-end-in-view'];
+const SHELLS = ['notes', 'scratch', 'release', 'bench', 'logs'];
 
-/** Two repositories' tabs in a window narrow enough to overflow, the
- *  last one opened active, and nothing hovered. */
+/** Shells alone in their directories, one at a time so the strip
+ *  takes them in this order. */
+async function loneShells(page: Page, homeDir: string, names: string[]) {
+  for (const name of names) {
+    startLoneShells(homeDir, [name]);
+    await expect(stripTab(page, new RegExp(name))).toBeVisible({
+      timeout: 30_000,
+    });
+  }
+}
+
+/** Two repositories' chips, then lone shells, in a window narrow
+ *  enough to overflow, the last worktree opened active, and nothing
+ *  hovered. */
 async function twoReposOfTabs(
   page: Page,
   app: ElectronApplication,
+  homeDir: string,
   other: string
 ) {
   await size(app);
   for (const branch of HOME) await createWorktree(page, branch);
   await switchRepo(page, other);
   for (const branch of OTHER) await createWorktree(page, branch);
+  await loneShells(page, homeDir, SHELLS);
   await page.mouse.move(600, 500);
 }
 
@@ -91,8 +99,8 @@ test.describe('Visual (tab strip) @visual', () => {
     test('tabs of two repositories wrapped onto a second row', async ({
       desktop,
     }) => {
-      const { page, app } = desktop;
-      await twoReposOfTabs(page, app, other);
+      const { page, app, homeDir } = desktop;
+      await twoReposOfTabs(page, app, homeDir, other);
       await expect(strip(page)).toHaveScreenshot('tab-strip-wrap.png', shot);
     });
   });
@@ -107,8 +115,8 @@ test.describe('Visual (tab strip) @visual', () => {
     });
 
     test('tabs of two repositories in one row', async ({ desktop }) => {
-      const { page, app } = desktop;
-      await twoReposOfTabs(page, app, other);
+      const { page, app, homeDir } = desktop;
+      await twoReposOfTabs(page, app, homeDir, other);
       await expect(strip(page)).toHaveScreenshot('tab-strip-scroll.png', shot);
       await expect(strip(page).locator('..')).toHaveScreenshot(
         'tab-strip-controls-scroll.png',
@@ -121,45 +129,15 @@ test.describe('Visual (tab strip) @visual', () => {
     });
   });
 
-  test.describe('light, attention', () => {
-    test.use({
-      desktopPrefs: { theme: 'light', nativeFrame: false },
-      n10Config: {
-        aiCommand: fakeAgent({ stream: true, intervalMs: 120, streamMs: 6000 }),
-      },
-    });
-
-    test('shows the attention badge inside the fixed control', async ({
-      desktop,
-    }) => {
-      const { page, app } = desktop;
-      await size(app);
-      await createWorktree(page, 'worker');
-      await page.getByRole('button', { name: 'Show review sidebar' }).click();
-      await launchAgentFromRail(page);
-      await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
-        timeout: 30_000,
-      });
-      await createWorktree(page, 'elsewhere');
-      await expect(tab(page, /worker/)).toHaveClass(/tab-attention/, {
-        timeout: 30_000,
-      });
-      await expect(strip(page).locator('..')).toHaveScreenshot(
-        'tab-strip-attention-control.png',
-        shot
-      );
-    });
-  });
-
   test.describe('dark', () => {
     test.use({ desktopPrefs: { theme: 'dark', nativeFrame: false } });
 
     test('the close button over the end of a hovered tab', async ({
       desktop,
     }) => {
-      const { page, app } = desktop;
-      await twoReposOfTabs(page, app, other);
-      const hovered = tab(page, /fix-login-loop/);
+      const { page, app, homeDir } = desktop;
+      await twoReposOfTabs(page, app, homeDir, other);
+      const hovered = stripTab(page, /scratch/);
       await forceHover(page, hovered);
       await expect(
         hovered.getByRole('button', { name: 'Close tab' }).locator('..')

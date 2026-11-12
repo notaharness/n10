@@ -3,7 +3,8 @@ import { test, expect } from './fixtures/desktop.js';
 import { createWorktree, sidebarRow, switchRepo, tab } from './setup/app.js';
 import { cleanupTestRepo, createTestRepo } from './setup/git-repo.js';
 import { armContextMenuDismiss } from './setup/menu.js';
-import { carryOver, tabNames } from './setup/tab-row.js';
+import { carryOver, namedTabs, tabNames } from './setup/tab-row.js';
+import { startLoneShells } from './setup/terminals.js';
 
 /**
  * Tabs and sidebar rows are chosen as the button goes down, the way
@@ -37,9 +38,12 @@ const transformOf = (t: Locator) => t.evaluate((el) => el.style.transform);
 const LIFTED = /^translate3d\((?!0px, 0px)/;
 
 test.describe('Choosing on press', () => {
+  // A worktree and a shell alone in its directory: two tabs of their own
+  // on the strip, beta in front.
   test.beforeEach(async ({ desktop }) => {
     await createWorktree(desktop.page, 'alpha');
-    await createWorktree(desktop.page, 'beta');
+    startLoneShells(desktop.homeDir, ['beta']);
+    await tab(desktop.page, /beta/).click({ timeout: 30_000 });
     await expect(tab(desktop.page, /beta/)).toHaveAttribute(
       'aria-selected',
       'true'
@@ -87,7 +91,9 @@ test.describe('Choosing on press', () => {
     await carryOver(page, tab(page, /alpha/), tab(page, /beta/));
     await expect(tab(page, /alpha/)).toHaveAttribute('aria-selected', 'true');
     await page.mouse.up();
-    await expect.poll(() => tabNames(page)).toEqual(['beta', 'alpha']);
+    await expect
+      .poll(() => namedTabs(page, ['alpha', 'beta']))
+      .toEqual(['beta', 'alpha']);
   });
 });
 
@@ -107,11 +113,15 @@ test.describe("Choosing another repository's tab", () => {
     desktop,
   }) => {
     const { page } = desktop;
+    // Alone in its place, each tab names its repository.
     const alpha = tab(page, /^repo-alpha · alpha-work/);
-    await expect(alpha).toBeVisible();
+    await expect(alpha).toHaveAttribute('aria-selected', 'false');
     await pressAndNudge(page, alpha);
-    // The label stays stable as the chosen tab opens its repository.
+    // Chosen before the button comes up, its repository opened.
     await expect(alpha).toHaveAttribute('aria-selected', 'true');
+    await expect
+      .poll(() => page.evaluate(() => window.n10.getRepo()))
+      .toMatchObject({ cwd: desktop.repoPath });
     await expect.poll(() => transformOf(alpha)).toMatch(LIFTED);
     await page.mouse.up();
   });
@@ -121,15 +131,13 @@ test.describe("Choosing another repository's tab", () => {
   }) => {
     const { page } = desktop;
     await carryOver(page, tab(page, /alpha-work/), tab(page, /beta-work/));
-    await expect(tab(page, /^repo-alpha · alpha-work/)).toHaveAttribute(
+    await expect(tab(page, /alpha-work/)).toHaveAttribute(
       'aria-selected',
       'true'
     );
     await page.mouse.up();
     await expect
-      .poll(() =>
-        page.locator('[role="tab"] [data-tab-label] .sr-only').allTextContents()
-      )
+      .poll(() => tabNames(page))
       .toEqual(['repo-beta · beta-work', 'repo-alpha · alpha-work']);
   });
 });

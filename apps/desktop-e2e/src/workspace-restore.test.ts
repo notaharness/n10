@@ -1,18 +1,24 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { createWorktree, tab, tabs, visibleText } from './setup/app.js';
+import {
+  createWorktree,
+  openRoster,
+  stripTab,
+  tab,
+  visibleText,
+} from './setup/app.js';
 import { tmuxAvailable } from './setup/external.js';
 import { shownTerminal } from './setup/prewarm.js';
-import { LIFT, motion } from './setup/tab-row.js';
+import { LIFT, motion, tabNames } from './setup/tab-row.js';
 import { startSurvivingTerminal } from './setup/terminals.js';
 import { killFixtureSessions, killTmuxSession } from './setup/tmux.js';
 
 /**
- * The tab workspace outlives the app: its order, its pins, the groups
- * the user collapsed and the active tab come back on the next launch
+ * The tab workspace outlives the app: its order, its pins and the
+ * active tab come back on the next launch
  * from `~/.n10/workspace.json` — tabs with no agent behind them too,
  * which nothing else would reopen. A terminal tab comes back bound to
  * the same tmux session it was saved with.
@@ -24,34 +30,24 @@ const SHELL_READY = 'restore-shell-ready';
 const SHELL_AGAIN = 'restore-shell-again';
 
 const placeChip = (page: Page) => page.locator('[data-group-chip^="place:"]');
-const disclosure = (page: Page) =>
-  placeChip(page).locator('[data-group-disclosure]');
-
-/** Whole accessible labels, in strip order; painted text may be cut. */
-async function tabLabels(page: Page): Promise<string[]> {
-  return Promise.all(
-    (await tabs(page).all()).map(
-      async (item) =>
-        (await item.getAttribute('aria-label')) ??
-        (await item.locator('[data-tab-label] .sr-only').textContent()) ??
-        ''
-    )
-  );
-}
+const rosterRows = (page: Page) =>
+  page.locator('[data-group-roster] [data-roster-row]');
 
 /**
- * Lift `name`'s tab and step it right once, over `neighbour`. The
+ * Lift `name`'s tab and step it right once, over `neighbour` (the
+ * element that slides: a chip's block). The
  * sensor listens for arrows a task after the lift, so an early press
  * can go unheard; each press is given a second to show before another
  * is tried, so a slow render does not carry the tab a second step.
  */
-async function stepRightOver(page: Page, name: RegExp, neighbour: RegExp) {
+async function stepRightOver(page: Page, name: RegExp, neighbour: Locator) {
   await tab(page, name).focus();
+  await expect(tab(page, name)).toBeFocused();
   await page.keyboard.press(LIFT);
   const moved = async () => {
     try {
       await expect
-        .poll(async () => (await motion(tab(page, neighbour))).transform, {
+        .poll(async () => (await motion(neighbour)).transform, {
           timeout: 1_000,
         })
         .toMatch(/^translate3d\(-\d/);
@@ -97,69 +93,98 @@ test.describe('Workspace restore', () => {
     rmSync(folder, { recursive: true, force: true });
   });
 
-  test('restores its tabs, pins, collapsed groups and order after a restart', async ({
+  test('restores its tabs, pins and order after a restart', async ({
     desktop,
   }) => {
-    const { page, homeDir } = desktop;
+    const { page, homeDir, repoPath } = desktop;
     const shell = tab(page, new RegExp(basename(folder)));
     await expect(shell).toBeVisible({ timeout: 30_000 });
     for (const branch of ['alpha', 'beta', 'gamma'])
       await createWorktree(page, branch);
-    await expect
-      .poll(() => tabLabels(page))
-      .toEqual([basename(folder), 'alpha', 'beta', 'gamma']);
+    // The repository's three tabs stand behind one chip.
+    const repo = expect.stringContaining(basename(repoPath));
+    const shellName = expect.stringContaining(basename(folder));
+    // A pinned tab stands outside its group, so it names its place too.
+    const gamma = expect.stringContaining('gamma');
+    await expect(placeChip(page).locator('[data-group-count]')).toHaveText('3');
+    await expect.poll(() => tabNames(page)).toEqual([shellName, repo]);
 
-    // Reorder: alpha after beta, by keyboard.
-    await stepRightOver(page, /^alpha/, /^beta/);
-    await page.keyboard.press('Space');
-    await expect
-      .poll(() => tabLabels(page))
-      .toEqual([basename(folder), 'beta', 'alpha', 'gamma']);
-
-    // Pin gamma: it moves to the strip's start, out of its group.
-    await tab(page, /^gamma/).click();
+    // Pin gamma, chosen from the chip's roster: it moves to the strip's
+    // start, out of its group.
+    await openRoster(page, placeChip(page));
+    await rosterRows(page).filter({ hasText: 'gamma' }).click();
     await page.keyboard.press('Control+Alt+p');
-    await expect(page.locator('[role="tab"][data-pinned="true"]')).toHaveCount(
-      1
+    await expect(stripTab(page, /gamma/)).toHaveAttribute(
+      'data-pinned',
+      'true'
     );
-    await expect
-      .poll(() => tabLabels(page))
-      .toEqual([
-        expect.stringMatching(/ · gamma$/),
-        basename(folder),
-        'beta',
-        'alpha',
-      ]);
-
-    // The host has written that down.
+    await expect(placeChip(page).locator('[data-group-count]')).toHaveText('2');
     await expect
       .poll(() => (saved(homeDir)?.pinned as string[] | undefined)?.length)
       .toBe(1);
 
-    // Collapse the repository's group, beta and alpha behind its chip,
-    // and quit at once: the save is still waiting out its debounce, and
-    // only the host's shutdown writes it.
-    await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'true');
-    await disclosure(page).click();
-    await expect(disclosure(page)).toHaveAttribute('aria-expanded', 'false');
-    await expect(tab(page, /^beta/)).toHaveCount(0);
+    // Beta before alpha inside the chip: its row dropped on alpha's.
+    await openRoster(page, placeChip(page));
+    const [alpha, beta] = await Promise.all(
+      [/^alpha/, /^beta/].map((name) =>
+        rosterRows(page).filter({ hasText: name }).boundingBox()
+      )
+    );
+    await page.mouse.move(
+      beta!.x + beta!.width / 2,
+      beta!.y + beta!.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(alpha!.x + alpha!.width / 2, alpha!.y + 6, {
+      steps: 15,
+    });
+    await page.mouse.up();
+    await expect(rosterRows(page)).toHaveText([/^beta/, /^alpha/]);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-group-roster]')).toHaveCount(0);
+
+    // Reorder: the shell after the repository's chip, by keyboard, and
+    // quit at once: the save is still waiting out its debounce, and only
+    // the host's shutdown writes it.
+    await stepRightOver(
+      page,
+      new RegExp(basename(folder)),
+      placeChip(page).locator('xpath=..')
+    );
+    await page.keyboard.press('Space');
+    await expect.poll(() => tabNames(page)).toEqual([gamma, repo, shellName]);
     await desktop.relaunch();
     const next = desktop.page;
+    // The notice is a toast that leaves after a few seconds: note any,
+    // from the start, to ask about once the tabs have settled.
+    await next.evaluate(() => {
+      const w = window as { goneNotice?: boolean };
+      const look = () => {
+        if (document.body.textContent?.includes('no longer available'))
+          w.goneNotice = true;
+      };
+      look();
+      new MutationObserver(look).observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    });
 
-    const pinned = next.locator('[role="tab"][data-pinned="true"]');
-    await expect(pinned).toHaveCount(1, { timeout: 30_000 });
-    await expect(pinned).toHaveAttribute('aria-selected', 'true');
-    await expect(disclosure(next)).toHaveAttribute('aria-expanded', 'false');
-    await expect(tab(next, /^beta/)).toHaveCount(0);
-    await disclosure(next).click();
-    await expect
-      .poll(() => tabLabels(next))
-      .toEqual([
-        expect.stringMatching(/ · gamma$/),
-        basename(folder),
-        'beta',
-        'alpha',
-      ]);
+    await expect(stripTab(next, /gamma/)).toHaveAttribute(
+      'data-pinned',
+      'true',
+      {
+        timeout: 30_000,
+      }
+    );
+    await expect(stripTab(next, /gamma/)).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await expect.poll(() => tabNames(next)).toEqual([gamma, repo, shellName]);
+    await openRoster(next, placeChip(next));
+    await expect(rosterRows(next)).toHaveText([/^beta/, /^alpha/]);
+    await next.keyboard.press('Escape');
 
     // The terminal tab is bound to the session it was saved with: it
     // shows that session, once, and is not waiting to reconnect.
@@ -168,6 +193,13 @@ test.describe('Workspace restore', () => {
     await restored.click();
     await expect(next.locator('[data-terminal-reconnecting]')).toHaveCount(0);
     await expect(shownTerminal(next)).toContainText(SHELL_READY);
+    // Bound, not given up and opened again at the end of the strip: no
+    // notice said it went.
+    expect(
+      await next.evaluate(
+        () => (window as { goneNotice?: boolean }).goneNotice ?? false
+      )
+    ).toBe(false);
   });
 
   // tmux reuses a name once its session has gone: the tab saved for the

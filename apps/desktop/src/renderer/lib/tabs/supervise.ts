@@ -1,7 +1,6 @@
 import { panesOf, replacePane, type Edge } from './layout.js';
 import { canSplit, MIN_PANE } from './layout-geometry.js';
 import { splitPane } from './pane-moves.js';
-import { chooseCollapsed } from './tab-order.js';
 import type { Tab } from './tab-identity.js';
 import type { Following, PaneId, PaneNode, Workspace } from './workspace.js';
 
@@ -59,8 +58,8 @@ function paneById(ws: Workspace, id: PaneId): PaneNode | undefined {
  * Tile a group: `players` leave pane `pane` for a new pane on its
  * `edge`, in their order, and the home stays. The new pane shows the
  * player the source showed when one moved, else the first; the source
- * shows the home and keeps focus. The group expands everywhere, so the
- * players are in sight.
+ * shows the home and keeps focus. In the new pane the players show as
+ * their group's chip.
  */
 export function tileGroup(
   ws: Workspace,
@@ -88,7 +87,6 @@ export function tileGroup(
       activeId: tile.home,
     }),
     focusedPane: tile.pane,
-    collapsed: chooseCollapsed(split.collapsed, [tile.key], false),
   };
 }
 
@@ -99,8 +97,8 @@ export function followerOf(ws: Workspace, key: string): PaneId | undefined {
 
 /**
  * Follow group `key` from pane `pane`: those of `ids` the pane holds go
- * to a new pane on its `edge`, which follows them and shows `show`, its
- * group expanded so every tab it follows is in sight. Focus stays where
+ * to a new pane on its `edge`, which follows them and shows `show`
+ * behind their group's chip there. Focus stays where
  * it is, and so does whatever the focused pane shows. One pane follows a
  * group at most; a second request is refused.
  */
@@ -132,7 +130,6 @@ export function followGroup(
       activeId: follow.show,
     }),
     follows: { ...split.follows, [added.id]: { key: follow.key, ids } },
-    collapsed: chooseCollapsed(split.collapsed, [follow.key], false),
   };
 }
 

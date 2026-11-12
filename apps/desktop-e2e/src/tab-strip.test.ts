@@ -17,7 +17,8 @@ import {
   armContextMenuPeek,
   clickAppMenuItem,
 } from './setup/menu.js';
-import { LIFT, motion, tabNames } from './setup/tab-row.js';
+import { LIFT, motion, namedTabs } from './setup/tab-row.js';
+import { startLoneShells } from './setup/terminals.js';
 
 /**
  * How the tab strip lays its tabs out: what it does with more than fit,
@@ -25,7 +26,8 @@ import { LIFT, motion, tabNames } from './setup/tab-row.js';
  * the close button over the end of the tab.
  */
 
-/** Seven tabs whose names, at full width, take more than one row. */
+/** Seven tabs whose names, at full width, take more than one row: shells
+ *  each alone in a directory, so each stands on the strip. */
 const MANY = [
   'feature-tab-strip-wrap',
   'fix-login-redirect-loop',
@@ -65,9 +67,17 @@ async function box(l: Locator) {
 const moveAway = (page: Page) => page.mouse.move(700, 600);
 
 test.describe('Tab strip overflow', () => {
+  const tabNames = (page: Page) => namedTabs(page, MANY);
+  /** The tabs' order as they opened. */
+  let order: string[] = [];
   test.beforeEach(async ({ desktop }) => {
-    for (const branch of MANY) await createWorktree(desktop.page, branch);
-    await expect.poll(() => tabNames(desktop.page)).toEqual(MANY);
+    startLoneShells(desktop.homeDir, MANY);
+    await expect
+      .poll(async () => (await tabNames(desktop.page)).sort(), {
+        timeout: 30_000,
+      })
+      .toEqual([...MANY].sort());
+    order = await tabNames(desktop.page);
   });
 
   test('wraps onto more rows by default, and scrolls one row once a tab menu says so', async ({
@@ -97,8 +107,8 @@ test.describe('Tab strip overflow', () => {
     desktop,
   }) => {
     const { page } = desktop;
-    const last = tab(page, /spike-front-truncation/);
-    const first = tab(page, /feature-tab-strip-wrap/);
+    const last = tab(page, new RegExp(order.at(-1)!));
+    const first = tab(page, new RegExp(order[0]!));
     const [from, to] = await Promise.all([box(last), box(first)]);
     expect(from.y).toBeGreaterThan(to.y);
 
@@ -110,37 +120,114 @@ test.describe('Tab strip overflow', () => {
     await page.mouse.up();
     await expect
       .poll(() => tabNames(page))
-      .toEqual(['spike-front-truncation', ...MANY.slice(0, -1)]);
+      .toEqual([order.at(-1), ...order.slice(0, -1)]);
   });
 
-  test('wrapped rows stay inside the fixed control rail', async ({
+  test('keeps All tabs at the first row’s end, and later rows run to the strip’s edge, across a resize', async ({
     desktop,
   }) => {
-    const { page } = desktop;
-    const edges = await tabs(page).evaluateAll((els) =>
-      els.map((el) => {
-        const r = el.getBoundingClientRect();
-        return { top: Math.round(r.top), right: r.right };
-      })
+    const { page, app } = desktop;
+    /** Each row's top and right end, the All tabs button's box and the
+     *  strip's right edge. */
+    const layout = async () => {
+      const edges = await tabs(page).evaluateAll((els) =>
+        els.map((el) => {
+          const r = el.getBoundingClientRect();
+          return { top: Math.round(r.top), right: r.right };
+        })
+      );
+      const ends = new Map<number, number>();
+      for (const e of edges)
+        ends.set(e.top, Math.max(ends.get(e.top) ?? 0, e.right));
+      const stripBox = await box(strip(page));
+      const control = await box(page.getByRole('button', { name: 'All tabs' }));
+      return {
+        rows: [...ends.entries()].sort(([a], [b]) => a - b),
+        right: stripBox.x + stripBox.width,
+        control,
+      };
+    };
+    const check = async () => {
+      const { rows: ends, right, control } = await layout();
+      expect(ends.length).toBeGreaterThan(2);
+      const [first, ...below] = ends;
+      // On the first row, after its last tab.
+      expect(Math.round(control.y)).toBe(first![0]);
+      expect(first![1]).toBeLessThanOrEqual(control.x + 0.5);
+      // Every full row below it (all but the last) runs on under where
+      // the button would be, to the strip's edge.
+      for (const [, end] of below.slice(0, -1)) {
+        expect(end).toBeGreaterThan(control.x + control.width - 1);
+        expect(end).toBeLessThanOrEqual(right + 0.5);
+      }
+    };
+    // Narrow enough for three rows.
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]!;
+      window.setMinimumSize(0, 0);
+      window.setContentSize(1000, 700);
+    });
+    await expect(check).toPass();
+    // Narrower: the rows break elsewhere, and the button keeps to the
+    // first one's end.
+    const before = (await layout()).right;
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]!;
+      const [w, h] = window.getContentSize();
+      window.setContentSize(w! - 157, h!);
+    });
+    await expect
+      .poll(async () => (await layout()).right)
+      .toBeLessThan(before - 100);
+    await expect(check).toPass();
+  });
+
+  test('keeps All tabs beside the wrapped tablist, in sight while its rows scroll', async ({
+    desktop,
+  }) => {
+    const { page, app } = desktop;
+    const control = page.getByRole('button', { name: 'All tabs' });
+    // Not one of the tablist's: a tablist owns tabs.
+    await expect(
+      strip(page).getByRole('button', { name: 'All tabs' })
+    ).toHaveCount(0);
+    // Short enough that the rows hit the strip's height cap and scroll.
+    await app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0]!;
+      window.setMinimumSize(0, 0);
+      window.setContentSize(700, 260);
+    });
+    await expect
+      .poll(() =>
+        strip(page).evaluate((el) => el.scrollHeight - el.clientHeight)
+      )
+      .toBeGreaterThan(0);
+    await strip(page).evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    await expect
+      .poll(() => strip(page).evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
+    const [track, button] = await Promise.all([box(strip(page)), box(control)]);
+    expect(Math.round(button.y)).toBe(Math.round(track.y));
+    // Left of the track's scrollbar.
+    const scrollbar = await strip(page).evaluate(
+      (el) => (el as HTMLElement).offsetWidth - el.clientWidth
     );
-    const ends = new Map<number, number>();
-    for (const e of edges) ends.set(e.top, e.right);
-    const stripBox = await box(strip(page));
-    const stripRight = stripBox.x + stripBox.width;
-    const control = await box(page.getByRole('button', { name: 'All tabs' }));
-    expect(control.x).toBeGreaterThanOrEqual(stripRight);
-    const rowEnds = [...ends.values()];
-    expect(rowEnds.length).toBeGreaterThan(1);
-    for (const end of rowEnds) expect(end).toBeLessThanOrEqual(stripRight);
-    expect(rowEnds.at(-1)).toBeLessThan(stripRight - 40);
+    expect(button.x + button.width).toBeLessThanOrEqual(
+      track.x + track.width - scrollbar + 0.5
+    );
+    await expect(control).toBeInViewport();
+    await control.click();
+    await expect(page.getByRole('dialog', { name: 'All tabs' })).toBeVisible();
   });
 
   test('over the room after the last tab, a dragged tab opens the end slot and drops there', async ({
     desktop,
   }) => {
     const { page } = desktop;
-    const first = tab(page, /feature-tab-strip-wrap/);
-    const last = tab(page, /spike-front-truncation/);
+    const first = tab(page, new RegExp(order[0]!));
+    const last = tab(page, new RegExp(order.at(-1)!));
     const [from, to] = await Promise.all([box(first), box(last)]);
     expect(to.y).toBeGreaterThan(from.y);
 
@@ -155,7 +242,7 @@ test.describe('Tab strip overflow', () => {
     await page.mouse.up();
     await expect
       .poll(() => tabNames(page))
-      .toEqual([...MANY.slice(1), 'feature-tab-strip-wrap']);
+      .toEqual([...order.slice(1), order[0]]);
   });
 
   test('lifted by keyboard from the end of the first row, a tab goes down into the second', async ({
@@ -167,7 +254,7 @@ test.describe('Tab strip overflow', () => {
     );
     const end = tops.lastIndexOf(tops[0]!);
     expect(end).toBeLessThan(MANY.length - 1);
-    const name = MANY[end]!;
+    const name = order[end]!;
     const t = tab(page, new RegExp(name));
     await t.focus();
     await page.keyboard.press(LIFT);
@@ -234,14 +321,10 @@ const fitsItsBox = (t: Locator) =>
 const TITLE =
   'Handle cancelled requests without leaving the half-written cache entry behind';
 
-/** The tab whose full accessible label ends with its primary name. */
+/** The tab whose accessible name has the whole of `name`: alone in its
+ *  place, a tab's name starts with the place's. */
 const namedTab = (page: Page, name: string) =>
-  tab(
-    page,
-    new RegExp(
-      `(?:^| · )${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: Close tab)?$`
-    )
-  );
+  tab(page, new RegExp(`${name}\\b`));
 
 test.describe('Tab labels', () => {
   test('a name too long for its tab loses its front, and a screen reader hears it whole', async ({
@@ -258,15 +341,16 @@ test.describe('Tab labels', () => {
     expect(shown.length).toBeLessThan(LONG.length);
     expect(await fitsItsBox(t)).toBe(true);
     // A sighted reader gets the whole of it too, on hover.
-    await expect(t).toHaveAttribute('title', new RegExp(LONG));
+    await expect(t).toHaveAttribute('title', new RegExp(`· ${LONG}$`, 'm'));
   });
 
+  // Alone, with no chip, a tab names its place first; the place gives
+  // way to the name when room is short.
   test('a name that fits is shown whole', async ({ desktop }) => {
     const { page } = desktop;
     await createWorktree(page, 'docs');
     const t = namedTab(page, 'docs');
-    await expect(shownLabel(t)).toHaveText(/(?:^| · )docs$/);
-    await expect(t).toHaveAttribute('title', /docs/);
+    await expect(shownLabel(t)).toHaveText(/ · docs$/);
   });
 });
 
@@ -355,13 +439,16 @@ test.describe('Close button on a tab asking for attention', () => {
   });
 
   test('keeps its cover opaque through the blink', async ({ desktop }) => {
-    const { page } = desktop;
+    const { page, homeDir } = desktop;
     await createWorktree(page, 'worker');
     await launchAgentFromRail(page);
     await expect(page.getByText('n10-fake-agent-ready').first()).toBeVisible({
       timeout: 30_000,
     });
-    await createWorktree(page, 'elsewhere');
+    // Look away, at a shell alone in its directory: the worker stays a
+    // tab of its own.
+    startLoneShells(homeDir, ['elsewhere']);
+    await tab(page, /elsewhere/).click({ timeout: 30_000 });
     const worker = tab(page, /worker/);
     await expect(worker).toHaveClass(/tab-attention/, { timeout: 30_000 });
 
@@ -394,9 +481,11 @@ test.describe('Close button', () => {
   test('the label runs to the end of the tab, and the close button covers it only on hover', async ({
     desktop,
   }) => {
-    const { page } = desktop;
+    const { page, homeDir } = desktop;
     await createWorktree(page, LONG);
-    await createWorktree(page, 'docs');
+    // Another tab of its own to make active, a shell alone in its place.
+    startLoneShells(homeDir, ['docs']);
+    await tab(page, /docs/).click({ timeout: 30_000 });
     // Not the active tab: that one used to keep its close button shown.
     const t = namedTab(page, LONG);
     const close = t.getByRole('button', { name: 'Close tab' });

@@ -80,21 +80,27 @@ export interface TabsApi extends Strip {
   /** Close every unpinned tab; `repo` is the one in view. */
   closeAll: (repo?: string) => void;
   closeActive: () => void;
-  /** Drag-reorder within a group: place `ids` before or after
-   *  `targetId`. */
+  /** A drop on the strip or a roster: place `ids` before or after
+   *  `targetId`, in its pane. */
   moveTabs: (
     ids: readonly string[],
     targetId: string,
-    side: 'before' | 'after'
+    side: 'before' | 'after',
+    /** Into another pane: its whole order as shown (`StripDrop`). */
+    order?: readonly string[]
   ) => void;
   /** Drag-reorder among blocks: the strip's tabs in this order. */
   arrangeTabs: (ids: readonly string[]) => void;
-  /** Collapse or expand the groups `keys` name. */
-  setCollapsed: (keys: readonly string[], collapsed: boolean) => void;
   /** Name a group, by affiliation key; `null` restores its label. */
   renameGroup: (key: string, name: string | null) => void;
-  assignCollisionOrdinals: (values: Readonly<Record<string, { base: string; ordinal: number }>>) => void;
-  assignChipOrdinals: (values: Readonly<Record<string, { label: string; ordinal: number; home?: boolean }>>) => void;
+  assignCollisionOrdinals: (
+    values: Readonly<Record<string, { base: string; ordinal: number }>>
+  ) => void;
+  assignChipOrdinals: (
+    values: Readonly<
+      Record<string, { label: string; ordinal: number; home?: boolean }>
+    >
+  ) => void;
   /**
    * Reconcile the strip with the current sidebar items *and* the host's
    * terminal listing, in one step: follow re-keyed items, open a tab
@@ -170,14 +176,14 @@ export function tabsActions(
     closeOthers: (id) => dispatch({ type: 'close-others', id }),
     closeAll: (repo) => dispatch({ type: 'close-all', repo }),
     closeActive: () => dispatch({ type: 'close-active' }),
-    moveTabs: (ids, targetId, side) =>
-      dispatch({ type: 'move', ids, targetId, side }),
+    moveTabs: (ids, targetId, side, order) =>
+      dispatch({ type: 'move', ids, targetId, side, order }),
     arrangeTabs: (ids) => dispatch({ type: 'arrange', ids }),
-    setCollapsed: (keys, collapsed) =>
-      dispatch({ type: 'set-collapsed', keys, collapsed }),
     renameGroup: (key, name) => dispatch({ type: 'rename-group', key, name }),
-    assignCollisionOrdinals: (values) => dispatch({ type: 'assign-collision-ordinals', values }),
-    assignChipOrdinals: (values) => dispatch({ type: 'assign-chip-ordinals', values }),
+    assignCollisionOrdinals: (values) =>
+      dispatch({ type: 'assign-collision-ordinals', values }),
+    assignChipOrdinals: (values) =>
+      dispatch({ type: 'assign-chip-ordinals', values }),
     syncItems: (repo, listings) =>
       dispatch({ type: 'sync-items', repo, ...listings }),
     repoOpened: (repo) => dispatch({ type: 'repo-opened', repo }),

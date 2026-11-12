@@ -3,6 +3,7 @@ import type { ClientRect, DragEndEvent, Modifier } from '@dnd-kit/core';
 import {
   restrictToHorizontalAxis,
   restrictToParentElement,
+  restrictToVerticalAxis,
 } from '@dnd-kit/modifiers';
 import { getEventCoordinates } from '@dnd-kit/utilities';
 import { usePrefersReducedMotion } from '../../lib/reduced-motion.js';
@@ -14,8 +15,7 @@ import { dropMove, isStripDragData } from './strip-drag.js';
  * the pointer (`CarriedOverlay`), its own place left standing, faded, in
  * its strip, and, over another pane's strip, the slot it would land in
  * there. Inside its own strip a drag is as it always was: the tab itself
- * moves, held inside the strip (a member inside its group), and its
- * neighbours make way.
+ * moves, held inside the strip, and its neighbours make way.
  */
 
 interface Point {
@@ -156,8 +156,8 @@ export function useLanding(pane: string, id: string): Landing | null {
 
 /**
  * The strip's modifier: a dragged tab is held inside its strip (past its
- * end it would widen a scrolling box that auto-scroll then chases), a
- * member inside its group, and to its row when the strip scrolls, until
+ * end it would widen a scrolling box that auto-scroll then chases), and
+ * to its row when the strip scrolls, until
  * it is carried out of the strip, when the copy under the pointer goes
  * where the pointer does. The same rule as `carriedOut`, from the
  * drag's own coordinates.
@@ -168,15 +168,14 @@ export const holdInStrip =
     const { active, activatorEvent, transform } = args;
     const start = activatorEvent ? getEventCoordinates(activatorEvent) : null;
     const at = start && { x: start.x + transform.x, y: start.y + transform.y };
-    if (carriedOut(active?.data.current, at)) return transform;
-    const held = wrap
-      ? args
-      : { ...args, transform: restrictToHorizontalAxis(args) };
+    const data = active?.data.current;
+    if (carriedOut(data, at)) return transform;
+    // A roster's rows stand in a column; a wrapped strip's tabs in rows.
+    const row = isStripDragData(data) && data.row !== undefined;
+    const axis = row ? restrictToVerticalAxis : restrictToHorizontalAxis;
+    const held = wrap && !row ? args : { ...args, transform: axis(args) };
     return restrictToParentElement(held);
   };
-
-/** Room between blocks on the strip (its `gap-2`). */
-const GAP_PX = 8;
 
 /**
  * What sortable place `id` adds to its style: a slot opened on the side
@@ -195,13 +194,19 @@ export function useSlotStyle(
   const landing = useLanding(pane, id);
   const out = useCarriedOut();
   const still = usePrefersReducedMotion();
-  const room = landing ? `${landing.width + GAP_PX}px` : undefined;
+  // Tabs touch on the strip: the slot is as wide as what lands. After
+  // the block ending a wrapped strip's first row, it comes on top of
+  // the room kept there for the strip's actions (`strip-first-row.ts`).
+  const room = landing ? `${landing.width}px` : undefined;
+  const roomAfter = landing
+    ? `calc(var(--row-end-reserve, 0px) + ${landing.width}px)`
+    : undefined;
   return (dragging, transform, transition) => ({
     // Carried out, the tab stays in its place: moved with the pointer
     // before the copy is up, it would widen its strip.
     transform: dragging && out ? undefined : transform,
     marginInlineStart: landing?.side === 'before' ? room : undefined,
-    marginInlineEnd: landing?.side === 'after' ? room : undefined,
+    marginInlineEnd: landing?.side === 'after' ? roomAfter : undefined,
     opacity: dragging && out ? 0.4 : undefined,
     transition: still
       ? transition

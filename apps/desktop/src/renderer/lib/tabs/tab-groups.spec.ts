@@ -3,12 +3,11 @@ import { placeAffiliation } from '@n10/core/ui';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-  expandsOnShow,
-  initiallyCollapsed,
-  isCollapsed,
+  homeOpenAmong,
   present,
   presentedIds,
   statusCounts,
+  stopOf,
   statusFromActivity,
   tabStopOf,
   type TabFacts,
@@ -49,7 +48,8 @@ const place = (path: string) => placeAffiliation(path);
 /** Tabs named by their session, each with the affiliation given. */
 function strip(
   entries: [string, Affiliation | null][],
-  pinned: readonly string[] = []
+  pinned: readonly string[] = [],
+  orchestratorsFirst = false
 ) {
   const tabs = entries.map(([name]) =>
     name === 'settings' ? settings : terminal(name)
@@ -59,7 +59,7 @@ function strip(
     tab.kind === 'terminal'
       ? { affiliation: of.get(tab.name) ?? null, session: tab.name }
       : { affiliation: null };
-  return present(tabs, facts, pinned.map(terminalTabId));
+  return present(tabs, facts, pinned.map(terminalTabId), orchestratorsFirst);
 }
 const shape = (groups: ReturnType<typeof present>) =>
   groups.map((g) => ({
@@ -83,7 +83,7 @@ describe('present with pins', () => {
     expect(shape(groups)).toEqual([
       { key: 'pin:terminal:a1', head: null, tabs: ['a1'], chipped: false },
       { key: 'pin:terminal:p2', head: null, tabs: ['p2'], chipped: false },
-      { key: 'codex:x', head: null, tabs: ['p1'], chipped: true },
+      { key: 'codex:x', head: null, tabs: ['p1'], chipped: false },
       { key: 'place:/a', head: null, tabs: ['a2'], chipped: false },
     ]);
     expect(groups.slice(0, 2).every((g) => g.pinned)).toBe(true);
@@ -91,20 +91,37 @@ describe('present with pins', () => {
     expect(presentedIds(groups)[0]).toBe('terminal:a1');
   });
 
-  it('leaves a stand-in for the rest of a group whose home is pinned', () => {
+  it('leaves the rest of a group whose home is pinned, headless, a chip from two tabs', () => {
     const groups = strip(
       [
         ['conductor', parent('claude:c', 'conductor')],
         ['p1', parent('claude:c', 'conductor')],
+        ['p2', parent('claude:c', 'conductor')],
       ],
       ['conductor']
     );
     expect(shape(groups)[1]).toEqual({
       key: 'claude:c',
       head: null,
-      tabs: ['p1'],
+      tabs: ['p1', 'p2'],
       chipped: true,
     });
+  });
+
+  it('finds a headless group’s home among other tabs: pinned, or another pane’s', () => {
+    const facts = (tab: Tab): TabFacts =>
+      tab.kind === 'terminal'
+        ? { affiliation: parent('claude:c', 'conductor'), session: tab.name }
+        : { affiliation: null };
+    const group = { affiliation: parent('claude:c', 'conductor') };
+    const players = [terminal('p1'), terminal('p2')];
+    expect(
+      homeOpenAmong(group, [...players, terminal('conductor')], facts)
+    ).toBe(true);
+    expect(homeOpenAmong(group, players, facts)).toBe(false);
+    expect(
+      homeOpenAmong({ affiliation: parent('codex:x') }, players, facts)
+    ).toBe(false);
   });
 
   it('puts an unpinned tab back in its group where it was', () => {
@@ -141,6 +158,32 @@ describe('present', () => {
     ]);
   });
 
+  it('walks a chip’s tabs in its roster’s order: a player’s own tab right after it', () => {
+    const worktree = (name: string): Tab => ({
+      id: `item:${name}`,
+      kind: 'item',
+      repo: '/r',
+      itemKey: `branch:${name}`,
+      preview: false,
+      worktree: `/r/wt/${name}`,
+    });
+    const aShell = terminal('a-shell');
+    if (aShell.kind === 'terminal') aShell.cwd = '/r/wt/a';
+    const conductor = terminal('conductor');
+    const tabs = [conductor, aShell, worktree('b'), worktree('a')];
+    const affiliation = parent('claude:c', 'conductor');
+    const facts = (tab: Tab): TabFacts => ({
+      affiliation,
+      session: tab.kind === 'terminal' ? tab.name : undefined,
+    });
+    expect(presentedIds(present(tabs, facts))).toEqual([
+      'terminal:conductor',
+      'item:b',
+      'item:a',
+      'terminal:a-shell',
+    ]);
+  });
+
   it('heads a parent group with its home’s tab, wherever it sits', () => {
     const groups = strip([
       ['p1', parent('claude:c', 'conductor')],
@@ -156,19 +199,62 @@ describe('present', () => {
     ]);
   });
 
-  it('keeps a chip for a parent with one tab, none for a place with one', () => {
+  it('chips a group of two tabs or more, a parent’s or a place’s, and no group of one', () => {
     const groups = strip([
       ['only', parent('codex:x')],
       ['notes', place('/notes')],
+      ['conductor', parent('claude:c', 'conductor')],
+      ['p1', parent('claude:c', 'conductor')],
+      ['a1', place('/a')],
+      ['a2', place('/a')],
     ]);
-    expect(groups.map((g) => g.chipped)).toEqual([true, false]);
+    expect(groups.map((g) => g.chipped)).toEqual([false, false, true, true]);
+  });
+
+  it('leads with the groups orchestrators head while the pane is not arranged by hand', () => {
+    const entries: [string, Affiliation | null][] = [
+      ['notes', place('/notes')],
+      ['p1', parent('codex:x')],
+      ['solo', parent('claude:s', 'solo')],
+      ['conductor', parent('claude:c', 'conductor')],
+      ['c1', parent('claude:c', 'conductor')],
+    ];
+    expect(strip(entries, [], true).map((g) => g.key)).toEqual([
+      'claude:s',
+      'claude:c',
+      'place:/notes',
+      'codex:x',
+    ]);
+    expect(strip(entries).map((g) => g.key)).toEqual([
+      'place:/notes',
+      'codex:x',
+      'claude:s',
+      'claude:c',
+    ]);
+  });
+
+  it('keeps pinned tabs ahead of the orchestrators it leads with', () => {
+    const groups = strip(
+      [
+        ['notes', place('/notes')],
+        ['conductor', parent('claude:c', 'conductor')],
+      ],
+      ['notes'],
+      true
+    );
+    expect(groups.map((g) => g.key)).toEqual([
+      'pin:terminal:notes',
+      'claude:c',
+    ]);
   });
 
   it('puts a group whose home reports to another right after that one’s', () => {
     const groups = strip([
       ['sub', parent('codex:sub', 'sub', 'claude:top')],
+      ['sub2', parent('codex:sub', 'sub', 'claude:top')],
       ['a', place('/a')],
       ['top', parent('claude:top', 'top')],
+      ['top2', parent('claude:top', 'top')],
       ['b', place('/b')],
     ]);
     expect(groups.map((g) => g.key)).toEqual([
@@ -186,6 +272,7 @@ describe('present', () => {
       ['leaf', sub],
       ['other', place('/other')],
       ['top', parent('claude:top', 'top')],
+      ['top2', parent('claude:top', 'top')],
       ['sub', sub],
     ]);
     expect(groups.map((g) => [g.key, g.behind])).toEqual([
@@ -195,10 +282,26 @@ describe('present', () => {
     ]);
   });
 
+  it('places a group of one tab by its own order, following no one', () => {
+    const groups = strip([
+      ['sub', parent('codex:sub', 'sub', 'claude:top')],
+      ['a', place('/a')],
+      ['top', parent('claude:top', 'top')],
+      ['top2', parent('claude:top', 'top')],
+    ]);
+    expect(groups.map((g) => [g.key, g.behind])).toEqual([
+      ['codex:sub', undefined],
+      ['place:/a', undefined],
+      ['claude:top', undefined],
+    ]);
+  });
+
   it('breaks a cycle of parents at the group that comes first', () => {
     const groups = strip([
       ['x', parent('codex:x', 'x', 'codex:y')],
+      ['x2', parent('codex:x', 'x', 'codex:y')],
       ['y', parent('codex:y', 'y', 'codex:x')],
+      ['y2', parent('codex:y', 'y', 'codex:x')],
     ]);
     expect(groups.map((g) => g.key)).toEqual(['codex:x', 'codex:y']);
   });
@@ -206,48 +309,34 @@ describe('present', () => {
   it('puts a follower of a cycle after the cycle’s first member', () => {
     const groups = strip([
       ['c', parent('codex:c', 'c', 'codex:a')],
+      ['c2', parent('codex:c', 'c', 'codex:a')],
       ['a', parent('codex:a', 'a', 'codex:b')],
+      ['a2', parent('codex:a', 'a', 'codex:b')],
       ['b', parent('codex:b', 'b', 'codex:a')],
+      ['b2', parent('codex:b', 'b', 'codex:a')],
     ]);
     expect(groups.map((g) => g.key)).toEqual(['codex:a', 'codex:c', 'codex:b']);
   });
 });
 
-describe('collapse', () => {
-  const [group] = strip([
-    ['a1', place('/a')],
-    ['a2', place('/a')],
-  ]);
-  it('starts a parent group collapsed and a place group expanded', () => {
-    expect(initiallyCollapsed(parent('codex:x'))).toBe(true);
-    expect(initiallyCollapsed(place('/a'))).toBe(false);
-    expect(initiallyCollapsed(null)).toBe(false);
-    expect(isCollapsed(group!, {})).toBe(false);
-    const [players] = strip([
-      ['p1', parent('codex:x')],
-      ['p2', parent('codex:x')],
-    ]);
-    expect(isCollapsed(players!, {})).toBe(true);
-    expect(isCollapsed(players!, { 'codex:x': false })).toBe(false);
-  });
-  it('follows the user’s choice for a chipped group only', () => {
-    expect(isCollapsed(group!, { 'place:/a': true })).toBe(true);
-    const [single] = strip([['notes', place('/notes')]]);
-    expect(isCollapsed(single!, { 'place:/notes': true })).toBe(false);
-  });
-});
-
 describe('tabStopOf', () => {
-  const presented = ['a', 'h', 'p1', 'p2', 'p3', 'z'];
-  it('is the active tab when it shows', () => {
-    expect(tabStopOf(presented, presented, 'p2')).toBe('p2');
+  const groups = strip([
+    ['solo', place('/solo')],
+    ['h', parent('claude:x', 'h')],
+    ['p1', parent('claude:x')],
+    ['p2', parent('claude:x')],
+    ['z', place('/z')],
+  ]);
+  it('is the active tab when it stands alone', () => {
+    expect(tabStopOf(groups, terminalTabId('z'))).toBe(terminalTabId('z'));
   });
-  it('is the shown tab nearest an active one behind a collapsed chip', () => {
-    expect(tabStopOf(presented, ['a', 'h', 'z'], 'p1')).toBe('h');
-    expect(tabStopOf(presented, ['a', 'z'], 'p3')).toBe('z');
+  it('is its group’s chip for a member, home or player', () => {
+    expect(tabStopOf(groups, terminalTabId('p2'))).toBe('chip:claude:x');
+    expect(tabStopOf(groups, terminalTabId('h'))).toBe('chip:claude:x');
   });
-  it('is the first shown with no active tab', () => {
-    expect(tabStopOf(presented, ['h', 'z'], null)).toBe('h');
+  it('is the first block with no active tab', () => {
+    expect(tabStopOf(groups, null)).toBe(terminalTabId('solo'));
+    expect(stopOf(groups[0]!)).toBe(terminalTabId('solo'));
   });
 });
 
@@ -328,35 +417,18 @@ describe('present (properties)', () => {
           }
           return false;
         };
+        const chipped = new Set(
+          groups.filter((g) => g.chipped).map((g) => g.key)
+        );
         const misplaced = groups.filter((g) => {
           const up = parentOf.get(g.key);
           if (!up || !at.has(up) || reaches(up, g.key)) return false;
+          // Only a chip follows a chip.
+          if (!chipped.has(g.key) || !chipped.has(up)) return false;
           return at.get(up)! > at.get(g.key)!;
         });
         expect(misplaced.map((g) => g.key)).toEqual([]);
       })
     );
-  });
-});
-
-describe('expandsOnShow', () => {
-  const was = { id: 'a', group: 'g' };
-  const now = { id: 'b', group: 'h' };
-  const state = { collapsed: true, hidden: true, focused: true };
-
-  it('expands the collapsed group of a tab activated in the focused pane', () => {
-    expect(expandsOnShow(was, now, state)).toBe('h');
-    expect(expandsOnShow(was, now, { ...state, collapsed: false })).toBeNull();
-  });
-
-  it('expands nothing in a pane that changed in the background', () => {
-    expect(expandsOnShow(was, now, { ...state, focused: false })).toBeNull();
-  });
-
-  it('expands a collapsed group the active tab joined behind its chip', () => {
-    const joined = { id: 'a', group: 'h' };
-    expect(expandsOnShow(was, joined, state)).toBe('h');
-    expect(expandsOnShow(was, joined, { ...state, hidden: false })).toBeNull();
-    expect(expandsOnShow(was, was, state)).toBeNull();
   });
 });

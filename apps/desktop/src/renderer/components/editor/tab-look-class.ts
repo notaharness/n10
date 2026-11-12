@@ -6,17 +6,32 @@ import { tabStateClassName } from './tab-marks.js';
  * and the copy that follows the pointer out of it (`CarriedOverlay`).
  */
 
-export const CHIP_BODY =
-  'flex h-full min-w-0 items-center gap-1.5 pr-1 text-[13px] leading-5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset';
-
-/** A chip's frame, in the active colours when its group holds the
- *  active tab. */
-export function chipClassName(containsActive: boolean): string {
+/** A chip is drawn as a tab is: the active tab's colours while its
+ *  group holds the active tab, blinking while its group has news, and
+ *  lit while a tab behind it is unseen (`chipSignal`). */
+export function chipClassName({
+  containsActive,
+  flashing,
+  unseen = false,
+  dragging,
+  wrap,
+}: {
+  containsActive: boolean;
+  flashing: boolean;
+  unseen?: boolean;
+  dragging: boolean;
+  wrap: boolean;
+}): string {
   return cn(
-    'group/chip relative my-0.5 flex h-8 shrink-0 items-center self-center overflow-hidden rounded-md border border-border transition-colors',
-    containsActive
-      ? 'bg-tab-active text-foreground'
-      : 'bg-tab text-muted-foreground hover:bg-tab-hover hover:text-foreground'
+    tabClassName({
+      active: containsActive,
+      unseen,
+      dragging,
+      flashing,
+      wrap,
+      pinned: false,
+    }),
+    'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset'
   );
 }
 

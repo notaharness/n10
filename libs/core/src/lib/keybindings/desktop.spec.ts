@@ -31,7 +31,6 @@ describe('desktop default bindings', () => {
     ['Tab', { ctrlKey: true }, 'desktop.tabs.cycle-next'],
     ['Tab', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.cycle-previous'],
     ['A', { ctrlKey: true, shiftKey: true }, 'desktop.tabs.attention'],
-    ['J', { ctrlKey: true, shiftKey: true }, 'desktop.groups.collapse-others'],
     ['p', { ctrlKey: true, altKey: true }, 'desktop.tabs.toggle-pin'],
     ['3', { ctrlKey: true }, 'desktop.tabs.select-3'],
     ['9', { ctrlKey: true }, 'desktop.tabs.select-9'],
@@ -76,7 +75,6 @@ describe('desktop default bindings', () => {
       'Ctrl+Tab',
       'Ctrl+Shift+Tab',
       'Ctrl+Shift+a',
-      'Ctrl+Shift+j',
       'Ctrl+Alt+p',
       ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `Ctrl+${n}`),
       'Ctrl+\\',
@@ -91,9 +89,6 @@ describe('desktop default bindings', () => {
     expect(
       descriptorFromDom(press('A', { ctrlKey: true, shiftKey: true }))
     ).toEqual(DESKTOP_DEFAULT_BINDINGS['desktop.tabs.attention'][0]);
-    expect(
-      descriptorFromDom(press('J', { ctrlKey: true, shiftKey: true }))
-    ).toEqual(DESKTOP_DEFAULT_BINDINGS['desktop.groups.collapse-others'][0]);
   });
 });
 

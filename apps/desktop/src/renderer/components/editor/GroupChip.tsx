@@ -2,265 +2,143 @@ import type { KeyboardEvent, RefObject } from 'react';
 import { toast } from 'sonner';
 import { harnessLabel } from '@n10/core/ui';
 import { useDesktopPrefs } from '../../lib/desktop-prefs.js';
-import { groupSummary } from '../../lib/tabs/group-status.js';
-import { useHoverPrewarm } from '../../lib/tabs/prewarm.js';
-import type { TabGroup, TabStatus } from '../../lib/tabs/tab-groups.js';
-import { useTabs } from '../../lib/tabs/tabs.js';
-import type { useCloseTabs } from '../../lib/tabs/use-close-tabs.js';
-import { cn, errorMessage } from '../../lib/utils.js';
+import { groupSummary, type ChipSignal } from '../../lib/tabs/group-status.js';
+import type { TabGroup } from '../../lib/tabs/tab-groups.js';
+import { errorMessage } from '../../lib/utils.js';
 import { PopoverAnchor } from '../ui/popover.js';
-import { RepoBand } from './tab-marks.js';
-import {
-  ChipActiveRule,
-  ChipCount,
-  ChipIcon,
-  HomeLabel,
-  PlaceLabel,
-} from './ChipLook.js';
-import { CHIP_BODY, chipClassName } from './tab-look-class.js';
-import { pressWithoutFocus } from './tab-keyboard.js';
-import { runGroupMenu, runTabMenu, type GroupMenu } from './tab-menu.js';
-import { usePaneMenus } from './use-pane-menus.js';
+import { ChipFace } from './ChipLook.js';
+import { chipClassName } from './tab-look-class.js';
+import { runGroupMenu, type GroupMenu } from './tab-menu.js';
 import type { useSortableTab } from './TabStrip.js';
 import type { useRosterOpen } from './use-roster-open.js';
 import type { TabFace } from './use-strip-groups.js';
 
-type Closer = ReturnType<typeof useCloseTabs>;
 type Sortable = ReturnType<typeof useSortableTab>;
 
-/** The home's own tab, standing as the chip's body: it activates the
- *  home, and drags the group. It shows the group's name — the home's
- *  label unless the user renamed the group — with the label as its
- *  tooltip. */
-function HomeBody({
-  face,
-  name,
-  containsActive,
-  setHandle,
-  handle,
-  menu,
-  closer,
-  onKeyDown,
-  justDropped,
-}: {
-  face: TabFace;
-  name: string;
-  containsActive: boolean;
-  justDropped: () => boolean;
-  setHandle: Sortable['setHandle'];
-  handle: Sortable['handle'];
-  menu: GroupMenu;
-  closer: Closer;
-  onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
-}) {
-  const tabs = useTabs();
-  const { tabMenu } = usePaneMenus();
-  const { tabOverflow } = useDesktopPrefs();
-  const { tab } = face;
-  const active = tab.id === tabs.activeId;
-  const hover = useHoverPrewarm(() => (active ? null : tab), true);
-  return (
-    <div
-      ref={setHandle}
-      {...handle}
-      {...hover.handlers}
-      aria-label={name}
-      aria-selected={active}
-      aria-description={
-        containsActive && !active ? 'Contains active tab' : undefined
-      }
-      data-home-tab={tab.id}
-      onKeyDown={(e) => {
-        handle.onKeyDown(e);
-        if (!e.defaultPrevented) onKeyDown(e);
-      }}
-      onMouseDown={(e) => {
-        pressWithoutFocus(e);
-        if (e.button !== 1) return;
-        e.preventDefault();
-        closer.close(tab.id);
-      }}
-      onClick={() => {
-        if (justDropped()) return;
-        hover.pressed();
-        menu.setCollapsed(false);
-        tabs.activate(tab.id);
-      }}
-      onDoubleClick={() => tabs.keep(tab.id)}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        runTabMenu(
-          tab,
-          tabs,
-          closer,
-          tabOverflow,
-          menu,
-          undefined,
-          tabMenu
-        ).catch((err: unknown) => toast.error(errorMessage(err)));
-      }}
-      title={[
-        name,
-        `Orchestrator: ${
-          face.taskTitle ??
-          (face.harness ? harnessLabel(face.harness) : 'Agent')
-        }`,
-        tab.kind === 'item' ? `Repository: ${tab.repo}` : undefined,
-        tab.kind === 'terminal' ? `Directory: ${tab.cwd}` : undefined,
-      ]
-        .filter(Boolean)
-        .join('\n')}
-      className={cn(CHIP_BODY, 'cursor-default')}
-    >
-      <HomeLabel face={face} name={name} />
-    </div>
-  );
-}
-
-/** A chip with no tab of its own: a parent not open here, or a place.
- *  It opens the roster, and drags the group. */
-function LabelBody({
-  label,
-  containsActive,
-  setHandle,
-  handle,
-  menu,
-  onKeyDown,
-  onPress,
-  justDropped,
-}: {
-  label: string;
-  containsActive: boolean;
-  onPress: () => void;
-  justDropped: () => boolean;
-  setHandle: Sortable['setHandle'];
-  handle: Sortable['handle'];
-  menu: GroupMenu;
-  onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
-}) {
-  return (
-    <div
-      ref={setHandle}
-      {...handle}
-      aria-label={`Show tabs in ${label}`}
-      aria-description={containsActive ? 'Contains active tab' : undefined}
-      aria-haspopup="dialog"
-      data-group-label
-      onKeyDown={(e) => {
-        handle.onKeyDown(e);
-        if (!e.defaultPrevented) onKeyDown(e);
-      }}
-      onClick={() => {
-        if (!justDropped()) onPress();
-      }}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        runGroupMenu(menu).catch((err: unknown) =>
-          toast.error(errorMessage(err))
-        );
-      }}
-      title={label}
-      className={cn(CHIP_BODY, 'cursor-default')}
-    >
-      <PlaceLabel label={label} />
-    </div>
-  );
+/** The chip's tooltip: its name, the active member's whole label, and
+ *  for a home what it is and where. */
+function chipTitle(
+  label: string,
+  head: TabFace | null,
+  active: TabFace | null
+): string {
+  const name = active ? `${label} / ${active.label}` : label;
+  if (!head) return name;
+  const { tab } = head;
+  const what =
+    head.taskTitle ?? (head.harness ? harnessLabel(head.harness) : 'Agent');
+  return [
+    name,
+    `Orchestrator: ${what}`,
+    tab.kind === 'item' ? `Repository: ${tab.repo}` : undefined,
+    tab.kind === 'terminal' ? `Directory: ${tab.cwd}` : undefined,
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
- * A group's chip: a disclosure that collapses or expands it, a body
- * (the home's tab, else a label that opens the roster) that drags the
- * group, and the roster button with the group's count and states.
- * Sibling controls, never nested in one another; the roster anchors to
- * the whole chip, and resting on it opens the roster.
+ * A group's chip: one control standing for the whole group on the
+ * strip, drawn as a tab (`ChipFace`). Pressing it shows the group's
+ * first tab; Enter or Alt+ArrowDown opens the roster of its tabs, as
+ * resting on it does; dragging it moves the group. It shows as active
+ * while the pane's active tab is one of its members, and names that
+ * member. It blinks and spins as `signal` says (`chipSignal`).
  */
 export function GroupChip({
   group,
   label,
-  head,
-  statuses,
+  faces,
   color,
-  collapsed,
-  containsActive,
+  signal,
+  active,
+  dragging,
   setHandle,
   handle,
   roster,
-  rosterButton,
+  rosterId,
+  chipRef,
   menu,
-  closer,
   onKeyDown,
-  justDropped,
+  onPress,
 }: {
   group: TabGroup;
   label: string;
-  head: TabFace | null;
-  statuses: readonly TabStatus[];
+  /** Its tabs' faces, in its order. */
+  faces: readonly TabFace[];
   color: string | null;
-  collapsed: boolean;
-  containsActive: boolean;
+  signal: ChipSignal;
+  /** The pane's active tab, when it is one of the group's. */
+  active: TabFace | null;
+  dragging: boolean;
   setHandle: Sortable['setHandle'];
   handle: Sortable['handle'];
   roster: ReturnType<typeof useRosterOpen>;
-  rosterButton: RefObject<HTMLButtonElement | null>;
+  /** The roster's element id, for `aria-controls`. */
+  rosterId: string;
+  /** The chip itself, where focus returns from the roster. */
+  chipRef: RefObject<HTMLDivElement | null>;
   menu: GroupMenu;
-  closer: Closer;
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
-  /** Whether the group was just dropped: the click that follows is no press. */
-  justDropped: () => boolean;
+  /** A press of the chip (not the click a drop ends in). */
+  onPress: () => void;
 }) {
-  const body = { setHandle, handle, menu, onKeyDown, justDropped };
+  const { tabOverflow } = useDesktopPrefs();
+  const containsActive = active !== null;
+  const head = group.head ? faces[0] ?? null : null;
+  const statuses = faces.map((f) => f.status);
   return (
     <PopoverAnchor asChild>
       <div
-        role="presentation"
+        ref={(el) => {
+          setHandle(el);
+          chipRef.current = el;
+        }}
+        {...handle}
+        aria-label={[
+          active ? `${label}, ${active.label}` : label,
+          groupSummary(statuses),
+        ].join('. ')}
+        aria-selected={containsActive}
+        aria-haspopup="dialog"
+        aria-expanded={roster.open}
+        aria-controls={roster.open ? rosterId : undefined}
+        aria-description={containsActive ? 'Contains active tab' : undefined}
         data-group-chip={group.key}
+        data-home-tab={group.head?.id}
         onPointerEnter={roster.enter}
         onPointerLeave={roster.leave}
         onPointerDownCapture={roster.cancelHover}
-        className={chipClassName(containsActive)}
+        onKeyDown={(e) => {
+          handle.onKeyDown(e);
+          if (!e.defaultPrevented) onKeyDown(e);
+        }}
+        onClick={onPress}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          runGroupMenu(menu).catch((err: unknown) =>
+            toast.error(errorMessage(err))
+          );
+        }}
+        title={chipTitle(label, head, active)}
+        className={chipClassName({
+          containsActive,
+          flashing: signal.flashing,
+          unseen: signal.unseen,
+          dragging,
+          wrap: tabOverflow === 'wrap',
+        })}
       >
-        {containsActive && <ChipActiveRule />}
-        <button
-          type="button"
-          aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
-          aria-expanded={!collapsed}
-          data-group-disclosure
-          onClick={() => menu.setCollapsed(!collapsed)}
-          onKeyDown={onKeyDown}
-          className="flex h-full w-6 shrink-0 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-        >
-          <ChipIcon head={head} collapsed={collapsed} active={containsActive} />
-        </button>
-        {head ? (
-          <HomeBody
-            face={head}
-            name={label}
-            containsActive={containsActive}
-            closer={closer}
-            {...body}
-          />
-        ) : (
-          <LabelBody
-            label={label}
-            containsActive={containsActive}
-            onPress={roster.press}
-            {...body}
-          />
-        )}
-        <button
-          ref={rosterButton}
-          type="button"
-          aria-label={`Show tabs in ${label}. ${groupSummary(statuses)}`}
-          aria-haspopup="dialog"
-          aria-expanded={roster.open}
-          data-group-roster-button
-          onClick={roster.press}
-          onKeyDown={onKeyDown}
-          className="flex h-full shrink-0 items-center gap-2 pr-1.5 pl-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-        >
-          <ChipCount statuses={statuses} />
-        </button>
-        <RepoBand color={color} />
+        <ChipFace
+          head={head}
+          label={label}
+          active={active}
+          count={faces.length}
+          planIds={faces.flatMap((f) => f.item?.pr?.id ?? [])}
+          color={color}
+          signal={signal}
+          open={roster.open}
+        />
       </div>
     </PopoverAnchor>
   );

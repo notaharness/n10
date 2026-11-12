@@ -62,3 +62,42 @@ export function rowStatus(
   if (facts.unseen) return 'Not yet opened';
   return ROW_WORDS.idle;
 }
+
+/** What a chip shows of its tabs' activity: whether it blinks for new
+ *  output, spins for work, and marks a tab opened behind it that
+ *  nobody has looked at. */
+export interface ChipSignal {
+  flashing: boolean;
+  working: boolean;
+  unseen: boolean;
+}
+
+/** A tab's activity, as its session's snapshot has it. */
+type Activity = { active: boolean; flashing: boolean } | undefined;
+
+/**
+ * The activity a chip carries. An orchestrator's chip carries its
+ * home's own alone: its players are the orchestrator's to watch, and
+ * blink and spin on their own rows. Its players' chip without it, while
+ * the orchestrator's tab is open elsewhere in the window (pinned, or in
+ * another pane), carries nothing: that tab already shows its status.
+ * Any other chip, a homeless orchestrator's players' included, carries
+ * every member's, since nothing else surfaces them. `activity` is the
+ * group's tabs', in its order; `home` says whether the first is the
+ * orchestrator's (`TabGroup.head`), and `homeElsewhere` whether its tab
+ * is open outside the group. `unseen` is the tabs' unseen marks, in the
+ * same order, carried by the same rule.
+ */
+export function chipSignal(
+  activity: readonly Activity[],
+  { home, homeElsewhere }: { home: boolean; homeElsewhere: boolean },
+  unseen: readonly boolean[] = []
+): ChipSignal {
+  const carried = home ? 1 : homeElsewhere ? 0 : activity.length;
+  const own = activity.slice(0, carried);
+  return {
+    flashing: own.some((a) => a?.flashing),
+    working: own.some((a) => a?.active),
+    unseen: unseen.slice(0, carried).some(Boolean),
+  };
+}

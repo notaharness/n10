@@ -1,4 +1,5 @@
 import type { Affiliation, SessionRef } from '@n10/core/ui';
+import { rosterEntries } from './roster-order.js';
 import type { Tab } from './tab-identity.js';
 
 /**
@@ -29,8 +30,9 @@ export interface TabGroup {
   head: Tab | null;
   /** Every member, the head first, the rest in their strip order. */
   tabs: Tab[];
-  /** Shown behind a chip: every parent group, and a place group of more
-   *  than one tab. */
+  /** Shown as one chip whose roster lists its tabs: a group of more
+   *  than one tab, a parent's or a place's. A group of one shows as its
+   *  tab. */
   chipped: boolean;
   /** On a group shown right after the parent group its home reports to
    *  (`Affiliation.follows`): that group's key. It moves with it. */
@@ -55,6 +57,19 @@ export function isHomeTab(
   );
 }
 
+/** Whether a parent group's home has a tab among `tabs` (every pane's,
+ *  for whether it is open anywhere in the window). */
+export function homeOpenAmong(
+  group: Pick<TabGroup, 'affiliation'>,
+  tabs: readonly Tab[],
+  facts: (tab: Tab) => TabFacts
+): boolean {
+  const a = group.affiliation;
+  if (a?.kind !== 'parent' || !a.home) return false;
+  const home = a.home;
+  return tabs.some((tab) => isHomeTab(tab, facts(tab), home));
+}
+
 function headOf(group: Tab[], facts: (tab: Tab) => TabFacts, a: Affiliation) {
   if (a.kind !== 'parent' || !a.home) return null;
   const home = a.home;
@@ -64,7 +79,9 @@ function headOf(group: Tab[], facts: (tab: Tab) => TabFacts, a: Affiliation) {
 /**
  * Groups whose head reports to another parent come right after that
  * parent's group, in their own first-tab order; groups do not nest. A
- * cycle of parents is broken at its member that comes first.
+ * cycle of parents is broken at its member that comes first. Only a
+ * chip follows a chip: a group of one tab stands as that tab, placed by
+ * its own order like any other.
  */
 function orderFollowers(groups: TabGroup[]): TabGroup[] {
   const byKey = new Map(groups.map((g) => [g.key, g]));
@@ -72,7 +89,8 @@ function orderFollowers(groups: TabGroup[]): TabGroup[] {
   const parentOf = (g: TabGroup): TabGroup | undefined => {
     const follows =
       g.affiliation?.kind === 'parent' ? g.affiliation.follows : undefined;
-    return follows ? byKey.get(follows) : undefined;
+    const parent = follows ? byKey.get(follows) : undefined;
+    return g.chipped && parent?.chipped ? parent : undefined;
   };
   const children = new Map<TabGroup, TabGroup[]>();
   for (const g of groups) {
@@ -121,10 +139,17 @@ function pinnedGroup(tab: Tab, facts: (tab: Tab) => TabFacts): TabGroup {
   };
 }
 
+/**
+ * The pane's groups, pinned tabs first. `orchestratorsFirst`: a pane
+ * whose order the user has not set by hand (`Workspace.arranged`) shows
+ * the groups an orchestrator heads before the rest, each side in its
+ * first-tab order, so n10 opening tabs on its own leads with them.
+ */
 export function present(
   tabs: readonly Tab[],
   facts: (tab: Tab) => TabFacts,
-  pinned: readonly string[] = []
+  pinned: readonly string[] = [],
+  orchestratorsFirst = false
 ): TabGroup[] {
   const pins = new Set(pinned);
   const members = new Map<
@@ -146,15 +171,16 @@ export function present(
       affiliation,
       head,
       tabs: head ? [head, ...list.filter((t) => t !== head)] : list,
-      chipped:
-        affiliation?.kind === 'parent' ||
-        (affiliation?.kind === 'place' && list.length > 1),
+      chipped: affiliation !== null && list.length > 1,
     };
   });
   const pinnedFirst = tabs
     .filter((t) => pins.has(t.id))
     .map((t) => pinnedGroup(t, facts));
-  return [...pinnedFirst, ...orderFollowers(groups)];
+  const ordered = orchestratorsFirst
+    ? [...groups.filter((g) => g.head), ...groups.filter((g) => !g.head)]
+    : groups;
+  return [...pinnedFirst, ...orderFollowers(ordered)];
 }
 
 /** What a group is called: the user's name for it, else `derived`. */
@@ -166,85 +192,38 @@ export function groupName(
   return names[group.key] ?? derived;
 }
 
-/** Whether a group the user has not collapsed or expanded starts
- *  collapsed, by what it belongs to. */
-const STARTS_COLLAPSED: Record<Affiliation['kind'], boolean> = {
-  // Players wait behind their parent's chip until asked for.
-  parent: true,
-  place: false,
-};
-
-export function initiallyCollapsed(affiliation: Affiliation | null): boolean {
-  return affiliation !== null && STARTS_COLLAPSED[affiliation.kind];
-}
-
-/** Whether `group` shows behind its chip alone, given the user's
- *  choices (`TabsState.collapsed`). Only a chipped group collapses. */
-export function isCollapsed(
-  group: TabGroup,
-  choices: Readonly<Record<string, boolean>>
-): boolean {
-  return (
-    group.chipped &&
-    (choices[group.key] ?? initiallyCollapsed(group.affiliation))
-  );
-}
-
-/** Every tab in the order the strip presents them, collapsed groups
- *  included: what positional switching walks. */
+/** Every tab in the order the strip presents them, members behind
+ *  chips included: what positional switching walks. */
 export function presentedIds(groups: readonly TabGroup[]): string[] {
-  return groups.flatMap((g) => g.tabs.map((t) => t.id));
+  return groups.flatMap((g) => rosterOrder(g).map((t) => t.id));
 }
 
-/** The real tabs the strip shows: a group's home, and its members
- *  unless it is collapsed. */
-export function shownTabIds(
-  groups: readonly TabGroup[],
-  choices: Readonly<Record<string, boolean>>
-): string[] {
-  return groups.flatMap((g) => {
-    if (!g.chipped || !isCollapsed(g, choices)) return g.tabs.map((t) => t.id);
-    return g.head ? [g.head.id] : [];
-  });
+/** A group's tabs in the order its roster lists them: an orchestrator's
+ *  players each followed by its own tabs (`rosterEntries`), so the keys
+ *  that walk tabs walk the rows the roster shows. */
+export function rosterOrder(group: TabGroup): Tab[] {
+  if (!group.chipped) return group.tabs;
+  const rows = rosterEntries(
+    group.tabs.map((tab) => ({ tab })),
+    group.head?.id,
+    group.affiliation?.kind === 'parent'
+  );
+  return rows.map((row) => row.face.tab);
 }
 
-/** The row's one Tab stop: the active tab when it shows, else the
- *  shown tab nearest it in strip order (behind a collapsed chip, its
- *  home or a neighbour), else the first. */
+/** What stands for `group` on the row: its chip, else its one tab. */
+export function stopOf(group: TabGroup): string {
+  return group.chipped ? `chip:${group.key}` : group.tabs[0]?.id ?? group.key;
+}
+
+/** The row's one Tab stop: what stands for the active tab (its own tab,
+ *  or its group's chip), else the first. */
 export function tabStopOf(
-  presented: readonly string[],
-  shown: readonly string[],
+  groups: readonly TabGroup[],
   activeId: string | null
 ): string | undefined {
-  const at = activeId === null ? -1 : presented.indexOf(activeId);
-  if (at < 0) return shown[0];
-  const visible = new Set(shown);
-  for (let d = 0; d < presented.length; d++) {
-    const near = [presented[at - d], presented[at + d]].find(
-      (id) => id !== undefined && visible.has(id)
-    );
-    if (near) return near;
-  }
-  return shown[0];
-}
-
-/**
- * The collapsed group to expand now that `now` is the active tab and its
- * group, where it was `before`: a tab activated from anywhere shows, so
- * its collapsed group expands; and so does a collapsed group the active
- * tab joins behind its chip (`hidden`: its affiliation came with a later
- * scan, or it was unpinned). Collapsing the active tab's group leaves it
- * collapsed until either changes. Only in the focused pane: a pane that
- * changes in the background (a follow pane's switch) expands nothing.
- */
-export function expandsOnShow(
-  before: { id: string | null; group: string | undefined },
-  now: { id: string | null; group: string | undefined },
-  state: { collapsed: boolean; hidden: boolean; focused: boolean }
-): string | null {
-  if (before.id === now.id && before.group === now.group) return null;
-  const expands = before.id !== now.id ? state.collapsed : state.hidden;
-  return now.group && expands && state.focused ? now.group : null;
+  const active = groupOf(groups, activeId) ?? groups[0];
+  return active && stopOf(active);
 }
 
 /** The group `tabId` stands in, if any. */

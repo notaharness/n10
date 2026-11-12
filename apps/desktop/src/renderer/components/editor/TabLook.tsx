@@ -1,3 +1,4 @@
+import { BrainIcon } from 'lucide-react';
 import type { SidebarItem } from '../../../host/contract.js';
 import { usePlanCount } from '../../lib/plan/plan.js';
 import { itemRunning } from '../../lib/sidebar/sidebar-model.js';
@@ -75,7 +76,7 @@ export function TabLook({
   return (
     <>
       <TabIcon
-        Icon={FACE_ICON[kind]}
+        Icon={face.home ? BrainIcon : FACE_ICON[kind]}
         running={item ? itemRunning(item) : face.running}
         snapshot={snapshot}
         active={active}

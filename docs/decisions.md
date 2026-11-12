@@ -790,11 +790,12 @@ and when Settings → Keyboard opens; a read begun before a write is dropped.
 
 The fixed All tabs control sits outside the tab track, so it remains available
 whether tabs wrap or scroll. Its popover is a plain roster in presented strip
-order, including members hidden behind a collapsed chip. It has no search or
+order, including the members behind each chip. It has no search or
 filter: the roster gives a complete account of the strip. The same row
-component serves chip rosters. Selecting a row expands its group, reveals its
-tab and focuses its terminal when present, else the tab itself. The control's
-badge counts tabs needing attention, currently new output only.
+component serves chip rosters. Selecting a row shows its tab, reveals it
+(or its chip) and focuses its terminal when present, else the tab itself.
+The control carries no badge; its accessible name counts the tabs needing
+attention, currently new output only.
 
 Next attention (Ctrl+Shift+A) walks a stable snapshot: blocked, error,
 unseen completion, then new output, each tier in presented order. Only new
@@ -804,9 +805,7 @@ skips tabs closed or cleared since its start and leaves newly active tabs for
 the next round. Manual activation resets the round; its own jump preserves
 it. A jump to a new-output item tab selects its agent pane so the output is
 visible. With no other pending tab, the command reports the current tab or
-toasts “Nothing needs attention.” Collapse others (Ctrl+Shift+J) keeps the
-active group expanded while collapsing the rest. Both commands are
-rebindable; a saved override on a conflicting chord wins and leaves the new
+toasts “Nothing needs attention.” The command is rebindable; a saved override on a conflicting chord wins and leaves the new
 default unassigned. On desktop a capital-letter chord requires the physical
 Shift modifier, because Caps Lock can capitalize a DOM key without Shift.
 
@@ -860,44 +859,75 @@ The strip derives groups from a pane's tab order on every render
 (`lib/tabs/tab-groups.ts` `present`): one per affiliation, in the order of
 each group's first tab, members in their relative order, the home's tab
 first. Contiguity is derived, never an invariant: nothing re-sorts the tabs
-on sync and no move is refused. Every parent group shows a chip, and a place
-group of two or more; a lone place tab is an ordinary tab. The chip is three
-sibling controls: its one icon, a folder closed or open, which collapses and
-expands it; a body (the home's own tab, or a label that opens the roster for
-a stand-in parent or a place); and the roster button
-with the group's tab count and the count of each state present. Status comes
-from the activity snapshot only: `flashing` is new output, `active` working.
-Nothing yet says blocked, failed or done, and none is inferred from silence,
-an exit or a pull request; the status type keeps those states for a source
-(tmux's pane program state). The roster (`GroupRoster.tsx`) is a controlled
-popover anchored to the chip: resting on the chip opens it without focus,
-a press pins it, Alt+ArrowDown opens it on the active row, Escape returns
-focus to its button and keeps hover from reopening it until the pointer
-leaves.
+on sync and no move is refused. A group of two tabs or more, a parent's or a
+place's, is a chip; a group of one is that tab, and only a chip follows a
+chip. Until the user arranges a pane's blocks by hand (`Workspace.arranged`,
+saved), the pane presents the groups an orchestrator heads first, after
+pins, so n10 opening tabs on its own leads with them; a drop among the
+blocks makes the order the user's, even where the stored order already
+matched it. Nothing of a chipped group expands into the row: the strip
+shows pinned tabs, then one block per chip or lone tab, so a group costs the
+same room however many tabs it holds, and a member is one hover away.
 
-Collapse is in `Workspace.collapsed`, an explicit choice per group over one
-rule by affiliation kind (`initiallyCollapsed`: a parent group starts
-collapsed, its players behind the chip, and a place group expanded),
-saved with the workspace. A collapsed group shows its chip alone; activating a tab in
-it from anywhere expands it, while collapsing the group the active tab is in
-leaves the active content as it is. A collapsed group the active tab joins
-behind its chip, when a later scan gives it its parent, expands too. Collapse others is on the native menus.
-Positional keyboard switching walks the presented order, collapsed members
-included (`tab-switching.ts`). Close Others closes every other unpinned tab.
+A chip is drawn as a tab (`ChipLook.tsx`, `tab-look-class.ts`): the same
+frame, colours and active treatment, with an orchestrator's brain for an
+orchestrator's group (and on its lone tab), else a folder, open while the
+roster is, and the tab count at its end. Status comes from the activity
+snapshot only: `flashing` is new output, `active` working, and a chip shows
+them as a tab does, blinking and spinning (`group-status.ts` `chipSignal`).
+An orchestrator's chip carries its home's own activity alone: its players
+are the orchestrator's to watch, and blink and spin on their own rows.
+Its players' chip without it (the home pinned, or in another pane, as
+after Tile group) carries nothing while the orchestrator's tab is open
+anywhere in the window, since that tab shows its status; with no tab for
+the orchestrator at all, it carries every player's, since nothing else
+surfaces them. Any other group's chip carries every member's. Nothing yet says blocked,
+failed or done, and none is inferred from silence, an exit or a pull
+request; the status type keeps those states for a source (tmux's pane
+program state). While the pane's active tab is a member, the chip takes the
+active tab's treatment and reads "group / member", the group's part cut
+first; it is the row's Tab stop then, as the active tab would be.
 
-Drag (`strip-drag.ts`): a member moves only among its group's members, and a
-group, dragged by its chip body, or a lone tab moves only between blocks.
+The roster (`GroupRoster.tsx`) is a controlled popover anchored to the chip,
+listing the home first ("Orchestrator …"), then the members in strip order,
+each with its state and the active one marked. In an orchestrator's roster
+the players sit under the home, and a player's own tabs (a terminal in its
+checkout) under the player (`roster-order.ts`); a place's roster is flat.
+Resting on the chip opens it without focus (400 ms, closing 180 ms after
+the pointer leaves chip and roster); Enter or Alt+ArrowDown opens it with
+its rows focused; Escape returns focus to the chip unless a rest opened it
+over a terminal. Pressing the chip shows the group's first tab in its
+roster's order (`rosterOrder`), the home for an orchestrator's. A row
+whose tab leaves the group while it has focus hands focus to the row now
+in its place, or to the pane's shown tab when the chip goes too. Choosing a row shows that tab and closes the roster,
+and the row of tabs does not change. A row's native menu is the tab's own (pin, split,
+move to a pane, close); the chip's is the group's (show tabs, rename, tile,
+follow). Pinning is how a member is kept in view: a pinned tab stands
+outside its group.
+
+Positional keyboard switching walks the presented order, members behind
+chips included (`tab-switching.ts`): activating a member marks its chip.
+Close Others closes every other unpinned tab.
+
+Drag (`strip-drag.ts`): a chip or a lone tab moves between blocks; a pinned
+one only among the pinned. A roster row is a sortable place of its own: it
+moves its tab among the group's rows, or carries it to another pane's strip
+or a pane's side, never onto its own pane's strip, where the group would
+gather it back. The roster is ours to hold open: a drag of one of its rows
+pins it until the row lands back in it (or Escape puts it back, which
+leaves the roster open), then holds it as it was opened; carried away,
+the roster closes. The click a row's drag ends in is no press. The copy
+under the pointer is the strip's `CarriedOverlay`, drawn by `DragOverlay`.
 Illegal places are disabled droppables (`useSortable`'s `disabled.droppable`),
 so pointer and keyboard drags meet only legal slots and the slot the strip
 opens is the one the drop takes. A block's drop arranges the whole strip in
 its presented order with the block moved, since the stored order may
 interleave groups; a group shown behind the one it follows moves with it as
-one block. The room after the last tab, the strip's or a wrapped group's, is
-the last legal place by index, not by dnd-kit's mount order. A member
-carried outside its group is told "Tabs stay in their group", and drags
-announce "Moving", "Position n of m", "Moved" and "Move cancelled". A home's
-tab selects on click, not on press, so dragging its group does not activate
-it.
+one block. The room after the last tab is the last legal place by index,
+not by dnd-kit's mount order. Drags announce "Moving", "Position n of m",
+"Moved" and "Move cancelled". A chip shows its first tab on click, not on
+press, and the click a drop ends in is ignored, so dragging its group
+shows nothing.
 
 ### Contextual tab labels
 
@@ -924,8 +954,8 @@ that metadata and reserves a stable width for an agent's changing title.
 
 The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): tabs by id, a
 layout tree of splits over panes (each with its order and active tab), the
-focused pane, and the user's marks — pins, collapsed groups, group names and
-dismissed sessions — beside `unseen` and `lastActiveByRepo`. Every reducer
+focused pane, and the user's marks — pins, group names, the panes arranged
+by hand and dismissed sessions — beside `unseen` and `lastActiveByRepo`. Every reducer
 pass works on one pane's `Strip` (its tabs as an ordered list and its active
 tab, beside the workspace-wide sets); `reduceStrip` is the pass layer.
 
@@ -996,9 +1026,11 @@ the pointer instead (`drag-preview.ts`, `CarriedOverlay.tsx`), so pane
 overflow and the pane portals never clip it, and the zone is read from the
 pointer's own events. Keyboard drags stay on the strip. On a strip, a block
 dropped among its own pane's blocks arranges that pane as presented;
-carried over another pane's strip, a tab or block (a member too, beside a
-block or its own group's member) opens the slot it would land in there, on
-the side the pointer is on, and moves there on drop. Another pane's places
+carried over another pane's strip, a tab or block (a roster row too) opens the slot it would land in there, on
+the side the pointer is on, and moves there on drop: that pane's whole order
+becomes its strip's presented order with the tabs in the slot, and the pane is
+arranged by hand from then on, so a drop beside an orchestrator's chip shown
+first lands there, not where the stored order puts its anchor. Another pane's places
 are targets only under the pointer, never the nearest place. Let go over
 nothing outside its strip's row (the strip's height across its pane), a
 drag is abandoned; within the row, past the strip's ends, it lands on the
@@ -1059,8 +1091,7 @@ its machine is not connected) until a listing binds it: the same name and
 creation time binds; a listing complete for its machine without it closes
 it, pin and all — a later session under its name gets its own tab; a listing
 not complete for its machine, or that does not know the creation time yet,
-waits. Item tabs reconcile through the re-key rules. Collapse choices keep
-the latest 64.
+waits. Item tabs reconcile through the re-key rules.
 
 One deliberate exception to "an unavailable repository is not proof of
 deletion": a restored item tab whose repository directory is gone from this

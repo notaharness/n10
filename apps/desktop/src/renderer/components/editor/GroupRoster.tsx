@@ -1,141 +1,54 @@
-import { CheckIcon } from 'lucide-react';
-import { useEffect, useRef, type RefObject } from 'react';
+import { useDndContext } from '@dnd-kit/core';
+import {
+  useContext,
+  useEffect,
+  useRef,
+  type ComponentProps,
+  type FocusEvent,
+  type RefObject,
+} from 'react';
 import {
   groupSummary,
-  rowStatus,
   rosterSummary,
   tabCount,
 } from '../../lib/tabs/group-status.js';
-import { cutSide } from '../../lib/tabs/tab-presentation.js';
 import type { Tab } from '../../lib/tabs/tabs.js';
-import { cn } from '../../lib/utils.js';
 import { PopoverContent } from '../ui/popover.js';
 import { ScrollArea } from '../ui/scroll-area.js';
-import { STATUS_MARK } from './StatusClusters.js';
-import { UnseenDot } from './tab-marks.js';
-import { FACE_ICON } from './TabIcon.js';
-import { TabLabel } from './TabLabel.js';
 import type { TabFace } from './use-strip-groups.js';
 import type { useRosterOpen } from './use-roster-open.js';
 import { walkRows } from './roster-keys.js';
-import { rosterSecondary } from './roster-text.js';
+import { rosterEntries } from '../../lib/tabs/roster-order.js';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { PaneScopeContext } from '../../lib/tabs/tabs.js';
+import { RosterRow } from './RosterRow.js';
+import { rosterRowId, useRosterRowDrag } from './use-roster-row-drag.js';
 
-/** The row's state, at its end: active first, then the state. */
-function RowStatus({
-  face,
-  active,
-  status,
-}: {
-  face: TabFace;
-  active: boolean;
-  status: string;
+/** A row that drags: its place among `group`'s rows. */
+function SortableRow({
+  group,
+  index,
+  ...row
+}: Omit<ComponentProps<typeof RosterRow>, 'drag'> & {
+  group: string;
+  index: number;
 }) {
-  const mark = STATUS_MARK[face.status];
-  return (
-    <span
-      className={cn(
-        'flex w-[100px] shrink-0 items-center justify-end gap-1 truncate text-[11px] leading-4',
-        mark?.className ?? 'text-muted-foreground'
-      )}
-    >
-      {active && <CheckIcon aria-hidden className="size-3 shrink-0" />}
-      {mark && <mark.Icon aria-hidden className="size-3 shrink-0" />}
-      <span className="truncate">
-        {[active ? 'Active' : '', status].filter(Boolean).join(' · ')}
-      </span>
-    </span>
-  );
-}
-
-/** The row's repository colour, down its leading edge. */
-function RowBand({ color }: { color: string | null }) {
-  if (!color) return null;
-  return (
-    <span
-      aria-hidden
-      className="absolute inset-y-0 left-0 w-0.5"
-      style={{ backgroundColor: color }}
-    />
-  );
-}
-
-function rowName(
-  label: string,
-  where: string,
-  active: boolean,
-  status: string
-) {
-  return [label, where, active ? 'Active' : '', status]
-    .filter(Boolean)
-    .join(', ');
-}
-
-export function RosterRow({
-  face,
-  active,
-  onJump,
-  home,
-}: {
-  face: TabFace;
-  active: boolean;
-  onJump: (tab: Tab) => void;
-  home: boolean;
-}) {
-  const { labelKind: kind } = face;
-  const label = home
-    ? ['Orchestrator', face.taskTitle].filter(Boolean).join(' · ')
-    : face.label;
-  const Icon = FACE_ICON[kind];
-  const status = rowStatus(face.status, {
-    exited: face.snapshot?.exited ?? false,
-    unseen: face.unseen,
-  });
-  const where = rosterSecondary(face);
-  return (
-    <li className="relative">
-      <button
-        type="button"
-        data-roster-row={face.tab.id}
-        aria-current={active || undefined}
-        aria-label={rowName(label, where, active, status)}
-        onClick={() => onJump(face.tab)}
-        className={cn(
-          'flex h-11 w-full items-center gap-2 px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-          active ? 'bg-tab-active' : 'hover:bg-tab-hover'
-        )}
-      >
-        <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-5">
-            <TabLabel
-              label={label}
-              parts={home ? undefined : face.labelParts}
-              machineLabel={face.machineLabel}
-              preview={face.tab.preview}
-              cut={face.labelSource === 'task' ? 'end' : cutSide(kind)}
-            />
-            {face.unseen && <UnseenDot />}
-          </span>
-          {where && (
-            <span className="truncate text-[11px] leading-4 text-muted-foreground">
-              {where}
-            </span>
-          )}
-        </span>
-        <RowStatus face={face} active={active} status={status} />
-      </button>
-      <RowBand color={face.repoColor} />
-    </li>
-  );
+  const drag = useRosterRowDrag(group, row.face, index);
+  return <RosterRow {...row} drag={drag} />;
 }
 
 /**
  * A group's tabs, in a popover under its chip: the home first, then the
- * members in strip order, each with its state. Choosing one shows it.
+ * members in strip order, an orchestrator's players under it
+ * (`rosterEntries`), each with its state. Choosing one shows it.
  * Hover opens it without taking focus; the keyboard opens it on the
  * active row, else the first.
  */
 export function GroupRoster({
+  id,
   groupKey,
   label,
   faces,
@@ -143,8 +56,12 @@ export function GroupRoster({
   roster,
   returnFocus,
   onJump,
+  onMenu,
   homeId,
+  players,
 }: {
+  /** What the chip's `aria-controls` names. */
+  id: string;
   groupKey: string;
   label: string;
   faces: readonly TabFace[];
@@ -153,7 +70,10 @@ export function GroupRoster({
   /** Where focus goes when Escape closes it. */
   returnFocus: RefObject<HTMLElement | null>;
   onJump: (tab: Tab) => void;
+  onMenu: (tab: Tab) => void;
   homeId?: string;
+  /** A parent's group: its players sit under its home. */
+  players: boolean;
 }) {
   const list = useRef<HTMLUListElement>(null);
   const escaped = useRef(false);
@@ -170,6 +90,17 @@ export function GroupRoster({
   useEffect(() => {
     if (keyboard) focusRows();
   }, [keyboard]);
+  // The place of the row focus is on. When its tab leaves the group
+  // (closed, pinned onto the strip), focus goes to the row now there,
+  // not to the page.
+  const focusedAt = useRef<number | null>(null);
+  const noteFocus = (e: FocusEvent<HTMLUListElement>) => {
+    const rows = [
+      ...(list.current?.querySelectorAll('[data-roster-row]') ?? []),
+    ];
+    const row = (e.target as Element).closest('[data-roster-row]');
+    focusedAt.current = row ? rows.indexOf(row) : null;
+  };
   const jump = (tab: Tab) => {
     // Choosing the tab already shown changes nothing to take focus: it
     // goes back to the chip, not to the page.
@@ -177,9 +108,24 @@ export function GroupRoster({
     onJump(tab);
   };
   const statuses = faces.map((f) => f.status);
+  const pane = useContext(PaneScopeContext) ?? '';
+  const entries = rosterEntries(faces, homeId, players);
+  const rowId = (face: TabFace) => rosterRowId(pane, face.tab.id);
   const summary = rosterSummary(statuses);
+  const rowIds = entries.map(({ face }) => face.tab.id).join('\n');
+  useEffect(() => {
+    const at = focusedAt.current;
+    if (at === null || document.activeElement !== document.body) return;
+    const rows =
+      list.current?.querySelectorAll<HTMLElement>('[data-roster-row]');
+    rows?.[Math.min(at, rows.length - 1)]?.focus();
+  }, [rowIds]);
+  // While a row is dragged by the keyboard, the arrows move it, not
+  // the focus.
+  const dragging = useDndContext().active !== null;
   return (
     <PopoverContent
+      id={id}
       data-group-roster
       role="dialog"
       aria-label={`Tabs in ${label}`}
@@ -192,18 +138,30 @@ export function GroupRoster({
         e.preventDefault();
         if (keyboard) focusRows();
       }}
-      onEscapeKeyDown={() => {
+      onEscapeKeyDown={(e) => {
+        // Escape during a drag puts the dragged tab back; the roster
+        // stays open.
+        if (dragging) {
+          e.preventDefault();
+          return;
+        }
         // A roster resting open over a terminal leaves focus there: only
         // focus taken into it, or opened by a press, goes back.
         escaped.current =
           roster.mode !== 'hover' ||
           !!document.activeElement?.closest('[data-group-roster]');
-        roster.escaped();
+        roster.close();
       }}
       onCloseAutoFocus={(e) => {
         e.preventDefault();
         if (escaped.current) returnFocus.current?.focus();
         escaped.current = false;
+      }}
+      onFocusOutside={(e) => {
+        // A terminal taking focus in an editor pane (the chip's pane
+        // focused as the roster opens) is no reason to close.
+        const target = e.target as Element | null;
+        if (target?.closest?.('[data-editor-panes]')) e.preventDefault();
       }}
       onInteractOutside={(e) => {
         // This chip's own controls open and close it themselves; any
@@ -236,17 +194,39 @@ export function GroupRoster({
         className="min-h-0 flex-1"
         viewportClassName="max-h-[inherit]"
       >
-        <ul ref={list} onKeyDown={walkRows} className="flex flex-col">
-          {faces.map((face) => (
-            <RosterRow
-              key={face.tab.id}
-              face={face}
-              active={face.tab.id === activeId}
-              onJump={jump}
-              home={face.tab.id === homeId}
-            />
-          ))}
-        </ul>
+        <SortableContext
+          items={entries.map(({ face }) => rowId(face))}
+          strategy={verticalListSortingStrategy}
+        >
+          <ul
+            ref={list}
+            data-roster-list
+            onKeyDown={dragging ? undefined : walkRows}
+            onFocus={noteFocus}
+            onBlur={(e) => {
+              if (e.relatedTarget) focusedAt.current = null;
+            }}
+            className="flex flex-col"
+          >
+            {entries.map(({ face, depth, tree }, index) => (
+              <SortableRow
+                key={face.tab.id}
+                group={groupKey}
+                index={index}
+                face={face}
+                active={face.tab.id === activeId}
+                onJump={jump}
+                onMenu={onMenu}
+                home={face.tab.id === homeId}
+                depth={depth}
+                {...(tree ? { tree } : {})}
+                // An orchestrator's players carry no band: only the
+                // home's shows.
+                band={!players || face.tab.id === homeId}
+              />
+            ))}
+          </ul>
+        </SortableContext>
       </ScrollArea>
     </PopoverContent>
   );

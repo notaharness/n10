@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures/desktop.js';
 import type { Locator } from '@playwright/test';
 import { createWorktree, tab } from './setup/app.js';
+import { startLoneShells } from './setup/terminals.js';
 
 /** Whether `el` lies within `box` from side to side. */
 async function inView(el: Locator, box: Locator): Promise<boolean> {
@@ -24,12 +25,11 @@ test('All tabs lists grouped tabs in strip order and jumps to one', async ({
     'gamma',
   ]);
   await all.getByRole('button', { name: /beta/ }).click();
-  await expect(tab(page, /beta/)).toHaveAttribute('aria-selected', 'true');
-  await expect
-    .poll(() =>
-      page.evaluate(() => document.activeElement?.getAttribute('data-tab-id'))
-    )
-    .toBe(await tab(page, /beta/).getAttribute('data-tab-id'));
+  // Behind the repository's chip, which names it and takes the focus.
+  const chip = page.locator('[data-group-chip^="place:"]');
+  await expect(chip).toHaveAttribute('aria-selected', 'true');
+  await expect(chip.locator('[data-group-active-label]')).toHaveText(/beta/);
+  await expect(chip).toBeFocused();
 });
 
 test.describe('scroll strip controls', () => {
@@ -37,9 +37,17 @@ test.describe('scroll strip controls', () => {
   test('shows fixed All tabs and working scroll arrows when tabs overflow', async ({
     desktop,
   }) => {
-    const { page } = desktop;
-    for (let i = 0; i < 10; i++)
-      await createWorktree(page, `feature-${i}-long-branch-name`);
+    const { page, homeDir } = desktop;
+    // Shells each alone in a directory, so every one stands on the strip.
+    const names = Array.from(
+      { length: 10 },
+      (_, i) => `feature-${i}-long-branch-name`
+    );
+    startLoneShells(homeDir, names);
+    for (const name of names)
+      await expect(tab(page, new RegExp(name))).toBeAttached({
+        timeout: 30_000,
+      });
     const strip = page.getByRole('tablist', { name: 'Open tabs' });
     await expect(strip).toHaveAttribute('data-overflow', 'scroll');
     const firstTab = strip.locator('[data-tab-id]').first();
@@ -48,15 +56,16 @@ test.describe('scroll strip controls', () => {
       .toBeGreaterThan(215);
     const right = page.getByRole('button', { name: 'Scroll tabs right' });
     const left = page.getByRole('button', { name: 'Scroll tabs left' });
-    // The strip keeps its active tab in view: the last one opened, at
-    // the far end, then the first one, near the start again.
-    const active = strip.getByRole('tab', { selected: true });
-    await expect(active).toHaveText(/feature-9-long-branch-name/);
-    await expect.poll(() => inView(active, strip)).toBe(true);
+    // The strip keeps its active tab in view: the last one, at the far
+    // end, then the first one, near the start again.
+    const placed = strip.locator('[data-tab-id]');
+    await page.keyboard.press('Control+9');
+    await expect(placed.last()).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => inView(placed.last(), strip)).toBe(true);
     await expect(left).toHaveAttribute('aria-disabled', 'false');
     await page.keyboard.press('Control+1');
-    await expect(active).toHaveText(/feature-0-long-branch-name/);
-    await expect.poll(() => inView(active, strip)).toBe(true);
+    await expect(placed.first()).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => inView(placed.first(), strip)).toBe(true);
     await strip.evaluate((el) => {
       el.scrollLeft = 0;
     });

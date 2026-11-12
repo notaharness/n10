@@ -1,4 +1,5 @@
-import { useDndContext, useDndMonitor } from '@dnd-kit/core';
+import { useDndContext, useDndMonitor, type Active } from '@dnd-kit/core';
+import { isStripDragData } from './strip-drag.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Resting on a chip this long opens its roster. */
@@ -9,18 +10,26 @@ export const HOVER_CLOSE_MS = 180;
 
 /**
  * How a roster is open: `hover` (the pointer rests on the chip; it
- * closes when the pointer leaves), `pinned` (a press opened it, or
- * pressed it while hover had it open; it closes on a choice, Escape or a
- * press outside) or `keyboard` (as pinned, with its rows focused).
+ * closes when the pointer leaves), `pinned` (held open while a row's
+ * menu is up; it closes on a choice, Escape or a press outside) or
+ * `keyboard` (as pinned, with its rows focused).
  */
 export type RosterMode = 'hover' | 'pinned' | 'keyboard';
 
-/** A roster's open state, for `Popover`'s controlled `open`. */
-export function useRosterOpen() {
+/** The roster a drag's row is in, if it drags a row. */
+const rowOf = (active: Active | null | undefined): string | undefined => {
+  const data = active?.data.current;
+  return isStripDragData(data) ? data.row : undefined;
+};
+
+/** A roster's open state, for `Popover`'s controlled `open`. `group`:
+ *  the group it lists, whose rows' drags hold it open. */
+export function useRosterOpen(group?: string) {
   const [mode, setMode] = useState<RosterMode | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Escape keeps hover from opening it again until the pointer leaves.
-  const suppressed = useRef(false);
+  // How it was open when one of its rows was picked up: a row landing
+  // back in it, or put back with Escape, leaves it open that way again.
+  const before = useRef<RosterMode | null>(null);
   const dragging = useDndContext().active !== null;
 
   const clear = () => {
@@ -33,28 +42,43 @@ export function useRosterOpen() {
     clear();
     setMode(null);
   }, []);
+  const own = (active: Active) =>
+    group !== undefined && rowOf(active) === group;
+  const putBack = () => setMode(before.current ?? 'pinned');
   // A drag is no rest: a pending open is dropped, and a hover-open
-  // roster closes.
+  // roster closes, unless the drag is one of its own rows, which holds
+  // it open until the row is dropped back in it or carried away.
   useDndMonitor({
-    onDragStart() {
+    onDragStart({ active }) {
       clear();
-      setMode((now) => (now === 'hover' ? null : now));
+      if (own(active)) before.current = mode;
+      setMode((now) => (own(active) ? 'pinned' : now === 'hover' ? null : now));
+    },
+    onDragEnd({ active, over }) {
+      if (!own(active)) return;
+      const data = over?.data.current;
+      if (isStripDragData(data) && data.row === group) putBack();
+      else close();
+    },
+    onDragCancel({ active }) {
+      if (own(active)) putBack();
     },
   });
 
   return {
     mode,
     open: mode !== null,
-    /** The pointer came onto the chip or the roster. */
+    /** The pointer came onto the chip or the roster. Only coming onto
+     *  it opens it: a pointer still resting where Escape closed it does
+     *  not open it again. */
     enter() {
       clear();
-      if (mode !== null || dragging || suppressed.current) return;
+      if (mode !== null || dragging) return;
       timer.current = setTimeout(() => setMode('hover'), HOVER_OPEN_MS);
     },
     /** The pointer left the chip or the roster. */
     leave() {
       clear();
-      suppressed.current = false;
       if (mode === 'hover') timer.current = setTimeout(close, HOVER_CLOSE_MS);
     },
     /** A press anywhere on the chip: the pointer is not resting, so a
@@ -62,18 +86,15 @@ export function useRosterOpen() {
     cancelHover() {
       if (mode === null) clear();
     },
-    /** A press on the roster button or a label that opens it. */
-    press() {
+    /** Keep a hover-open roster open, as a press would (its row's menu
+     *  takes the pointer away). */
+    hold() {
       clear();
-      setMode((now) => (now === null || now === 'hover' ? 'pinned' : null));
+      setMode((now) => (now === 'hover' ? 'pinned' : now));
     },
     openByKeyboard() {
       clear();
       setMode('keyboard');
-    },
-    escaped() {
-      suppressed.current = true;
-      close();
     },
     close,
   };

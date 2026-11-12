@@ -123,7 +123,8 @@ Every rule below has its reasoning in `docs/decisions.md`.
   rows (`lib/tabs/tab-affiliation.ts`). Groups are presentation only:
   `present` (`lib/tabs/tab-groups.ts`) derives them from a pane's tab order
   every render, pinned tabs first, and positional switching walks its
-  order. Collapse is `Workspace.collapsed`; drag legality is
+  order. A group of two tabs or more is one chip, drawn as a tab, whose
+  roster lists its tabs; nothing expands into the row. Drag legality is
   `components/editor/strip-drag.ts`. Rules and reasoning: decisions.md
   "Tab groups".
 - The strip's state is a `Workspace` (`lib/tabs/workspace.ts`): a layout
@@ -233,9 +234,9 @@ Every rule below has its reasoning in `docs/decisions.md`.
   shows it (`showSession`), which is what marks output seen.
 - The tab strip wraps or scrolls as the `tabOverflow` desktop pref says,
   chosen from a tab's menu (radio items). Wrapped, dnd-kit sorts it with
-  `rectSortingStrategy` and no axis lock; plain flex-wrap leaves space
-  after each row's tabs, and the strip's end (`StripEnd`) takes the last
-  row's remaining room. Either way the
+  `rectSortingStrategy` and no axis lock; a full row's tabs grow to share
+  its width, and the strip's end (`StripEnd`) takes the last row's
+  remaining room. Either way the
   dragged tab stays inside the strip (`holdInStrip`, `drag-preview.ts`):
   past its end it would widen a scrolling box that auto-scroll then
   chases. Carried out of the strip it stays in its place, faded, and a

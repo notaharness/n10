@@ -9,14 +9,7 @@ import {
 } from '../../lib/tabs/attention-round.js';
 import { rowStatus } from '../../lib/tabs/group-status.js';
 import { setStripCommands } from '../../lib/tabs/strip-commands.js';
-import {
-  groupOf,
-  isCollapsed,
-  presentedIds,
-  shownTabIds,
-  tabStopOf,
-  type TabGroup,
-} from '../../lib/tabs/tab-groups.js';
+import { stopOf, tabStopOf, type TabGroup } from '../../lib/tabs/tab-groups.js';
 import { indexItems } from '../../lib/tabs/tab-item.js';
 import { useTabs } from '../../lib/tabs/tabs.js';
 import { useRequestAgentView } from '../../lib/tabs/tab-views.js';
@@ -69,7 +62,7 @@ export function EditorArea({
   const requestAgentView = useRequestAgentView();
   const closer = useCloseTabs(items);
   const index = indexItems(repo.cwd, items);
-  const { groups, faceOf, colorOf, factsOf, activitySource } =
+  const { groups, faceOf, colorOf, signalOf, factsOf, activitySource } =
     useStripGroups(items);
   const derivedOf = useChipLabels(groups, faceOf);
   const [announced, announce] = useState('');
@@ -88,29 +81,7 @@ export function EditorArea({
   const pins = groups.filter((g) => g.pinned).length;
   const { stripMenu } = usePaneMenus();
 
-  const tabStopId = tabStopOf(
-    presentedIds(groups),
-    shownTabIds(groups, tabs.collapsed),
-    tabs.activeId
-  );
-
-  const activeGroup = groupOf(groups, tabs.activeId);
-  const others = groups.filter((g) => g.chipped && g !== activeGroup);
-  const canCollapseOthers =
-    others.some((g) => !isCollapsed(g, tabs.collapsed)) ||
-    (!!activeGroup && isCollapsed(activeGroup, tabs.collapsed));
-  const collapseOthers = () => {
-    if (!canCollapseOthers) {
-      announce('No other groups to collapse');
-      return;
-    }
-    tabs.setCollapsed(
-      others.map((g) => g.key),
-      true
-    );
-    if (activeGroup?.chipped) tabs.setCollapsed([activeGroup.key], false);
-    announce(activeGroup ? 'Other groups collapsed' : 'Groups collapsed');
-  };
+  const tabStop = tabStopOf(groups, tabs.activeId);
   const attention = () => {
     const faces = groups.flatMap((group) => group.tabs.map(faceOf));
     const step = nextAttention(
@@ -149,7 +120,6 @@ export function EditorArea({
     if (!tabs.focused) return;
     setStripCommands({
       attention,
-      collapseOthers,
       togglePin: () => {
         const id = tabs.activeId;
         if (id !== null) tabs.setPinned([id], !tabs.pinned.includes(id));
@@ -182,14 +152,11 @@ export function EditorArea({
       label={labelOf(group)}
       faceOf={faceOf}
       color={colorOf(group)}
-      collapsed={isCollapsed(group, tabs.collapsed)}
+      signal={signalOf(group)}
       closer={closer}
-      tabStopId={tabStopId}
+      tabStop={stopOf(group) === tabStop}
       menu={{
-        canCollapseOthers,
-        collapseOthers,
         rename: () => rename(group.key, derivedOf(group)),
-        setCollapsed: (collapsed) => tabs.setCollapsed([group.key], collapsed),
         ...supervise.menuFor(group),
       }}
     />
@@ -227,8 +194,6 @@ export function EditorArea({
               const face = faceOf(tab);
               if (tab.kind === 'item' && face.status === 'new-output')
                 requestAgentView(tab.id);
-              const group = groupOf(groups, tab.id);
-              if (group?.chipped) tabs.setCollapsed([group.key], false);
               tabs.activate(tab.id);
               revealTab(tabs.paneId, tab.id);
             }}
@@ -257,7 +222,7 @@ export function EditorArea({
                   }}
                   active={tab.id === tabs.activeId}
                   closer={closer}
-                  tabStop={tab.id === tabStopId}
+                  tabStop={tab.id === tabStop}
                   pinned={run.lead.pinned}
                   rename={run.lead.pinned ? undefined : renameAlone(run.lead)}
                 />
@@ -310,6 +275,7 @@ export function EditorArea({
           faceOf={faceOf}
           labelOf={labelOf}
           colorOf={colorOf}
+          signalOf={signalOf}
         />
       </div>
       {confirmDialog}
@@ -325,7 +291,7 @@ function PinsEnd() {
     <div
       aria-hidden
       data-pins-end
-      className="ml-2 w-px shrink-0 self-stretch bg-border"
+      className="w-px shrink-0 self-stretch bg-border"
     />
   );
 }

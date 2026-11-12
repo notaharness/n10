@@ -6,8 +6,8 @@ import { cn } from '../../lib/utils.js';
 import { Tip } from '../ui/tooltip.js';
 
 /**
- * The marks a tab carries, shared by the strip's tabs and the player
- * rows an orchestrator tab lists, which are drawn as tabs.
+ * The marks a tab carries, shared by the strip's tabs, its groups'
+ * chips and the rows of a group's roster.
  */
 
 /** A tab's colours in each state. Opaque in every one: the close button

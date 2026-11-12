@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { acceptsDrop, dropMove, type StripDragData } from './strip-drag.js';
 
-const member = (group: string, index: number): StripDragData => ({
-  kind: 'member',
-  label: 'm',
-  group,
-  index,
-});
 const block = (ids: string[], index: number): StripDragData => ({
   kind: 'block',
   label: 'b',
@@ -15,14 +9,8 @@ const block = (ids: string[], index: number): StripDragData => ({
 });
 
 describe('strip drag', () => {
-  it('lets a member land only among its own group’s members', () => {
-    expect(acceptsDrop(member('g', 1), member('g', 0))).toBe(true);
-    expect(acceptsDrop(member('h', 1), member('g', 0))).toBe(false);
-    expect(acceptsDrop(block(['x'], 1), member('g', 0))).toBe(false);
-  });
-  it('lets a block land only between blocks', () => {
+  it('lets a block land between blocks', () => {
     expect(acceptsDrop(block(['x'], 1), block(['a', 'b'], 0))).toBe(true);
-    expect(acceptsDrop(member('g', 0), block(['a', 'b'], 0))).toBe(false);
   });
   it('keeps pinned tabs among the pinned, and everything else out of them', () => {
     const pin = (id: string, index: number): StripDragData =>
@@ -33,20 +21,6 @@ describe('strip drag', () => {
     expect(acceptsDrop(pin('p', 0), pin('q', 1))).toBe(true);
     expect(acceptsDrop(block(['x'], 2), pin('q', 1))).toBe(false);
     expect(acceptsDrop(pin('p', 0), block(['x'], 2))).toBe(false);
-  });
-  it('moves a member before or after its target by their places', () => {
-    expect(dropMove('a', member('g', 0), 'c', member('g', 2), [])).toEqual({
-      kind: 'move',
-      ids: ['a'],
-      targetId: 'c',
-      side: 'after',
-    });
-    expect(dropMove('c', member('g', 2), 'a', member('g', 0), [])).toEqual({
-      kind: 'move',
-      ids: ['c'],
-      targetId: 'a',
-      side: 'before',
-    });
   });
   it('arranges the strip as presented, with the block in its new place', () => {
     const blocks = [['a', 'b'], ['c'], ['d', 'e']];
@@ -93,41 +67,76 @@ describe('strip drag', () => {
       side: 'before',
     });
   });
-  it('lets a member land in another pane’s strip, beside a block or its own group', () => {
-    const tab = { ...member('g', 1), pane: 'pane-1' };
-    const there: StripDragData = {
-      kind: 'block',
-      label: 'b',
-      ids: ['c', 'd'],
-      index: 0,
-      pane: 'pane-2',
-    };
-    expect(acceptsDrop(there, tab)).toBe(true);
-    expect(acceptsDrop({ ...there, pane: 'pane-1' }, tab)).toBe(false);
-    expect(acceptsDrop({ ...there, pinned: true } as StripDragData, tab)).toBe(
-      false
-    );
-    expect(acceptsDrop({ ...member('h', 0), pane: 'pane-2' }, tab)).toBe(false);
-    expect(dropMove('a', tab, 'block:h', there, [], 'after')).toEqual({
+  it('lands where the other pane’s strip showed the slot, whatever its stored order', () => {
+    // The other pane stores x, o, p but presents the orchestrator's chip
+    // [o, p] first, then x; the drop is on the chip's right half.
+    const carried = { ...block(['y'], 0), pane: 'pane-1' };
+    const chip = { ...block(['o', 'p'], 0), pane: 'pane-2' };
+    const there = [['o', 'p'], ['x']];
+    expect(
+      dropMove('block:y', carried, 'block:o', chip, [['y']], 'after', there)
+    ).toEqual({
       kind: 'move',
-      ids: ['a'],
-      targetId: 'd',
+      ids: ['y'],
+      targetId: 'p',
       side: 'after',
+      order: ['o', 'p', 'y', 'x'],
     });
-    // Beside its own group's member there, on the pointer's side.
+    expect(
+      dropMove('block:y', carried, 'block:o', chip, [['y']], 'before', there)
+    ).toMatchObject({ order: ['y', 'o', 'p', 'x'] });
+    // A strip that changed under the drag gives the anchor alone.
+    expect(
+      dropMove('block:y', carried, 'block:o', chip, [['y']], 'after', [['x']])
+    ).not.toHaveProperty('order');
+  });
+  it('makes no move onto itself', () => {
+    const blocks = [['a'], ['b']];
+    expect(
+      dropMove('block:a', block(['a'], 0), 'block:a', block(['a'], 0), blocks)
+    ).toBeNull();
+  });
+});
+
+describe('a roster row', () => {
+  const row = (id: string, index: number, pane = 'p1', group = 'g') =>
+    ({
+      ...block([id], index),
+      pane,
+      row: group,
+    } as StripDragData);
+  const onStrip = (ids: string[], index: number, pane: string) =>
+    ({ ...block(ids, index), pane } as StripDragData);
+
+  it('lands among its own group’s rows, or on another pane’s strip, never its own strip', () => {
+    expect(acceptsDrop(row('b', 1), row('a', 0))).toBe(true);
+    expect(acceptsDrop(row('b', 1, 'p1', 'h'), row('a', 0))).toBe(false);
+    expect(acceptsDrop(onStrip(['x'], 0, 'p2'), row('a', 0))).toBe(true);
+    expect(acceptsDrop(onStrip(['x'], 0, 'p1'), row('a', 0))).toBe(false);
+    // Nor does a strip's block land on a row.
+    expect(acceptsDrop(row('a', 0), onStrip(['x'], 0, 'p1'))).toBe(false);
+  });
+
+  it('moves its tab beside the row it is dropped on, in the strip as presented', () => {
+    const blocks = [['x'], ['a', 'b', 'c'], ['y']];
+    expect(
+      dropMove('row:a', row('a', 0), 'row:c', row('c', 2), blocks)
+    ).toEqual({ kind: 'arrange', ids: ['x', 'b', 'c', 'a', 'y'] });
+    expect(
+      dropMove('row:c', row('c', 2), 'row:a', row('a', 0), blocks)
+    ).toEqual({ kind: 'arrange', ids: ['x', 'c', 'a', 'b', 'y'] });
+  });
+
+  it('goes beside a block on another pane’s strip', () => {
     expect(
       dropMove(
-        'a',
-        tab,
-        'x',
-        { ...member('g', 3), pane: 'pane-2' },
+        'row:a',
+        row('a', 0),
+        'block:x',
+        onStrip(['x'], 0, 'p2'),
         [],
-        'before'
+        'after'
       )
-    ).toEqual({ kind: 'move', ids: ['a'], targetId: 'x', side: 'before' });
-  });
-  it('makes no move onto itself or another group’s member', () => {
-    expect(dropMove('a', member('g', 0), 'a', member('g', 0), [])).toBeNull();
-    expect(dropMove('a', member('g', 0), 'x', member('h', 0), [])).toBeNull();
+    ).toEqual({ kind: 'move', ids: ['a'], targetId: 'x', side: 'after' });
   });
 });

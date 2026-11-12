@@ -11,6 +11,19 @@ export async function tabNames(page: Page): Promise<string[]> {
   return (await tabs(page).allInnerTexts()).map((t) => t.split('\n')[0].trim());
 }
 
+/** The strip's tabs as the first of `names` each one's whole text
+ *  contains, left to right: a label may carry its place or directory
+ *  around the name, and be cut to fit where it shows. */
+export async function namedTabs(
+  page: Page,
+  names: readonly string[]
+): Promise<string[]> {
+  const texts = await tabs(page).evaluateAll((els) =>
+    els.map((el) => el.textContent ?? '')
+  );
+  return texts.map((text) => names.find((name) => text.includes(name)) ?? text);
+}
+
 /** Press `from` and carry it, in pointer steps, over `to`'s centre —
  *  still held, so the test can look at the strip mid-drag. */
 export async function carryOver(page: Page, from: Locator, to: Locator) {

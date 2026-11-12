@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/desktop.js';
-import { showChanges, sidebarRow, tab, tabs } from './setup/app.js';
+import { keepOpen, showChanges, showTab, sidebarRow } from './setup/app.js';
 import { updateFakeGh, type FakeGitHub } from './setup/fake-gh.js';
 import {
   commitOnBranch,
@@ -191,13 +191,13 @@ test.describe('when it moves while another pull request is in front', () => {
     // pane until it is in front again.
     await sidebarRow(page, /Exact head/).click();
     await showChanges(page);
-    await tab(page, /Exact head/).dblclick();
+    await keepOpen(page, desktop.app, /Exact head/);
     await expect(diffText(page, 'first version')).toBeVisible({
       timeout: 30_000,
     });
     await sidebarRow(page, /Other change/).click();
     await showChanges(page);
-    await tab(page, /Other change/).dblclick();
+    await keepOpen(page, desktop.app, /Other change/);
     await expect(diffText(page, 'other change')).toBeVisible({
       timeout: 30_000,
     });
@@ -213,12 +213,14 @@ test.describe('when it moves while another pull request is in front', () => {
       timeout: 30_000,
     });
 
-    await tab(page, /Exact head/).click();
+    await showTab(page, /Exact head/);
     await expect(page.getByRole('status', { name: 'New commits' })).toBeVisible(
       { timeout: 30_000 }
     );
     await expect(diffText(page, 'first version')).toBeVisible();
     await expect(diffText(page, 'second version')).toHaveCount(0);
-    await expect(tabs(page)).toHaveCount(2);
+    await expect(
+      page.locator('[data-group-chip^="place:"] [data-group-count]')
+    ).toHaveText('2');
   });
 });

@@ -18,6 +18,7 @@ import {
   stopFollowing,
   tileGroup,
 } from './supervise.js';
+import { arrangeTabs } from './tab-order.js';
 import { placeFor } from './tab-placement.js';
 import { prunePaneLabels, reconciledPaneLabels } from './tab-label-state.js';
 import type { TabsAction } from './tabs-model.js';
@@ -126,10 +127,18 @@ function crossPaneMove(
     (id) => Object.hasOwn(ws.tabs, id) && !dest?.order.includes(id)
   );
   if (!dest || !elsewhere) return null;
-  return moveToPane(ws, action.ids, dest.id, {
+  const moved = moveToPane(ws, action.ids, dest.id, {
     targetId: action.targetId,
     side: action.side,
   });
+  // Where the destination's strip showed the slot, not where its stored
+  // order puts the anchor: its order becomes the user's.
+  if (!action.order || moved === ws) return moved;
+  return withStrip(
+    moved,
+    dest.id,
+    arrangeTabs(stripOf(moved, dest.id), action.order)
+  );
 }
 
 /** The tab an action names, and whether bringing it to the front
@@ -299,7 +308,6 @@ function distribute(
   return {
     ...ws,
     pinned: pinned.length === after.pinned.length ? after.pinned : pinned,
-    collapsed: after.collapsed,
     dismissed: after.dismissed,
     groupNames: after.groupNames,
     unseen: after.unseen,
@@ -320,7 +328,15 @@ function settle(ws: Workspace): Workspace {
   const unseen = next.unseen.filter((id) => !shown.has(id));
   const seen =
     unseen.length === next.unseen.length ? next : { ...next, unseen };
-  return prunePaneLabels(remembered(seen));
+  return pruneArranged(prunePaneLabels(remembered(seen)));
+}
+
+/** Only live panes stay arranged: a pane id is minted again after its
+ *  pane closes, and the new pane is nobody's arrangement. */
+function pruneArranged(ws: Workspace): Workspace {
+  const live = new Set(panesOf(ws.layout).map((p) => p.id));
+  const arranged = ws.arranged.filter((id) => live.has(id));
+  return arranged.length === ws.arranged.length ? ws : { ...ws, arranged };
 }
 
 function remembered(ws: Workspace): Workspace {
