@@ -350,7 +350,12 @@ test.describe('Tab groups', () => {
     // A member's task names its roster row, and the chip while shown.
     const session = findN10SessionFor(first, homeDir) as string;
     setTmuxPaneTitle(session, 'Probe scan', homeDir);
-    await openRoster(page, place);
+    // Opened from the keyboard, it stays open while the title is polled:
+    // one a rest opened closes on any pointer leave, and parallel
+    // workers' windows on one X display move the pointer.
+    await place.focus();
+    await page.keyboard.press('Alt+ArrowDown');
+    await expect(roster(page)).toBeVisible();
     const row = rosterRows(page).filter({ hasText: 'Probe scan' });
     await expect(row).toHaveCount(1, { timeout: 30_000 });
     await expect(
