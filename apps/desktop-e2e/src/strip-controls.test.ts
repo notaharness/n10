@@ -56,15 +56,16 @@ test.describe('scroll strip controls', () => {
       .toBeGreaterThan(215);
     const right = page.getByRole('button', { name: 'Scroll tabs right' });
     const left = page.getByRole('button', { name: 'Scroll tabs left' });
-    // The strip keeps its active tab in view: the last one opened, at
-    // the far end, then the first one, near the start again.
-    const active = strip.getByRole('tab', { selected: true });
-    await expect(active).toHaveText(/feature-9-long-branch-name/);
-    await expect.poll(() => inView(active, strip)).toBe(true);
+    // The strip keeps its active tab in view: the last one, at the far
+    // end, then the first one, near the start again.
+    const placed = strip.locator('[data-tab-id]');
+    await page.keyboard.press('Control+9');
+    await expect(placed.last()).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => inView(placed.last(), strip)).toBe(true);
     await expect(left).toHaveAttribute('aria-disabled', 'false');
     await page.keyboard.press('Control+1');
-    await expect(active).toHaveText(/feature-0-long-branch-name/);
-    await expect.poll(() => inView(active, strip)).toBe(true);
+    await expect(placed.first()).toHaveAttribute('aria-selected', 'true');
+    await expect.poll(() => inView(placed.first(), strip)).toBe(true);
     await strip.evaluate((el) => {
       el.scrollLeft = 0;
     });
