@@ -175,13 +175,14 @@ describe('saveWorkspace', () => {
     });
   });
 
-  it('writes what is waiting when the host shuts down', () => {
+  // What the host's shutdown calls (`host-worker.spec.ts`). Read off
+  // disk: a load would flush the save itself.
+  it('writes what is waiting at once when flushed', () => {
     void saveWorkspace({ a: 2 });
     flushWorkspace();
-    expect(loadWorkspace()).toEqual({
-      status: 'restored',
+    expect(JSON.parse(readFileSync(file(), 'utf8'))).toEqual({
+      version: WORKSPACE_VERSION,
       workspace: { a: 2 },
-      goneRepos: [],
     });
   });
 
