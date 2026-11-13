@@ -184,6 +184,7 @@ vi.mock('./services/machines.js', () =>
 vi.mock('./services/inbound-mail.js', () =>
   recorder('inboundMail', ['dismissInboundMail'])
 );
+vi.mock('./services/folders.js', () => recorder('folders', ['listDirectory']));
 
 const { createHostApi, createViewerApi } = await import(
   './register-handlers.js'
@@ -204,6 +205,7 @@ const WIRING: [keyof HostApi, unknown[], string][] = [
   ['getRepoInfo', ['/repo'], 'repo.getRepoInfo'],
   ['listRecentRepos', [], 'repo.listRecentRepos'],
   ['forgetRecent', ['/repo'], 'repo.forgetRecentRepo'],
+  ['listDirectory', ['/repo'], 'folders.listDirectory'],
 
   ['getSettingsView', [], 'settings.getSettingsView'],
   [
@@ -447,6 +449,7 @@ describe('host API wiring', () => {
       'getVersion', // built inline from process.versions
       'selectRepoDirectory', // native dialog, injected by main.ts
       'selectFolder', // the same dialog, any folder
+      'getHostTarget', // main.ts knows where the host runs
       'openExternal',
       'showContextMenu',
       'showAppMenu',

@@ -3,6 +3,8 @@ import {
   FIRST_DELAY_MS,
   MAX_DELAY_MS,
   MAX_RESTARTS,
+  REMOTE_MAX_DELAY_MS,
+  REMOTE_RESTARTS,
   RestartPolicy,
   STABLE_MS,
 } from './host-restarts.js';
@@ -46,5 +48,17 @@ describe('RestartPolicy', () => {
     policy.ready();
     c.advance(STABLE_MS);
     expect(policy.ended()).toBe(FIRST_DELAY_MS);
+  });
+
+  it('reconnects a remote host for as long as it takes, at a capped pace', () => {
+    const policy = new RestartPolicy(clock().now, REMOTE_RESTARTS);
+    const delays = Array.from({ length: 100 }, () => policy.ended());
+    expect(delays).not.toContain(null);
+    expect(delays.slice(0, 3)).toEqual([
+      FIRST_DELAY_MS,
+      FIRST_DELAY_MS * 2,
+      FIRST_DELAY_MS * 4,
+    ]);
+    expect(delays.at(-1)).toBe(REMOTE_MAX_DELAY_MS);
   });
 });

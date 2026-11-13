@@ -97,6 +97,9 @@ async function startElectron() {
       ...process.env,
       N10_VITE_URL: DEV_URL,
       N10_DESKTOP_VERSION: 'dev',
+      // The checkout's own host, not an installed n10 in WSL or over
+      // SSH, unless asked for (N10_HOST_COMMAND then runs a checkout there).
+      N10_HOST: process.env.N10_HOST || 'local',
       ELECTRON_ENABLE_LOGGING: '1',
     },
   });

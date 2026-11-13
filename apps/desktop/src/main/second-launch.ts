@@ -79,12 +79,15 @@ function bringForward(openWindow: () => void): void {
  * `openWindow` when there is none (macOS keeps running with every
  * window closed), and, when the launch named a repository, `open` it in
  * the page that has claimed launches (`launch-repo.ts`), by its
- * webContents id, or keep it for the next page that claims. Install
+ * webContents id, or keep it for the next page that claims. `toHost`
+ * names the repository as the session host sees it, or null for one the
+ * host cannot open (a Windows folder, for a host in WSL). Install
  * before the first window is created.
  */
 export function installSecondLaunch(
   open: (viewer: number, cwd: string) => void,
-  openWindow: () => void
+  openWindow: () => void,
+  toHost: (repo: string) => string | null = (repo) => repo
 ): void {
   app.on('browser-window-created', (_event, win) => {
     // The claim is the page's, so it ends when another document commits,
@@ -102,8 +105,13 @@ export function installSecondLaunch(
   });
   app.on('second-instance', (_event, _argv, _cwd, data) => {
     bringForward(openWindow);
-    const repo = requestedRepo(data);
-    if (!repo) return;
+    const requested = requestedRepo(data);
+    if (!requested) return;
+    const repo = toHost(requested);
+    if (!repo) {
+      console.warn(`[desktop] second launch: not on the host: ${requested}`);
+      return;
+    }
     const viewer = offerLaunchRepo(repo);
     if (viewer !== null) open(viewer, repo);
   });
