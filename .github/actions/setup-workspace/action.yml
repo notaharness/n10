@@ -12,9 +12,13 @@ runs:
       with:
         node-version: 24
 
+    # ImageOS (ubuntu24, …) is the runner's own variable, not in the
+    # `env` context.
     - id: node
       shell: bash
-      run: echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
+        echo "image=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
 
     # Native modules (node-pty) are built for this Node and runner image,
     # so both are in the key alongside the lockfile.
@@ -25,7 +29,7 @@ runs:
           node_modules
           apps/*/node_modules
           libs/*/node_modules
-        key: node-modules-v1-${{ runner.os }}-${{ env.ImageOS }}-${{ runner.arch }}-${{ steps.node.outputs.version }}-${{ hashFiles('package-lock.json') }}
+        key: node-modules-v1-${{ runner.os }}-${{ steps.node.outputs.image }}-${{ runner.arch }}-${{ steps.node.outputs.version }}-${{ hashFiles('package-lock.json') }}
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
