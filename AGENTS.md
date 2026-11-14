@@ -65,6 +65,10 @@ Next.js requires otherwise).
 - Install dependencies with `npm ci` in a fresh worktree before running code
   checks. Do not copy another checkout's `node_modules`; workspace links and
   nested dependencies must belong to this checkout. Typecheck before code edits.
+- In worktrees inside `.claude/worktrees/`, use `NX_DAEMON=false` for Nx
+  commands: the daemon can miss source edits under the ignored parent directory
+  and return stale cached results ([#338](https://github.com/notaharness/n10/issues/338)).
+  This workaround is scoped to those worktrees, not every checkout.
 - Run checks appropriate to the change. Full lint uses `--all` to include
   projects with their own ESLint configs. Claude's edit hook does not run in Codex.
 - Pre-commit runs lint-staged. Use `lint && git commit` so lint failure stops

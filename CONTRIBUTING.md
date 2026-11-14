@@ -6,42 +6,82 @@ Planned work lives on the [n10 roadmap](https://github.com/orgs/notaharness/proj
 grouped by epic. Issues labelled
 [`good first issue`](https://github.com/notaharness/n10/labels/good%20first%20issue)
 are small and fully specified. Comment on an issue before you start so nobody
-duplicates the work.
+duplicates the work. If no starter issue is available, open a question asking
+for a small task. Agree on the scope of substantial changes in the issue first.
 
 To propose something new, [open an issue](https://github.com/notaharness/n10/issues/new/choose)
 first. Describe the outcome you want and how we'd know it's done.
 
 ## Set up
 
-You need Node.js 22.12 or newer, Git and tmux 3.2 or newer. On Linux, also install
-`build-essential` and `python3` so `node-pty` compiles.
+Fork [notaharness/n10](https://github.com/notaharness/n10) on GitHub. Use Node.js
+24 to match CI (the product supports 22.12+), Git 2.38 or newer, and tmux 3.7
+or newer for the tests. The product itself supports tmux 3.2+, but older tmux
+versions can fail or skip tests that rely on 3.7 behavior.
+
+On Linux, install `build-essential` and `python3` so `node-pty` compiles.
+Replace `YOUR-USER` with your GitHub username and choose a topic branch name:
 
 ```sh
-git clone https://github.com/notaharness/n10.git
+git clone https://github.com/YOUR-USER/n10.git
 cd n10
+git remote add upstream https://github.com/notaharness/n10.git
+git fetch upstream
+git switch -c fix/your-change upstream/master
 npm ci
 ```
 
-Use `npm ci`, not `npm install`, so you get the locked dependency tree.
+Use `npm ci`, not `npm install`, so you get the locked dependency tree. Run it
+in each fresh worktree; do not copy another checkout's `node_modules`.
+
+### Optional tools and credentials
+
+- A signed-in agent CLI is needed to launch that agent in n10. It is not needed
+  for ordinary unit tests or offline e2e tests, which use fake agents/providers.
+- The `gh` CLI, signed in, is needed for live GitHub use. Offline tests do not
+  need your GitHub login or the maintainer's integration PAT.
+- Docker is needed for `npx nx e2e:visual desktop-e2e`, which uses a pinned
+  screenshot environment. It is not needed for the ordinary offline e2e suites.
+  Packaging smoke tests also use containers; see [testing.md](docs/testing.md).
+- Nix is optional. On Linux, `nix develop` provides Node 24, Git, tmux, gh and
+  native build tools. Browser dependencies and Docker are separate.
+- Live GitHub integration uses a dedicated fixture repository and a PAT with
+  write/admin access to it. Maintainers run that suite; do not request the PAT
+  or substitute a personal token just to make a fork PR pass.
 
 ## Run and check
 
+Find the Nx project for your change, then run the relevant app and checks:
+
 ```sh
+npx nx show projects
+npx nx show project desktop --json    # targets and configuration for one project
+npx nx serve desktop                  # Desktop from source, with reload
 npx nx serve cli                      # rebuild dependencies and run the TUI
-npx nx test <project>                 # unit tests
+npx nx dev website                    # site at http://localhost:3100
+npx nx test <project>                 # replace <project> with a listed project
 npx nx run-many -t lint --all         # warnings fail too
 npx nx run-many -t typecheck --all
 npx nx e2e cli-e2e                    # offline TUI tests
 npx nx e2e desktop-e2e                # offline Electron tests
 ```
 
-`AGENTS.md` lists the rest, including visual and live integration tests.
+Typecheck before editing code, then run checks that cover your change before
+pushing. In a worktree under `.claude/worktrees/`, prefix Nx commands with
+`NX_DAEMON=false` to avoid the known stale-cache condition in
+[#338](https://github.com/notaharness/n10/issues/338).
 
-Run the checks that cover your change before you push. CI runs lint, tests,
-typecheck, builds and end-to-end tests on every pull request, and a pre-commit
-hook runs lint on staged files. See [`docs/testing.md`](docs/testing.md) for
-test fixtures and visual QA, and [`docs/linting.md`](docs/linting.md) for lint
-budgets and when an exception is acceptable.
+Before browser or desktop e2e, install the runtime dependencies. CI uses
+`npx --no install-electron` and `npx playwright install --with-deps chromium`;
+Linux desktop tests also need `xvfb`. See [testing.md](docs/testing.md) for
+fixtures, platform requirements, Beam tests, screenshots and failure artifacts.
+Beam e2e downloads a public, checksum-verified test binary; no private build or
+Beam account is needed.
+
+The pre-commit hook formats and lints staged files. [linting.md](docs/linting.md)
+explains lint budgets, exceptions and the website's generated-type prerequisite.
+[AGENTS.md](AGENTS.md) lists package boundaries and the remaining conventions;
+[apps/website/README.md](apps/website/README.md) covers website-specific commands.
 
 ### tmux safety
 
@@ -82,6 +122,38 @@ Review its changes before you open a pull request.
 - Add or update tests for the behavior you change.
 - Fill in the pull request template.
 - Keep it small. Split unrelated changes into separate pull requests.
+
+Push your topic branch to your fork, then open a pull request against
+`notaharness/n10`'s `master`:
+
+```sh
+git push -u origin HEAD
+```
+
+### After opening a pull request
+
+A first-time contributor's Actions runs may wait for maintainer approval.
+You do not need to configure repository secrets. The required `main` check
+runs affected lint, tests, builds, typechecks, offline e2e, visual and Beam
+checks without the integration PAT.
+
+The Integration workflow skips its live job on fork PRs and explains the skip
+in its run summary. A maintainer's `master` run covers live GitHub integration
+after merge; a skip does not mean those tests ran on your PR. Same-repository
+PRs matching the workflow's paths still run live integration.
+
+Maintainers review the scope, behavior and code, and may ask for changes.
+Open a draft PR if you want feedback on the approach. Push revisions to the
+same branch and reply to review comments with what you addressed or what is
+still unclear. If a check is waiting on maintainer access, mention it in the
+PR. Passing CI alone is not a decision to merge.
+
+## Find your way around
+
+- [architecture.md](docs/architecture.md): package roles and dependency boundaries.
+- [decisions.md](docs/decisions.md): design rationale and known limitations.
+- [testing.md](docs/testing.md): fixtures, test prerequisites and CI coverage.
+- [linting.md](docs/linting.md): rules, budgets and exceptions.
 
 ## Releases
 
