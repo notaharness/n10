@@ -14,9 +14,11 @@ export default defineConfig({
   timeout: 120_000,
   workers: 1,
   retries: 0,
+  // `github` annotates the workflow run and pull request with each failure.
   reporter: process.env.CI
     ? [
         ['list'],
+        ...(process.env.GITHUB_ACTIONS ? [['github'] as const] : []),
         [
           'html',
           { open: 'never', outputFolder: './test-output/playwright/report' },
