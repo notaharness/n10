@@ -138,7 +138,7 @@ No pull request check uses a secret, so you do not need to configure any.
 CI first runs `Plan affected checks`, whose summary lists what this change
 affects and what it skips. Then lint, typechecks, unit tests and builds run in
 one job, while the desktop and TUI e2e suites run in parallel shards, such as
-`Desktop e2e (2/6)`, beside `Desktop screenshots` and `Desktop with beam`.
+`Desktop e2e (2/8)`, beside `Desktop screenshots` and `Desktop with beam`.
 Unaffected suites show as skipped. The required `main` check passes when
 every other job passed or was skipped. When a shard fails, its annotations
 name the test and its artifact holds the traces and screenshots;

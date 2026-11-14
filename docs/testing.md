@@ -301,11 +301,11 @@ The workflows are the source of truth for triggers, paths and commands:
   parallel:
 
   - `Lint, typecheck, unit tests, build`: those targets for affected projects.
-  - `Desktop e2e (n/6)` and `TUI e2e (n/3)`: the offline suites, split with
+  - `Desktop e2e (n/8)` and `TUI e2e (n/3)`: the offline suites, split with
     Playwright's `--shard`. Each shard builds what it tests and uploads its
     own traces, screenshots and video when it fails; Playwright's `github`
     reporter annotates the failing test. Re-run the failed shard alone, or
-    run its tests locally with `npx nx e2e desktop-e2e -- --shard=2/6`.
+    run its tests locally with `npx nx e2e desktop-e2e -- --shard=2/8`.
   - `Desktop screenshots` (`e2e:visual`) and `Desktop with beam` (`e2e:beam`).
   - `main`, the one required check, passes when every job above passed or was
     skipped because nothing affects it.

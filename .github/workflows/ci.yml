@@ -70,7 +70,7 @@ jobs:
       - run: npx nx affected -t lint test build typecheck
 
   desktop-e2e:
-    name: Desktop e2e (${{ matrix.shard }}/6)
+    name: Desktop e2e (${{ matrix.shard }}/8)
     needs: plan
     if: needs.plan.outputs.desktop-e2e == 'true'
     runs-on: ubuntu-latest
@@ -78,7 +78,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
 
@@ -86,7 +86,7 @@ jobs:
 
       - uses: ./.github/actions/setup-e2e
 
-      - run: npx nx run desktop-e2e:e2e -- --shard=${{ matrix.shard }}/6
+      - run: npx nx run desktop-e2e:e2e -- --shard=${{ matrix.shard }}/8
 
       - name: Upload this shard's traces and screenshots
         if: failure()
