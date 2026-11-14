@@ -61,11 +61,11 @@ scope, such as `fix(desktop): …`. Link the issue and describe what the code do
 A draft PR is useful for feedback on the approach; maintainers review the scope,
 behavior and code, and may ask for revisions.
 
-First-time Actions runs may wait for maintainer approval. The required `main`
-check needs no integration PAT. Fork PRs skip the live Integration job and get
-an explanation in the workflow summary; a maintainer's `master` run covers live
-integration after merge. A skip does not mean the live tests ran on your PR.
-You do not need to supply a token. See
+First-time Actions runs may wait for maintainer approval. No pull request
+check uses a secret, so you do not need to supply a token. CI plans the suites
+your change affects, runs them in parallel jobs with the e2e suites split into
+shards, and reports one required check, `main`. Live GitHub integration runs
+nightly on `master`, not on pull requests. See
 [after opening a pull request](https://github.com/notaharness/n10/blob/master/CONTRIBUTING.md#after-opening-a-pull-request)
 for the review and CI handoff.
 
