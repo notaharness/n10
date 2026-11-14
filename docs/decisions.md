@@ -886,7 +886,11 @@ failed or done, and none is inferred from silence, an exit or a pull
 request; the status type keeps those states for a source (tmux's pane
 program state). While the pane's active tab is a member, the chip takes the
 active tab's treatment and reads "group / member", the group's part cut
-first; it is the row's Tab stop then, as the active tab would be.
+first, down to its first 2.5rem, and the member's at 9rem; it is the row's
+Tab stop then, as the active tab would be. The chip is as wide as what it
+shows: neither cap may hold a percentage of the chip's width, which CSS
+drops while it sizes the chip by its contents (a cyclic percentage), so a
+cap written so would leave room for the text it cuts.
 
 The roster (`GroupRoster.tsx`) is a controlled popover anchored to the chip,
 listing the home first ("Orchestrator …"), then the members in strip order,

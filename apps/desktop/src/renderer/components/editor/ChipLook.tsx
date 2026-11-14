@@ -48,9 +48,16 @@ function ChipIcon({
 
 /**
  * The chip's name. With the pane's active tab among its members it reads
- * "group / member", as wide as a tab may be: the group's part is cut
- * first, and the member's label stops 3.5rem short of the whole width,
- * so a few letters of the group always show.
+ * "group / member": the group's whole name and at most 9rem of the
+ * member's, and the chip only as wide as that. Short of room, the
+ * group's part is cut first, down to its first 2.5rem, so a few letters
+ * of the group always show; then the member's.
+ *
+ * A width or max-width with a percentage in it counts as `auto` or
+ * `none` while the chip is sized by its contents (a cyclic percentage):
+ * a cap written so would leave the chip room for text the cap then
+ * cuts. The member's cap is a plain length; the group's floor is a
+ * percentage on purpose.
  */
 function ChipLabel({
   label,
@@ -66,20 +73,22 @@ function ChipLabel({
       </span>
     );
   return (
-    <span className="flex min-w-0 flex-1 items-baseline gap-1">
-      <span
-        data-group-label
-        className="min-w-0 shrink-[100] truncate text-muted-foreground"
-      >
-        {label}
+    <span className="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden">
+      {/* As wide as its text (`basis-[content]`), and never narrower
+          than its first 2.5rem or its whole text when that is shorter:
+          flex's automatic minimum, the lesser of `width` and the text.
+          That `width` is a percentage of the row, so it adds nothing to
+          the chip's width. The cut is its child's: this box is no
+          scroll container, which would lose the minimum. */}
+      <span className="w-[min(2.5rem,100%)] shrink-[100] basis-[content]">
+        <span data-group-label className="block truncate text-muted-foreground">
+          {label}
+        </span>
       </span>
       <span aria-hidden className="shrink-0 text-muted-foreground">
         /
       </span>
-      <span
-        data-group-active-label
-        className="max-w-[min(9rem,calc(100%-3.5rem))] min-w-0 truncate"
-      >
+      <span data-group-active-label className="max-w-36 min-w-0 truncate">
         {active.label}
       </span>
     </span>
