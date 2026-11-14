@@ -1,5 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -97,5 +103,30 @@ describe('gitLine', () => {
   it('trims the trailing newline off a one-line answer', async () => {
     const sha = await gitLine(['rev-parse', 'HEAD'], { cwd: repo });
     expect(sha).toMatch(/^[0-9a-f]{40}$/);
+  });
+});
+
+/**
+ * A read must not write the index. `git status` and `git diff` refresh
+ * stale stat data and write the index back when they can take
+ * `index.lock`, and a user's or agent's `git commit` that starts while
+ * n10 holds it fails with "index.lock: File exists".
+ */
+describe('runGit and the index', () => {
+  it('leaves a stale index unwritten', async () => {
+    const index = join(repo, '.git', 'index');
+    const past = new Date('2001-01-01T00:00:00Z');
+    utimesSync(join(repo, 'file.txt'), past, past);
+    const before = readFileSync(index);
+
+    await runGit(['status', '--porcelain'], { cwd: repo, maxBytes: 1024 });
+    await runGit(['diff', '--numstat', 'HEAD'], { cwd: repo, maxBytes: 1024 });
+    expect(readFileSync(index).equals(before)).toBe(true);
+
+    // The index really was stale: plain git rewrites it.
+    const env = { ...process.env };
+    delete env.GIT_OPTIONAL_LOCKS;
+    execFileSync('git', ['status', '--porcelain'], { cwd: repo, env });
+    expect(readFileSync(index).equals(before)).toBe(false);
   });
 });
