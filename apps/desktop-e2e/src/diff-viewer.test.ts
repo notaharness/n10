@@ -20,9 +20,7 @@ test.describe('Diff viewer (no changes)', () => {
     await sidebarRow(page, new RegExp(BRANCH)).click();
 
     await expect(page.getByText(/No changes between/)).toBeVisible();
-    await expect(
-      page.getByText('0 files changed DELIBERATE CI BREAK')
-    ).toBeVisible();
+    await expect(page.getByText('0 files changed')).toBeVisible();
   });
 });
 
