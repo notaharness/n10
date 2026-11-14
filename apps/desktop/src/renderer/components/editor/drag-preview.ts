@@ -1,5 +1,10 @@
 import { useContext, useSyncExternalStore, type CSSProperties } from 'react';
-import type { ClientRect, DragEndEvent, Modifier } from '@dnd-kit/core';
+import {
+  useDndContext,
+  type ClientRect,
+  type DragEndEvent,
+  type Modifier,
+} from '@dnd-kit/core';
 import {
   restrictToHorizontalAxis,
   restrictToParentElement,
@@ -182,6 +187,12 @@ export const holdInStrip =
  * a cross-pane drop would land, sliding open as the strip's own reorder
  * does, and, for the place a drag was carried out of, its tab faded and
  * left where it is.
+ *
+ * Margins slide only while a drag is under way. The first row's reserve
+ * is a margin too (`strip-first-row.ts`), placed as tabs open, labels
+ * settle and the strip resizes; sliding there, it would be measured
+ * mid-slide, place the row's end wrongly and slide again, and the row
+ * would shift under a tab about to be lifted.
  */
 export function useSlotStyle(
   id: string
@@ -194,6 +205,7 @@ export function useSlotStyle(
   const landing = useLanding(pane, id);
   const out = useCarriedOut();
   const still = usePrefersReducedMotion();
+  const slides = useDndContext().active !== null && !still;
   // Tabs touch on the strip: the slot is as wide as what lands. After
   // the block ending a wrapped strip's first row, it comes on top of
   // the room kept there for the strip's actions (`strip-first-row.ts`).
@@ -208,8 +220,8 @@ export function useSlotStyle(
     marginInlineStart: landing?.side === 'before' ? room : undefined,
     marginInlineEnd: landing?.side === 'after' ? roomAfter : undefined,
     opacity: dragging && out ? 0.4 : undefined,
-    transition: still
-      ? transition
-      : [transition, 'margin 200ms ease'].filter(Boolean).join(', '),
+    transition: slides
+      ? [transition, 'margin 200ms ease'].filter(Boolean).join(', ')
+      : transition,
   });
 }

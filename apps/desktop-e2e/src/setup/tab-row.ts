@@ -108,6 +108,37 @@ export function sidewaysScroll(page: Page) {
   });
 }
 
+/** Wait until `strip` (a tablist) holds still: its size, its scroll
+ *  extent and every tab's box the same two frames running. A resize
+ *  lays the strip out again over a frame or two (the first row's
+ *  reserve, the pane's own width), and a strip that changes keeps its
+ *  active tab in view, scrolling back what a test scrolled. */
+export async function expectStripSettled(strip: Locator) {
+  await expect
+    .poll(() =>
+      strip.evaluate(
+        (el) =>
+          new Promise<boolean>((done) => {
+            const shot = () =>
+              JSON.stringify([
+                el.clientWidth,
+                el.clientHeight,
+                el.scrollHeight,
+                ...[...el.querySelectorAll('[role=tab]')].map((t) => {
+                  const r = t.getBoundingClientRect();
+                  return [r.left, r.top, r.width, r.height];
+                }),
+              ]);
+            requestAnimationFrame(() => {
+              const before = shot();
+              requestAnimationFrame(() => done(shot() === before));
+            });
+          })
+      )
+    )
+    .toBe(true);
+}
+
 /** Where an element's box ends on the right, as laid out and moved. */
 export function rightEdge(l: Locator) {
   return l.evaluate((el) => el.getBoundingClientRect().right);

@@ -17,7 +17,12 @@ import {
   armContextMenuPeek,
   clickAppMenuItem,
 } from './setup/menu.js';
-import { LIFT, motion, namedTabs } from './setup/tab-row.js';
+import {
+  expectStripSettled,
+  LIFT,
+  motion,
+  namedTabs,
+} from './setup/tab-row.js';
 import { startLoneShells } from './setup/terminals.js';
 
 /**
@@ -191,17 +196,22 @@ test.describe('Tab strip overflow', () => {
     await expect(
       strip(page).getByRole('button', { name: 'All tabs' })
     ).toHaveCount(0);
-    // Short enough that the rows hit the strip's height cap and scroll.
+    // Short enough that the rows hit the strip's height cap and scroll,
+    // in any font: the cap (70% of a pane 142px tall) is under three
+    // rows, and seven tabs at least 112px wide take three rows of a
+    // strip 409px wide, the reserve for All tabs at the first's end.
     await app.evaluate(({ BrowserWindow }) => {
       const window = BrowserWindow.getAllWindows()[0]!;
       window.setMinimumSize(0, 0);
-      window.setContentSize(700, 260);
+      window.setContentSize(700, 200);
     });
     await expect
-      .poll(() =>
-        strip(page).evaluate((el) => el.scrollHeight - el.clientHeight)
-      )
-      .toBeGreaterThan(0);
+      .poll(() => page.evaluate(() => [innerWidth, innerHeight]))
+      .toEqual([700, 200]);
+    await expectStripSettled(strip(page));
+    expect(
+      await strip(page).evaluate((el) => el.scrollHeight - el.clientHeight)
+    ).toBeGreaterThan(0);
     await strip(page).evaluate((el) => {
       el.scrollTop = el.scrollHeight;
     });
