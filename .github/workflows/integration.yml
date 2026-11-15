@@ -23,7 +23,27 @@ permissions:
   contents: read
 
 jobs:
+  fork-notice:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Explain live integration coverage
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          ## Live integration skipped for this fork
+
+          These tests need a maintainer-owned GitHub fixture repository and
+          `INTEGRATION_TEST_PAT`, which is not available to fork pull requests.
+          You do not need to supply a token. The required `main` check runs
+          without this secret.
+
+          A maintainer's run on `master` covers live integration after merge.
+          This pull request's live integration tests have not run.
+          EOF
+
   integration:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

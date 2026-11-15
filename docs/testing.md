@@ -291,14 +291,32 @@ GH_TOKEN=<integration-pat> gh api \
   -f body="kirby-test-runner involvement marker — keeps PR #322 visible to the involves: sidebar query for the outdated-thread fixture test."
 ```
 
-**CI pipelines:**
+## CI coverage
 
-- **CI** (`.github/workflows/ci.yml`) — runs `nx affected -t lint test build typecheck e2e`. Runs `npx playwright install --with-deps chromium` before `nx affected` (needed for `cli-e2e`). Uploads `apps/cli-e2e/test-output/` as an artifact on failure. Integration tests skipped (no `GH_TOKEN`).
-- **Integration Tests** (`.github/workflows/integration.yml`) — runs `npx nx e2e:integration cli-e2e` with `GH_TOKEN` from the `INTEGRATION_TEST_PAT` secret. Triggers on PRs, pushes to master, and manual dispatch. Uses `concurrency` with `cancel-in-progress: false` because the test repo is shared state.
-- **Package** (`.github/workflows/package.yml`) — packs `@notaharness/n10` and runs `apps/cli/scripts/test-installed.sh` on the tarball in a clean container. Triggers on PRs touching packaging; the Release workflow calls it before publishing.
-- **Linux packages** (`.github/workflows/linux-packages.yml`) — builds the desktop's .deb and AppImage on x64 and arm64 runners, installs the deb in clean Ubuntu and launches both formats under Xvfb. The AppImage runs in extraction mode and normally with FUSE 3. Triggers on PRs touching the installer configuration; the Release workflow calls it.
-- **macOS packages** (`.github/workflows/macos-packages.yml`) — builds DMG and ZIP assets on Apple Silicon and Intel runners, installs each DMG, and checks the renderer and a shell PTY. Triggers on PRs touching the macOS installer; the Release workflow calls it.
-- **Release** (`.github/workflows/release.yml`) — publishes on a `v*` tag; see the `publish-beta` skill.
+The workflows are the source of truth for triggers, paths and commands:
+
+- [CI](../.github/workflows/ci.yml): the required `main` job runs affected lint,
+  unit tests, builds, typechecks, offline e2e and visual tests, then Beam e2e.
+  It needs no integration PAT. A separate `nix` job builds the package.
+- [Integration Tests](../.github/workflows/integration.yml): runs both CLI and
+  desktop live suites with `INTEGRATION_TEST_PAT` and the shared fixture repo.
+  Fork PRs skip the live job and get a summary explaining that a maintainer's
+  `master` run covers live integration after merge. Same-repository PRs matching
+  the workflow's paths, pushes to master and manual dispatch run the live job.
+  Workflow concurrency protects the shared fixture repository.
+- [Package](../.github/workflows/package.yml),
+  [Linux packages](../.github/workflows/linux-packages.yml) and
+  [macOS packages](../.github/workflows/macos-packages.yml): package and install
+  smoke tests on relevant PRs; also called by the release workflow.
+- [WSL2](../.github/workflows/wsl.yml): offline suites in WSL2, nightly and for
+  changes to its workflow or tools, plus manual dispatch.
+- [Release](../.github/workflows/release.yml): tag-based publishing and manual
+  rehearsals; see the `publish-beta` skill.
+
+First-time contributors may need a maintainer to approve Actions. That approval
+allows the workflows to start; it does not give fork PRs access to secrets.
+See [the contribution guide](../CONTRIBUTING.md#after-opening-a-pull-request)
+for the review and CI handoff.
 
 ## Orchestra interoperability
 

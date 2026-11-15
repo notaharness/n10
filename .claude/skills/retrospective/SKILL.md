@@ -24,9 +24,9 @@ Run this command after completing a significant implementation, especially when:
 git branch --show-current
 ```
 
-**If on `main` or the branch is unclear, ASK THE USER:**
+**If on `master` or the branch is unclear, ASK THE USER:**
 
-> "What branch should I analyze? (The current branch is `main` which suggests the work may have been merged already)"
+> "What branch should I analyze? (The current branch is `master` which suggests the work may have been merged already)"
 
 ---
 
@@ -133,13 +133,13 @@ Show the user what you've gathered:
 
 ```bash
 # First commit on branch
-git log main..[branch] --oneline --reverse | head -1
+git log master..[branch] --oneline --reverse | head -1
 
 # All commits with dates
-git log main..[branch] --format="%h %ad %s" --date=short
+git log master..[branch] --format="%h %ad %s" --date=short
 
 # Files modified
-git diff --stat main...[branch]
+git diff --stat master...[branch]
 
 # PR dates
 gh pr view [PR-NUMBER] --json createdAt,mergedAt
