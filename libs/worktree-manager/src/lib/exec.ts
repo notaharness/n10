@@ -17,6 +17,18 @@ export const GIT_NO_PROMPT_ENV = {
   GIT_SSH_COMMAND: 'ssh -o BatchMode=yes', // ssh: never prompt on TTY
 };
 
+/**
+ * n10's git calls run beside the user's and the agents' own git. A read
+ * such as `git status` refreshes stale stat data in the
+ * index and, when it can take `index.lock`, writes the index back as a
+ * side effect, so a `git commit` that starts meanwhile fails with
+ * "index.lock: File exists". `GIT_OPTIONAL_LOCKS=0` skips that optional
+ * write. A lock an operation needs is still taken.
+ */
+const GIT_NO_OPTIONAL_LOCKS_ENV = {
+  GIT_OPTIONAL_LOCKS: '0',
+};
+
 export function exec(
   command: string,
   options?: { encoding: BufferEncoding } & ExecOptions
@@ -24,7 +36,12 @@ export function exec(
   return execAsync(command, {
     timeout: GIT_TIMEOUT_MS,
     ...options,
-    env: { ...process.env, ...GIT_NO_PROMPT_ENV, ...options?.env },
+    env: {
+      ...process.env,
+      ...GIT_NO_PROMPT_ENV,
+      ...GIT_NO_OPTIONAL_LOCKS_ENV,
+      ...options?.env,
+    },
   });
 }
 

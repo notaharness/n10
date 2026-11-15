@@ -18,6 +18,19 @@ import { spawn } from 'node:child_process';
  * rejects, with git's own stderr as the message.
  */
 
+/**
+ * n10's reads run beside the user's and the agents' own git. `git status`
+ * and `git diff` refresh stale stat data and write the index back when
+ * they can take `index.lock`, so a `git commit` that starts meanwhile
+ * fails with "index.lock: File exists". `GIT_OPTIONAL_LOCKS=0` skips
+ * that write for status (the same as `@n10/worktree-manager`'s `exec`);
+ * `git diff <commit>` against the working tree ignores it and skips the
+ * write only with `diff.autoRefreshIndex` off, which leaves its output
+ * unchanged.
+ */
+const NO_INDEX_WRITE_ENV = { GIT_OPTIONAL_LOCKS: '0' };
+const NO_INDEX_REFRESH = ['-c', 'diff.autoRefreshIndex=false'];
+
 /** Enough of git's complaint to be diagnostic; it is never the payload. */
 const MAX_STDERR_BYTES = 64 * 1024;
 
@@ -48,8 +61,9 @@ export function runGitBytes(
   opts: GitRunOptions
 ): Promise<{ bytes: Buffer; truncated: boolean }> {
   return new Promise((resolve, reject) => {
-    const child = spawn('git', [...args], {
+    const child = spawn('git', [...NO_INDEX_REFRESH, ...args], {
       cwd: opts.cwd,
+      env: { ...process.env, ...NO_INDEX_WRITE_ENV },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     // A git that exits before reading all of its input (killed at the
