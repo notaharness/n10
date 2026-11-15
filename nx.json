@@ -9,7 +9,12 @@
       "!{projectRoot}/.eslintrc.json",
       "!{projectRoot}/eslint.config.mjs"
     ],
-    "sharedGlobals": []
+    "sharedGlobals": [
+      "{workspaceRoot}/.github/workflows/ci.yml",
+      "{workspaceRoot}/.github/actions/**/*",
+      "{workspaceRoot}/tools/ci/**/*",
+      "{workspaceRoot}/tools/tmux/**/*"
+    ]
   },
   "plugins": [
     {

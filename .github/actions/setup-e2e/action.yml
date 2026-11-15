@@ -1,0 +1,42 @@
+name: Set up the e2e runtime
+description: >
+  What the Playwright suites need besides node_modules: Playwright's
+  system packages and fonts, Chromium when a suite drives a browser,
+  Xvfb for Electron, and the tmux the suites run against.
+
+inputs:
+  chromium:
+    description: Install Playwright's Chromium (cli-e2e drives one; desktop-e2e drives Electron).
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - id: playwright
+      shell: bash
+      run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    - if: inputs.chromium == 'true'
+      id: browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-chromium-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+
+    # The system packages and fonts come with every run, cached browser
+    # or not: Electron renders with the same fonts, and the e2e suites
+    # measure text.
+    - if: inputs.chromium == 'true' && steps.browsers.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx playwright install --with-deps chromium
+
+    - if: inputs.chromium != 'true' || steps.browsers.outputs.cache-hit == 'true'
+      shell: bash
+      run: npx playwright install-deps chromium
+
+    # Electron has no headless mode of its own; run-e2e.mjs starts it
+    # inside xvfb-run.
+    - shell: bash
+      run: sudo apt-get install -y --no-install-recommends xvfb
+
+    - uses: ./.github/actions/setup-tmux

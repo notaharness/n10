@@ -295,15 +295,32 @@ GH_TOKEN=<integration-pat> gh api \
 
 The workflows are the source of truth for triggers, paths and commands:
 
-- [CI](../.github/workflows/ci.yml): the required `main` job runs affected lint,
-  unit tests, builds, typechecks, offline e2e and visual tests, then Beam e2e.
-  It needs no integration PAT. A separate `nix` job builds the package.
-- [Integration Tests](../.github/workflows/integration.yml): runs both CLI and
-  desktop live suites with `INTEGRATION_TEST_PAT` and the shared fixture repo.
-  Fork PRs skip the live job and get a summary explaining that a maintainer's
-  `master` run covers live integration after merge. Same-repository PRs matching
-  the workflow's paths, pushes to master and manual dispatch run the live job.
-  Workflow concurrency protects the shared fixture repository.
+- [CI](../.github/workflows/ci.yml) runs on every pull request and push to
+  `master`, with no secrets. `Plan affected checks` reads `nx affected` and
+  writes a summary of what runs and what is skipped; the jobs after it run in
+  parallel:
+
+  - `Lint, typecheck, unit tests, build`: those targets for affected projects.
+  - `Desktop e2e (n/8)` and `TUI e2e (n/3)`: the offline suites, split with
+    Playwright's `--shard`. Each shard builds what it tests and uploads its
+    own traces, screenshots and video when it fails; Playwright's `github`
+    reporter annotates the failing test. Re-run the failed shard alone, or
+    run its tests locally with `npx nx e2e desktop-e2e -- --shard=2/8`.
+  - `Desktop screenshots` (`e2e:visual`) and `Desktop with beam` (`e2e:beam`).
+  - `main`, the one required check, passes when every job above passed or was
+    skipped because nothing affects it.
+
+  A suite with no affected project is skipped. Changes to the workflow,
+  `.github/actions`, `tools/ci` or `tools/tmux` are shared Nx inputs
+  (`nx.json`), so they run every suite. A newer push to a pull request
+  cancels its running checks. A separate `nix` job builds the package.
+
+- [Integration Tests](../.github/workflows/integration.yml) runs both live
+  suites with `INTEGRATION_TEST_PAT` and the shared fixture repository nightly
+  on `master` and on manual dispatch, never on pull requests. A failing
+  nightly opens or comments on one tracking issue, and the next passing one
+  closes it. Workflow concurrency queues runs against the shared fixture
+  repository.
 - [Package](../.github/workflows/package.yml),
   [Linux packages](../.github/workflows/linux-packages.yml) and
   [macOS packages](../.github/workflows/macos-packages.yml): package and install
@@ -314,7 +331,7 @@ The workflows are the source of truth for triggers, paths and commands:
   rehearsals; see the `publish-beta` skill.
 
 First-time contributors may need a maintainer to approve Actions. That approval
-allows the workflows to start; it does not give fork PRs access to secrets.
+allows the workflows to start; no pull request check uses a secret.
 See [the contribution guide](../CONTRIBUTING.md#after-opening-a-pull-request)
 for the review and CI handoff.
 

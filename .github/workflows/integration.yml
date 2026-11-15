@@ -1,17 +1,15 @@
 name: Integration Tests
 
+# The live suites: both shells against real GitHub through a dedicated
+# fixture repository and INTEGRATION_TEST_PAT. They mostly verify GitHub
+# as a vendor, so they run nightly on master and on manual dispatch, not
+# on pull requests; no pull request check needs a secret. A nightly
+# failure opens (or comments on) one tracking issue, and the next passing
+# nightly closes it.
+
 on:
-  push:
-    branches: [master]
-  pull_request:
-    paths:
-      - 'apps/cli/**'
-      - 'libs/**'
-      - 'apps/cli-e2e/**'
-      - 'apps/cli-wterm-host/**'
-      - 'apps/desktop/**'
-      - 'apps/desktop-e2e/**'
-      - '.github/workflows/integration.yml'
+  schedule:
+    - cron: '41 2 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -19,31 +17,11 @@ concurrency:
   cancel-in-progress: false # test repo is shared state — queue, don't cancel
 
 permissions:
-  actions: read
   contents: read
 
 jobs:
-  fork-notice:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-      - name: Explain live integration coverage
-        run: |
-          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
-          ## Live integration skipped for this fork
-
-          These tests need a maintainer-owned GitHub fixture repository and
-          `INTEGRATION_TEST_PAT`, which is not available to fork pull requests.
-          You do not need to supply a token. The required `main` check runs
-          without this secret.
-
-          A maintainer's run on `master` covers live integration after merge.
-          This pull request's live integration tests have not run.
-          EOF
-
   integration:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    name: Live GitHub integration
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -51,31 +29,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-workspace
+
+      - uses: ./.github/actions/setup-e2e
         with:
-          node-version: 24
-          cache: 'npm'
-
-      - run: npm ci
-
-      # Electron otherwise downloads its binary on the first e2e launch,
-      # inside Playwright's launch timeout.
-      - run: npx --no install-electron
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+          chromium: 'true'
 
       - name: Verify gh CLI auth
         env:
           GH_TOKEN: ${{ secrets.INTEGRATION_TEST_PAT }}
         run: gh auth status
-
-      # desktop-e2e drives the real Electron app, which needs a display.
-      - name: Install xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-
-      # The tmux both e2e suites run against (docs/testing.md).
-      - uses: ./.github/actions/setup-tmux
 
       - name: Build CLI
         run: npx nx build cli
@@ -118,3 +81,40 @@ jobs:
             apps/desktop-e2e/test-output
           if-no-files-found: ignore
           retention-days: 7
+
+  # Scheduled runs and dispatches on master only, so a dispatch on a
+  # topic branch never files an issue. A cancelled run says nothing
+  # either way and is left alone.
+  track:
+    name: Track the nightly result
+    needs: integration
+    if: >-
+      always() && github.ref == 'refs/heads/master' &&
+      (needs.integration.result == 'success' || needs.integration.result == 'failure')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULT: ${{ needs.integration.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TITLE: Nightly live integration tests are failing
+        run: |
+          issue=$(gh issue list --state open --limit 100 --json number,title \
+            --jq "map(select(.title == env.TITLE)) | first | .number // empty")
+          if [ "$RESULT" = failure ]; then
+            body="Failed on \`$GITHUB_SHA\`: $RUN_URL"
+            if [ -n "$issue" ]; then
+              gh issue comment "$issue" --body "$body"
+            else
+              gh issue create --title "$TITLE" --body "$body
+
+          The nightly live GitHub integration run (\`.github/workflows/integration.yml\`) failed. Its artifacts hold the n10 debug log and Playwright traces. The next passing nightly closes this issue."
+            fi
+          elif [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "Passed on \`$GITHUB_SHA\`: $RUN_URL"
+          fi

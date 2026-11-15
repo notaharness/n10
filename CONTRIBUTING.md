@@ -133,14 +133,21 @@ git push -u origin HEAD
 ### After opening a pull request
 
 A first-time contributor's Actions runs may wait for maintainer approval.
-You do not need to configure repository secrets. The required `main` check
-runs affected lint, tests, builds, typechecks, offline e2e, visual and Beam
-checks without the integration PAT.
+No pull request check uses a secret, so you do not need to configure any.
 
-The Integration workflow skips its live job on fork PRs and explains the skip
-in its run summary. A maintainer's `master` run covers live GitHub integration
-after merge; a skip does not mean those tests ran on your PR. Same-repository
-PRs matching the workflow's paths still run live integration.
+CI first runs `Plan affected checks`, whose summary lists what this change
+affects and what it skips. Then lint, typechecks, unit tests and builds run in
+one job, while the desktop and TUI e2e suites run in parallel shards, such as
+`Desktop e2e (2/8)`, beside `Desktop screenshots` and `Desktop with beam`.
+Unaffected suites show as skipped. The required `main` check passes when
+every other job passed or was skipped. When a shard fails, its annotations
+name the test and its artifact holds the traces and screenshots;
+[testing.md](docs/testing.md#ci-coverage) shows how to run that shard
+locally. A maintainer can re-run just that shard.
+
+Live GitHub integration tests run nightly on `master`, not on pull requests,
+so your PR has no live integration check. A nightly failure opens a tracking
+issue for maintainers.
 
 Maintainers review the scope, behavior and code, and may ask for changes.
 Open a draft PR if you want feedback on the approach. Push revisions to the

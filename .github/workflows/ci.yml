@@ -1,73 +1,207 @@
 name: CI
 
+# `plan` decides from `nx affected` which suites this change needs; the
+# jobs after it run in parallel, the e2e suites split into Playwright
+# shards, and `main` (the ruleset's one required check) passes only when
+# none of them failed or was cancelled. A suite nothing affects is
+# skipped, and `plan`'s summary says so. Layout: docs/testing.md.
+
 on:
   push:
     branches:
       - master
   pull_request:
 
+# A newer push to a pull request supersedes its running checks. Pushes
+# to master each get their own group, so none is ever cancelled.
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
-  actions: read
   contents: read
 
 jobs:
-  main:
+  plan:
+    name: Plan affected checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # nx-set-shas reads master's last successful CI run.
+      actions: read
+    outputs:
+      any: ${{ steps.affected.outputs.any }}
+      desktop-e2e: ${{ steps.affected.outputs.desktop-e2e }}
+      cli-e2e: ${{ steps.affected.outputs.cli-e2e }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-workspace
+
+      - uses: nrwl/nx-set-shas@v4
+
+      - id: affected
+        run: node tools/ci/plan-affected.mjs
+
+  checks:
+    name: Lint, typecheck, unit tests, build
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
         with:
-          node-version: 24
-          cache: 'npm'
+          fetch-depth: 0
 
-      - run: npm ci
+      - uses: ./.github/actions/setup-workspace
 
-      # Electron otherwise downloads its binary on the first e2e launch,
-      # inside Playwright's launch timeout.
-      - run: npx --no install-electron
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-
-      # xvfb: desktop-e2e drives the real Electron app, which has no
-      # headless mode of its own and needs an X server on the runner.
-      - name: Install xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-
-      # tmux is required by the tmux, core and both application e2e
-      # suites, which run against 3.7 (docs/testing.md).
+      # The tmux and core unit suites run against tmux 3.7 (docs/testing.md).
       - uses: ./.github/actions/setup-tmux
 
       - uses: nrwl/nx-set-shas@v4
 
-      # `e2e:visual` runs the screenshot suite inside a pinned container
-      # (see apps/desktop-e2e/run-visual.mjs). Baselines are generated in
-      # that same image, so the runner's own fonts never enter into it
-      # and the comparison can hold at zero tolerance.
-      - run: npx nx affected -t lint test build typecheck e2e e2e:visual
+      - run: npx nx affected -t lint test build typecheck
 
-      # The app against real beam daemons (apps/desktop-e2e/run-beam-e2e.mjs),
-      # after the offline suite rather than beside it on the same X server.
-      - run: npx nx affected -t e2e:beam
+  desktop-e2e:
+    name: Desktop e2e (${{ matrix.shard }}/8)
+    needs: plan
+    if: needs.plan.outputs.desktop-e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
 
-      # The desktop e2e targets land under `apps/desktop-e2e/test-output`,
-      # each in its own subdirectory (`playwright/` for the offline suite,
-      # `visual/` for the screenshot suite, `beam/` for the beam suite),
-      # so a failing screenshot's expected/actual/diff PNGs travel with
-      # the offline suite's traces instead of one run erasing another's.
-      - name: Upload Playwright test output on failure
+      - uses: ./.github/actions/setup-workspace
+
+      - uses: ./.github/actions/setup-e2e
+
+      - run: npx nx run desktop-e2e:e2e -- --shard=${{ matrix.shard }}/8
+
+      - name: Upload this shard's traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-test-output
-          path: |
-            apps/cli-e2e/test-output
-            apps/desktop-e2e/test-output
+          name: desktop-e2e-shard-${{ matrix.shard }}
+          path: apps/desktop-e2e/test-output/playwright
           if-no-files-found: ignore
           retention-days: 7
+
+  cli-e2e:
+    name: TUI e2e (${{ matrix.shard }}/3)
+    needs: plan
+    if: needs.plan.outputs.cli-e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+
+      - uses: ./.github/actions/setup-e2e
+        with:
+          chromium: 'true'
+
+      - run: npx nx run cli-e2e:e2e -- --shard=${{ matrix.shard }}/3
+
+      - name: Upload this shard's traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-e2e-shard-${{ matrix.shard }}
+          path: apps/cli-e2e/test-output/playwright
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The screenshot suite runs inside a pinned container
+  # (apps/desktop-e2e/run-visual.mjs). Baselines are generated in that
+  # same image, so the runner's own fonts never enter into it and the
+  # comparison can hold at zero tolerance.
+  desktop-visual:
+    name: Desktop screenshots
+    needs: plan
+    if: needs.plan.outputs.desktop-e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+
+      - run: npx nx run desktop-e2e:e2e:visual
+
+      - name: Upload expected, actual and diff screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-visual
+          path: apps/desktop-e2e/test-output/visual
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The app against real beam daemons (apps/desktop-e2e/run-beam-e2e.mjs).
+  desktop-beam:
+    name: Desktop with beam
+    needs: plan
+    if: needs.plan.outputs.desktop-e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-workspace
+
+      - uses: ./.github/actions/setup-e2e
+
+      - run: npx nx run desktop-e2e:e2e:beam
+
+      - name: Upload traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-beam
+          path: apps/desktop-e2e/test-output/beam
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The ruleset's required check. A skipped job means nothing affected
+  # it; any other result than success or skipped fails this one.
+  main:
+    name: main
+    needs: [plan, checks, desktop-e2e, cli-e2e, desktop-visual, desktop-beam]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every needed job to pass
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          {
+            echo '| Job | Result |'
+            echo '| --- | --- |'
+            jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"' <<< "$NEEDS"
+          } >> "$GITHUB_STEP_SUMMARY"
+          failed=$(jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key): \(.value.result)"' <<< "$NEEDS")
+          if [ -n "$failed" ]; then
+            echo "::error::Required jobs did not pass: $(echo $failed)"
+            exit 1
+          fi
 
   # The flake builds from package-lock.json's resolved URLs and integrity
   # hashes alone, so this also fails when a locked package lacks either.

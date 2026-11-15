@@ -1,0 +1,53 @@
+name: Set up the workspace
+description: >
+  Node.js 24 and the locked dependency tree. node_modules is restored
+  whole while package-lock.json and the Node version are unchanged;
+  otherwise `npm ci` installs it and the result is saved before
+  anything runs in it.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+
+    # ImageOS (ubuntu24, …) is the runner's own variable, not in the
+    # `env` context.
+    - id: node
+      shell: bash
+      run: |
+        echo "version=$(node --version)" >> "$GITHUB_OUTPUT"
+        echo "image=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
+
+    # Native modules (node-pty) are built for this Node and runner image,
+    # so both are in the key alongside the lockfile.
+    - id: cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          libs/*/node_modules
+        key: node-modules-v1-${{ runner.os }}-${{ steps.node.outputs.image }}-${{ runner.arch }}-${{ steps.node.outputs.version }}-${{ hashFiles('package-lock.json') }}
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci
+
+    # Electron otherwise downloads its binary on the first e2e launch,
+    # inside Playwright's launch timeout. Saved with node_modules.
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx --no install-electron
+
+    # Saved straight after the install, so nothing a later step writes
+    # under node_modules (tool caches, downloads) reaches the next job.
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          libs/*/node_modules
+        key: ${{ steps.cache.outputs.cache-primary-key }}

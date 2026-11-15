@@ -30,9 +30,13 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   workers: 1,
   retries: 0,
+  // `github` turns each failure into an annotation on the workflow run
+  // and the pull request, so a failed shard names its test without
+  // anyone opening the log.
   reporter: process.env.CI
     ? [
         ['list'],
+        ...(process.env.GITHUB_ACTIONS ? [['github'] as const] : []),
         ['html', { open: 'never', outputFolder: `${outputBase}/report` }],
       ]
     : 'list',
