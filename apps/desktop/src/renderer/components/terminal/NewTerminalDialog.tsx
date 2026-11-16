@@ -11,6 +11,7 @@ import type { LaunchStep, TerminalKind } from '../../../host/contract.js';
 import { useRecentRepos } from '../../lib/data/queries.js';
 import { useRepo } from '../../lib/repo-context.js';
 import { basename, errorMessage } from '../../lib/utils.js';
+import { pickHostFolder } from '../../lib/folders/pick-host-folder.js';
 import { useMachineChoice } from '../../lib/machines/use-machine-choice.js';
 import {
   MachineChoiceSelect,
@@ -110,7 +111,7 @@ export function NewTerminalDialog({
 
   const pickFolder = async (advance: boolean) => {
     try {
-      const dir = await window.n10.selectFolder();
+      const dir = await pickHostFolder('folder');
       if (dir) choose({ kind: 'folder', cwd: dir }, advance);
     } catch (err: unknown) {
       toast.error(errorMessage(err));

@@ -2,6 +2,8 @@
 
 Status: accepted. Windows support is experimental and runs n10 inside WSL 2; tmux remains required. It supersedes the native-execution direction of [#346](https://github.com/notaharness/n10/pull/346).
 
+Update: option B is now implemented, generalized to any POSIX host reachable over a pipe. On Windows, `n10` runs Electron natively and starts `n10 host --stdio` in WSL (`--host=wsl[:<distro>]`, the default there) or over SSH (`--host=ssh:<destination>`, any platform). The host is the unchanged `host-worker.js`; [host-target.ts](../../apps/desktop/src/main/host-target.ts), [host-link.ts](../../apps/desktop/src/main/host-link.ts) and [host-wire.ts](../../apps/desktop/src/main/host-wire.ts) are the adapter the B section below asked for: private inherited pipes, marked JSON lines with a version handshake, stdout reserved for the protocol, EOF as a detaching shutdown, beam started by the Linux host. WSLg remains a supported path. Still open from the list below: flow control beyond Node's stream buffering, reconnect reconciliation beyond the existing respawn-and-reload, and updating the remote host from the app. The sections below record the assessment as it was made.
+
 ## Recommendation and support boundary
 
 Ship n10 inside WSL 2 as experimental: the app on the Windows desktop through WSLg is the primary path, and `n10 --tui` in Windows Terminal is the fallback where WSLg is unavailable. Defer a native Windows Electron shell until measured WSLg limitations justify a separate Windows-to-Linux host transport.

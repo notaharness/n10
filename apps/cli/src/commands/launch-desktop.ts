@@ -91,10 +91,14 @@ export function electronSpawnOptions(
 
 /**
  * Runs Electron on the app in `root`, the package directory, whose manifest
- * names `desktop/main/main.js` as the main script. Resolves with Electron's
- * exit code.
+ * names `desktop/main/main.js` as the main script. `args` are the launch's
+ * own (`--host=<where>`), passed on. Resolves with Electron's exit code.
  */
-export function launchDesktop(root: string, version: string): Promise<number> {
+export function launchDesktop(
+  root: string,
+  version: string,
+  args: readonly string[] = []
+): Promise<number> {
   if (!existsSync(join(root, 'desktop', 'main', 'main.js'))) {
     console.error(
       'n10: this build has no desktop app. From source, run `npx nx serve desktop`.'
@@ -116,16 +120,16 @@ export function launchDesktop(root: string, version: string): Promise<number> {
     console.error(electronFailure(error, () => require.resolve('electron')));
     return Promise.resolve(1);
   }
-  const args = sandboxArgs(electron);
-  if (args.length > 0) console.warn(unsandboxedWarning());
+  const sandbox = sandboxArgs(electron);
+  if (sandbox.length > 0) console.warn(unsandboxedWarning());
   const handoff = desktopUpdateHandoff(root);
   const options = electronSpawnOptions(version, {
     ...process.env,
     N10_UPDATE_HANDOFF: handoff.request,
   });
-  const child = spawn(electron, [...args, root], options);
+  const child = spawn(electron, [...sandbox, root, ...args], options);
   return superviseChild(child).then((code) => {
-    const hint = sandboxAbortHint(code, args);
+    const hint = sandboxAbortHint(code, sandbox);
     if (hint) console.error(hint);
     return handoff.finish(code);
   });

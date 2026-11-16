@@ -39,8 +39,12 @@ async function run(command: Command): Promise<number | undefined> {
       await runTui(command.args, root);
       return undefined;
     }
+    case 'host': {
+      const { runHost } = await import('./commands/host.js');
+      return runHost(root, packageVersion(), command.args);
+    }
     case 'desktop':
-      return launchDesktop(root, packageVersion());
+      return launchDesktop(root, packageVersion(), process.argv.slice(2));
     case 'unknown':
       console.error(`n10: unknown argument '${command.arg}'\n\n${USAGE}`);
       return 2;

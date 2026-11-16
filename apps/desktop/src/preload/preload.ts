@@ -53,6 +53,8 @@ const api: N10HostApi = {
   listRecentRepos: () => ipcRenderer.invoke(IPC.listRecentRepos),
   selectRepoDirectory: () => ipcRenderer.invoke(IPC.selectRepoDirectory),
   selectFolder: () => ipcRenderer.invoke(IPC.selectFolder),
+  getHostTarget: () => ipcRenderer.invoke(IPC.getHostTarget),
+  listDirectory: (path) => ipcRenderer.invoke(IPC.listDirectory, path),
   forgetRecent: (cwd) => ipcRenderer.invoke(IPC.forgetRecent, cwd),
 
   getSettingsView: () => ipcRenderer.invoke(IPC.getSettingsView),
